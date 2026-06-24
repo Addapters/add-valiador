@@ -96,7 +96,7 @@ const FIELDS = [
   'area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2',
   'year_built','condition','fee_amount','perito_avaliador',
   'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
-  'nuc_risco','data_pedido','tipo_reavaliacao','tipo_via','escada','ampliacao','lugar','documentacao',
+  'nuc_risco','data_pedido','tipo_via','escada','ampliacao','lugar','documentacao',
 ]
 
 function norm(s: string) { return s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'') }

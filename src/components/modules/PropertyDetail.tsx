@@ -45,6 +45,14 @@ function F({ label, value, field, type = 'text', onSave, opts }: {
     toast.success('Guardado')
   }
 
+  function setToday() {
+    const today = new Date().toISOString().slice(0, 10)
+    setVal(today)
+    onSave({ [field]: today })
+    setEditing(false)
+    toast.success('Guardado')
+  }
+
   if (opts) return (
     <div>
       <label className="label">{label}</label>
@@ -59,10 +67,14 @@ function F({ label, value, field, type = 'text', onSave, opts }: {
     <div>
       <label className="label">{label}</label>
       {editing ? (
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
           <input type={type} className="input flex-1 py-1 text-sm" value={val}
             onChange={e => setVal(e.target.value)} autoFocus
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }} />
+          {type === 'date' && (
+            <button className="btn text-xs py-1 px-2 whitespace-nowrap text-brand-600 border-brand-200 hover:bg-brand-50"
+              onClick={setToday}>Hoje</button>
+          )}
           <button className="btn btn-primary py-1 px-2" onClick={save}><Save size={13} /></button>
           <button className="btn py-1 px-2" onClick={() => { setVal(value ?? ''); setEditing(false) }}>✕</button>
         </div>
@@ -283,7 +295,7 @@ export default function PropertyDetail() {
               <F label="ID Registo Predial"   field="id_registo_predial"   value={property.id_registo_predial}   onSave={save} />
               <F label="ID Registo Matricial" field="id_registo_matricial" value={property.id_registo_matricial} onSave={save} />
               <F label="Fracção"              field="fracao"               value={property.fracao}               onSave={save} />
-              <F label="Tipo reavaliação"     field="tipo_reavaliacao"     value={property.tipo_reavaliacao}     onSave={save} />
+              <F label="Tipo via"             field="tipo_via"            value={property.tipo_via}            onSave={save} />
             </div>
           </div>
         )}
@@ -349,7 +361,7 @@ export default function PropertyDetail() {
                       <img src={publicUrl} alt={`Foto ${slot}`} className="w-full h-full object-cover" />
                       <span className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">{slot}</span>
                       <button className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => deletePhoto.mutate(photo.id)}><Trash2 size={11} /></button>
+                        onClick={() => { if (confirm('Eliminar esta foto permanentemente?')) deletePhoto.mutate(photo.id) }}><Trash2 size={11} /></button>
                     </div>
                   )
                 }
@@ -519,7 +531,7 @@ export default function PropertyDetail() {
                         <td className="text-gray-500 text-xs max-w-[140px] truncate">{c.notes || '—'}</td>
                         <td>
                           <button className="text-red-400 hover:text-red-600" onClick={async () => {
-                            await supabase.from('market_comps').delete().eq('id', c.id)
+                            if (confirm('Eliminar este comparável?')) await supabase.from('market_comps').delete().eq('id', c.id)
                             qc.invalidateQueries({ queryKey: ['property', id] })
                           }}><Trash2 size={13} /></button>
                         </td>
