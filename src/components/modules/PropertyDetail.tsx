@@ -12,13 +12,30 @@ import toast from 'react-hot-toast'
 
 declare global { interface Window { L: any } }
 
-const TABS = ['info','location','map','construction','market_chars','photos','comps','prev','notes','billing'] as const
+const TABS = [
+  'sec1','sec2','sec3','sec4','sec5','sec6','sec7','sec8',
+  'sec9','sec10','sec11','sec12','sec13','sec14','sec15','sec16','sec17','sec18'
+] as const
 type Tab = typeof TABS[number]
 const TAB_LABELS: Record<Tab, string> = {
-  info: 'Identificação', location: 'Localização', map: 'Mapa',
-  construction: 'Construção', market_chars: 'Localiz./Mercado',
-  photos: 'Fotos', comps: 'Comparáveis', prev: 'Aval. anterior',
-  notes: 'Notas', billing: 'Faturação'
+  sec1:  '1. Identificação',
+  sec2:  '2. Morada',
+  sec3:  '3. Descrição',
+  sec4:  '4. Localização',
+  sec5:  '5. Construção',
+  sec6:  '6. Áreas',
+  sec7:  '7. Métodos',
+  sec8:  '8. Documentos',
+  sec9:  '9. Condicionalismos',
+  sec10: '10. Advertências',
+  sec11: '11. Conclusão',
+  sec12: '12. Justificação',
+  sec13: '13. Certificação',
+  sec14: '14. Faturação',
+  sec15: 'Fotos',
+  sec16: 'Comparáveis',
+  sec17: 'Aval. anterior',
+  sec18: 'Notas',
 }
 
 function useLeaflet(active: boolean, cb: () => void) {
@@ -30,9 +47,9 @@ function useLeaflet(active: boolean, cb: () => void) {
   }, [active])
 }
 
-function F({ label, value, field, type = 'text', onSave, opts }: {
+function F({ label, value, field, type = 'text', onSave, opts, span, textarea }: {
   label: string; value: any; field: string; type?: string
-  onSave: (p: any) => void; opts?: string[]
+  onSave: (p: any) => void; opts?: string[]; span?: boolean; textarea?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(value ?? '')
@@ -54,7 +71,7 @@ function F({ label, value, field, type = 'text', onSave, opts }: {
   }
 
   if (opts) return (
-    <div>
+    <div className={span ? 'col-span-2' : ''}>
       <label className="label">{label}</label>
       <select className="input text-sm" value={value || ''} onChange={e => { onSave({ [field]: e.target.value || null }); toast.success('Guardado') }}>
         <option value="">—</option>
@@ -64,16 +81,17 @@ function F({ label, value, field, type = 'text', onSave, opts }: {
   )
 
   return (
-    <div>
+    <div className={span ? 'col-span-2' : ''}>
       <label className="label">{label}</label>
       {editing ? (
-        <div className="flex gap-1 items-center">
-          <input type={type} className="input flex-1 py-1 text-sm" value={val}
-            onChange={e => setVal(e.target.value)} autoFocus
-            onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }} />
+        <div className="flex gap-1 items-start">
+          {textarea
+            ? <textarea className="input flex-1 py-1 text-sm min-h-[80px]" value={val} onChange={e => setVal(e.target.value)} autoFocus/>
+            : <input type={type} className="input flex-1 py-1 text-sm" value={val} onChange={e => setVal(e.target.value)} autoFocus
+                onKeyDown={e => { if (e.key === 'Enter' && !textarea) save(); if (e.key === 'Escape') setEditing(false) }}/>
+          }
           {type === 'date' && (
-            <button className="btn text-xs py-1 px-2 whitespace-nowrap text-brand-600 border-brand-200 hover:bg-brand-50"
-              onClick={setToday}>Hoje</button>
+            <button className="btn text-xs py-1 px-2 whitespace-nowrap text-brand-600 border-brand-200 hover:bg-brand-50" onClick={setToday}>Hoje</button>
           )}
           <button className="btn btn-primary py-1 px-2" onClick={save}><Save size={13} /></button>
           <button className="btn py-1 px-2" onClick={() => { setVal(value ?? ''); setEditing(false) }}>✕</button>
@@ -92,7 +110,7 @@ const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8]
 export default function PropertyDetail() {
   const { id } = useParams()
   const qc = useQueryClient()
-  const [tab, setTab] = useState<Tab>('info')
+  const [tab, setTab] = useState<Tab>('sec1')
   const [uploading, setUploading] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [mapReady, setMapReady] = useState(false)
@@ -137,9 +155,9 @@ export default function PropertyDetail() {
     toast.success('Coordenadas guardadas')
   }
 
-  useLeaflet(tab === 'map', () => setMapReady(true))
+  useLeaflet(tab === 'sec2', () => setMapReady(true))
   useEffect(() => {
-    if (!mapReady || !mapRef.current || tab !== 'map' || !property) return
+    if (!mapReady || !mapRef.current || tab !== 'sec2' || !property) return
     setTimeout(() => {
       if (mapInst.current) { mapInst.current.remove(); mapInst.current = null }
       const L = window.L
@@ -191,21 +209,12 @@ export default function PropertyDetail() {
     setGenerating(true)
     try {
       const templateUrl = import.meta.env.VITE_REPORT_TEMPLATE_URL
-      if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada. Carrega o template para o Supabase Storage e define a variável.')
-
-      // Re-fetch photos frescos da BD para garantir que temos todos
-      const { data: freshPhotos } = await supabase
-        .from('property_photos')
-        .select('*')
-        .eq('property_id', property.id)
-        .order('slot')
-        .order('sort_order')
-
+      if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada.')
+      const { data: freshPhotos } = await supabase.from('property_photos').select('*').eq('property_id', property.id).order('slot').order('sort_order')
       const photoUrls = (freshPhotos || []).map((ph: any) => {
         const { data } = supabase.storage.from('photos').getPublicUrl(ph.storage_path)
         return { ...ph, url: data.publicUrl }
       }).filter((ph: any) => ph.url)
-
       await generateAbancaReport(property, photoUrls, comps, templateUrl)
       toast.success('Relatório gerado com sucesso')
     } catch (e: any) {
@@ -218,157 +227,456 @@ export default function PropertyDetail() {
   if (isLoading) return <div className="p-8 text-gray-400">A carregar…</div>
   if (!property) return <div className="p-8 text-gray-400">Imóvel não encontrado.</div>
 
-  const tabLabels = { ...TAB_LABELS, photos: `Fotos (${photos.length})`, comps: `Comparáveis (${comps.length})` }
+  const tabLabels = { ...TAB_LABELS }
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-100 bg-white">
-        <Link to="/properties" className="text-gray-400 hover:text-gray-700"><ArrowLeft size={18} /></Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-lg font-semibold">{property.external_ref || property.ref}</h1>
-            <VisitBadge status={property.visit_status} />
-            <BillingBadge status={property.billing_status} />
-            {property.latitude && <span className="text-xs text-emerald-600 flex items-center gap-1"><MapPin size={11} />Georreferenciado</span>}
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-6 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/properties" className="text-gray-400 hover:text-gray-600"><ArrowLeft size={18}/></Link>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg font-semibold">{property.external_ref || property.ref}</h1>
+                {property.id_bien && <span className="text-xs text-gray-400 font-mono">ID: {property.id_bien}</span>}
+                <VisitBadge status={property.visit_status} />
+                <BillingBadge status={property.billing_status} />
+              </div>
+              <p className="text-xs text-gray-400 truncate">{[property.property_type, property.municipality, property.district].filter(Boolean).join(' · ')}</p>
+            </div>
           </div>
-          <p className="text-sm text-gray-500">{[property.street, property.number, property.municipality, property.district].filter(Boolean).join(', ') || property.address || ''}</p>
-          {property.perito_avaliador && <p className="text-xs text-gray-400 mt-0.5">Perito: {property.perito_avaliador}</p>}
-        </div>
-        <button className="btn btn-primary flex items-center gap-2" onClick={generateReport} disabled={generating}>
-          {generating ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
-          {generating ? 'A gerar…' : 'Gerar relatório'}
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100 bg-white px-6 overflow-x-auto">
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-3 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors ${tab === t ? 'border-brand-400 text-brand-600 font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
-            {(tabLabels as any)[t]}
+          <button className="btn btn-primary flex items-center gap-1.5 whitespace-nowrap" onClick={generateReport} disabled={generating}>
+            {generating ? <Loader2 size={13} className="animate-spin"/> : <FileSpreadsheet size={13}/>}
+            Gerar relatório
           </button>
-        ))}
+        </div>
+        {/* Tabs */}
+        <div className="flex gap-0.5 mt-3 overflow-x-auto pb-px">
+          {TABS.map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-t whitespace-nowrap transition-colors
+                ${tab === t ? 'bg-brand-50 text-brand-600 border-b-2 border-brand-400' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+              {tabLabels[t]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="p-6">
 
-        {/* TAB: Identificação */}
-        {tab === 'info' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Dados do processo</h3>
-              <F label="Nº Relatório"        field="nr_relatorio"        value={property.nr_relatorio}        onSave={save} />
-              <F label="Referência externa"  field="external_ref"        value={property.external_ref}        onSave={save} />
-              <F label="Data do relatório"   field="data_relatorio"      value={property.data_relatorio}      type="date" onSave={save} />
-              <F label="Tipo de serviço"     field="tipo_servico"        value={property.tipo_servico}        onSave={save}
-                opts={['Avaliação','Vistoria','Portabilidade','Reavaliação','Outros']} />
-              <F label="Finalidade"          field="finalidade"          value={property.finalidade}          onSave={save}
-                opts={['Adjudicado sem visita interior','Adjudicado com visita interior','Garantia hipotecária','Informativo','Normas de informação financeira','Outros']} />
-              <F label="Perito Avaliador"    field="perito_avaliador"    value={property.perito_avaliador}    onSave={save} />
-            </div>
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Tipo e uso</h3>
-              <F label="Tipo de Bem"     field="property_type"    value={property.property_type}    onSave={save} />
-              <F label="Subtipo de Bem"  field="property_subtype" value={property.property_subtype} onSave={save} />
-              <F label="Uso do Bem"      field="use_type"         value={property.use_type}         onSave={save} />
-              <F label="Subuso do Bem"   field="use_subtype"      value={property.use_subtype}      onSave={save} />
-              <F label="Tipologia"       field="typology"         value={property.typology}         onSave={save} />
-              <F label="Tipo de Prédio"  field="tipo_predio"      value={property.tipo_predio}      onSave={save}
-                opts={['Urbano','Rústico','Urbano e Rustico','Prédio urbano em PH','Prédio urbano em PT','Prédio misto','Fração autonóma','Prédio rústico']} />
-              <F label="Destino"         field="destino"          value={property.destino}          onSave={save}
-                opts={['N/A','Arrendamento','Uso Próprio','Promoção para venda','Outros']} />
-              <F label="Composição"      field="composicao_imovel" value={property.composicao_imovel} onSave={save} />
-            </div>
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Áreas</h3>
-              <F label="m² (col. N — adoptada)"  field="area_m2"          value={property.area_m2}          type="number" onSave={save} />
-              <F label="m² Considerada"           field="area_considerada" value={property.area_considerada} type="number" onSave={save} />
-              <F label="m² Garagem"               field="area_garage_m2"   value={property.area_garage_m2}   type="number" onSave={save} />
-              <F label="m² Anexo"                 field="area_annex_m2"    value={property.area_annex_m2}    type="number" onSave={save} />
-              <F label="Área bruta"               field="gross_area"       value={property.gross_area}       type="number" onSave={save} />
-              <F label="Área útil"                field="useful_area"      value={property.useful_area}      type="number" onSave={save} />
-              <F label="Área terreno"             field="land_area"        value={property.land_area}        type="number" onSave={save} />
-            </div>
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Registo predial</h3>
-              <F label="ID Registo Predial"   field="id_registo_predial"   value={property.id_registo_predial}   onSave={save} />
-              <F label="ID Registo Matricial" field="id_registo_matricial" value={property.id_registo_matricial} onSave={save} />
-              <F label="Fracção"              field="fracao"               value={property.fracao}               onSave={save} />
-              <F label="Tipo via"             field="tipo_via"            value={property.tipo_via}            onSave={save} />
-            </div>
-          </div>
-        )}
-
-        {/* TAB: Localização */}
-        {tab === 'location' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Endereço</h3>
-              <F label="Tipo de via"   field="tipo_via"     value={property.tipo_via}    onSave={save} />
-              <F label="Rua"           field="street"       value={property.street}      onSave={save} />
-              <F label="Número"        field="number"       value={property.number}      onSave={save} />
-              <F label="Bloco"         field="block"        value={property.block}       onSave={save} />
-              <F label="Escada"        field="escada"       value={property.escada}      onSave={save} />
-              <F label="Piso / Letra"  field="floor_letter" value={property.floor_letter} onSave={save} />
-              <F label="Fracção"       field="fracao"       value={property.fracao}      onSave={save} />
-              <F label="Lugar"         field="lugar"        value={property.lugar}       onSave={save} />
-              <F label="Código Postal" field="postal_code"  value={property.postal_code} onSave={save} />
-            </div>
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Divisão administrativa</h3>
-              <F label="Freguesia"  field="parish"       value={property.parish}       onSave={save} />
-              <F label="Concelho"   field="municipality" value={property.municipality} onSave={save} />
-              <F label="Distrito"   field="district"     value={property.district}     onSave={save} />
-            </div>
-          </div>
-        )}
-
-        {/* TAB: Mapa */}
-        {tab === 'map' && (
+        {/* ── SEC 1: IDENTIFICAÇÃO DO PEDIDO ─────────────────────────────── */}
+        {tab === 'sec1' && (
           <div className="space-y-4">
-            <div className="flex items-end gap-3 flex-wrap">
-              <div><label className="label">Latitude</label>
-                <input type="number" step="0.000001" className="input w-40" defaultValue={property.latitude || ''} key={`lat-${property.latitude}`}
-                  onBlur={e => e.target.value && update.mutate({ latitude: parseFloat(e.target.value) })} /></div>
-              <div><label className="label">Longitude</label>
-                <input type="number" step="0.000001" className="input w-40" defaultValue={property.longitude || ''} key={`lon-${property.longitude}`}
-                  onBlur={e => e.target.value && update.mutate({ longitude: parseFloat(e.target.value) })} /></div>
-              <button className="btn btn-primary" onClick={handleGeocode} disabled={geocoding}>
-                {geocoding ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
-                {geocoding ? 'A geocodificar…' : 'Obter coordenadas'}
-              </button>
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">1. Identificação do Pedido</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Data do Relatório"        field="data_relatorio"        value={property.data_relatorio}        type="date"   onSave={save} />
+              <F label="Relatório válido até"      field="data_validade_relatorio" value={property.data_validade_relatorio} type="date" onSave={save} />
+              <F label="Relatório n.º"            field="nr_relatorio"          value={property.nr_relatorio}                        onSave={save} />
+              <F label="Banco / Entidade"         field="banco"                 value={property.banco}                               onSave={save} />
+              <F label="Tipo de Relatório"        field="tipo_relatorio"        value={property.tipo_relatorio}
+                opts={['Avaliação','Reavaliação','Vistoria','Portabilidade','Correção de erros']} onSave={save} />
+              <F label="Subtipo de Relatório"     field="subtipo_relatorio"     value={property.subtipo_relatorio}                   onSave={save} />
+              <F label="Finalidade"               field="finalidade"            value={property.finalidade}
+                opts={['Adjudicado com visita interior','Adjudicado sem visita interior','Garantia hipotecária','Outros fins']} onSave={save} />
+              <F label="Ref. Externa (Avaliador)" field="external_ref"          value={property.external_ref}                        onSave={save} />
+              <F label="ID do Bem"               field="id_bien"               value={property.id_bien}                             onSave={save} />
+              <F label="NUC Risco"               field="nuc_risco"             value={property.nuc_risco}                           onSave={save} />
+              <F label="Tipo de Serviço"          field="tipo_servico"          value={property.tipo_servico}
+                opts={['Avaliação','Vistoria','Portabilidade','Reavaliação']} onSave={save} />
             </div>
-            <div ref={mapRef} style={{ height: '460px', borderRadius: '12px', border: '0.5px solid #e5e7eb' }} />
+            <div className="border-t pt-4 mt-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Perito Avaliador</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Nome do Perito"         field="perito_avaliador"      value={property.perito_avaliador}                    onSave={save} />
+                <F label="NIF do Perito"          field="perito_nif"            value={property.perito_nif}                          onSave={save} />
+                <F label="N.º CMVM"               field="perito_cmvm"           value={property.perito_cmvm}                         onSave={save} />
+                <F label="N.º Apólice Seguro"     field="nr_apolice"            value={property.nr_apolice}                          onSave={save} />
+                <F label="Data Validade Seguro"   field="data_validade_seguro"  value={property.data_validade_seguro}   type="date"  onSave={save} />
+                <F label="Seguradora"             field="seguradora"            value={property.seguradora}                          onSave={save} />
+              </div>
+            </div>
+            <div className="border-t pt-4 mt-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Requerente / Mandatário</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Requerente — Nome"      field="requerente_nome"       value={property.requerente_nome}                     onSave={save} />
+                <F label="Requerente — NIF"       field="requerente_nif"        value={property.requerente_nif}                      onSave={save} />
+                <F label="Mandatário — Nome"      field="mandatario_nome"       value={property.mandatario_nome}                     onSave={save} />
+                <F label="Mandatário — NIF"       field="mandatario_nif"        value={property.mandatario_nif}                      onSave={save} />
+              </div>
+            </div>
           </div>
         )}
 
-        {/* TAB: Fotos */}
-        {tab === 'photos' && (
-          <div className="space-y-5">
-            <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${isDragActive ? 'border-brand-400 bg-brand-50' : 'border-gray-200 hover:border-brand-300'}`}>
-              <input {...getInputProps()} />
-              <Upload size={24} className="mx-auto text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500">{uploading ? 'A processar fotos…' : 'Arrasta fotos aqui ou clica para seleccionar'}</p>
+        {/* ── SEC 2: MORADA DO IMÓVEL ────────────────────────────────────── */}
+        {tab === 'sec2' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">2. Morada do Imóvel</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <F label="Tipo de Via"      field="tipo_via"      value={property.tipo_via}
+                opts={['Rua','Avenida','Praça','Largo','Estrada','Travessa','Beco','Calçada','Caminho','Alameda','Outro']} onSave={save} />
+              <F label="Nome da Via"      field="street"        value={property.street}      span onSave={save} />
+              <F label="Portal / N.º"     field="number"        value={property.number}            onSave={save} />
+              <F label="Bloco"            field="block"         value={property.block}             onSave={save} />
+              <F label="Escada"           field="escada"        value={property.escada}            onSave={save} />
+              <F label="Andar / Piso"     field="floor_letter"  value={property.floor_letter}      onSave={save} />
+              <F label="Porta / Fração"   field="fracao"        value={property.fracao}            onSave={save} />
+              <F label="Complemento"      field="lugar"         value={property.lugar}             onSave={save} />
+              <F label="Código Postal"    field="postal_code"   value={property.postal_code}       onSave={save} />
+              <F label="Freguesia"        field="parish"        value={property.parish}            onSave={save} />
+              <F label="Concelho"         field="municipality"  value={property.municipality}      onSave={save} />
+              <F label="Distrito"         field="district"      value={property.district}          onSave={save} />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+            {/* Mapa */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase">Localização no Mapa</h3>
+                <button className="btn flex items-center gap-1.5 text-xs" onClick={handleGeocode} disabled={geocoding}>
+                  {geocoding ? <Loader2 size={12} className="animate-spin"/> : <MapPin size={12}/>}
+                  Obter coordenadas
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <F label="Latitude"  field="latitude"  value={property.latitude}  type="number" onSave={save} />
+                <F label="Longitude" field="longitude" value={property.longitude} type="number" onSave={save} />
+              </div>
+              <div ref={mapRef} style={{ height: '320px', borderRadius: '12px', border: '0.5px solid #e5e7eb' }} />
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 3: DESCRIÇÃO DO IMÓVEL ────────────────────────────────── */}
+        {tab === 'sec3' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">3. Descrição do Imóvel</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Tipo de Bem"            field="property_type"      value={property.property_type}
+                opts={['Apartamento','Moradia','Moradias unifamiliares','Moradias em banda','Habitação','Loja','Comércio','Escritórios','Armazém','Naves industriais','Garagem','Arrumos','Outros Anexos','Terreno rústico','Terreno urbano','Edifício']} onSave={save} />
+              <F label="Subtipo de Bem"         field="property_subtype"   value={property.property_subtype}    onSave={save} />
+              <F label="Uso"                    field="use_type"           value={property.use_type}
+                opts={['Residencial','Comercial','Industrial','Serviços','Misto','Rústico']} onSave={save} />
+              <F label="Subuso"                 field="use_subtype"        value={property.use_subtype}         onSave={save} />
+              <F label="Destino"                field="destino"            value={property.destino}
+                opts={['1ª residência','2ª residência','VPO / Livre','Arrendamento']} onSave={save} />
+              <F label="Estado do Bem"          field="property_state"     value={property.property_state}
+                opts={['Em projecto','Em construção','Em reabilitação','Terminado','Hipótese terminado']} onSave={save} />
+              <F label="Estado de Conservação"  field="estado_conservacao" value={property.estado_conservacao}
+                opts={['Muito Bom','Bom','Normal','Deficiente','Muito Deficiente','Ruinoso']} onSave={save} />
+              <F label="Estado de Ocupação"     field="estado_ocupacao"    value={property.estado_ocupacao}
+                opts={['Livre','Ocupado pelo proprietário','Arrendado','Ocupado por terceiros']} onSave={save} />
+              <F label="% Obra Executada"       field="pct_obra"           value={property.pct_obra}           type="number" onSave={save} />
+              <F label="Tipologia"              field="typology"           value={property.typology}            onSave={save} />
+              <F label="Imóvel Singular"        field="imovel_singular"    value={property.imovel_singular}
+                opts={['Sim','Não']} onSave={save} />
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Registos</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Registo Predial"       field="id_registo_predial"    value={property.id_registo_predial}    onSave={save} />
+                <F label="Artigo Matricial"      field="id_registo_matricial"  value={property.id_registo_matricial}  onSave={save} />
+                <F label="Fracção"               field="fracao"                value={property.fracao}                onSave={save} />
+                <F label="Tipo de Prédio"        field="tipo_predio"           value={property.tipo_predio}
+                  opts={['Prédio urbano','Prédio rústico','Prédio misto']} onSave={save} />
+                <F label="Referência Cadastral"  field="ref_cadastral"         value={property.ref_cadastral}         onSave={save} />
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Descrição</h3>
+              <F label="Composição / Descrição do Imóvel" field="composicao_imovel" value={property.composicao_imovel} span textarea onSave={save} />
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 4: CARACTERÍSTICAS DA LOCALIZAÇÃO ─────────────────────── */}
+        {tab === 'sec4' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">4. Características da Localização</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Características do Mercado"   field="caract_mercado"            value={property.caract_mercado}
+                opts={['Urbano consolidado','Urbano não consolidado','Urbanizável','Rural']} onSave={save} />
+              <F label="Zona Envolvente"              field="zona_envolvente"            value={property.zona_envolvente}             onSave={save} />
+              <F label="Expectativas do Mercado"      field="tipo_expectativa_mercado"   value={property.tipo_expectativa_mercado}
+                opts={['Muito positiva','Positiva','Estável','Negativa','Muito negativa']} onSave={save} />
+              <F label="Evolução do Mercado"          field="evolucao_mercado"           value={property.evolucao_mercado}
+                opts={['Tendencialmente positiva','Estável','Tendencialmente negativa']} onSave={save} />
+              <F label="Ocupação Laboral"             field="ocupacao_laboral"           value={property.ocupacao_laboral}
+                opts={['Muito alta','Alta','Média','Baixa','Muito baixa']} onSave={save} />
+              <F label="População do Concelho"        field="populacao_concelho"         value={property.populacao_concelho}          onSave={save} />
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Datas do Processo</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Data do Pedido"             field="data_pedido_relatorio"      value={property.data_pedido_relatorio}      type="date" onSave={save} />
+                <F label="Data da Visita ao Imóvel"   field="data_visita"                value={property.data_visita}                type="date" onSave={save} />
+                <F label="Data de Conclusão e Entrega" field="data_conclusao"            value={property.data_conclusao}             type="date" onSave={save} />
+                <F label="Data do Relatório"          field="data_relatorio"             value={property.data_relatorio}             type="date" onSave={save} />
+                <F label="Data da Avaliação Anterior" field="prev_valuation_date"        value={property.prev_valuation_date}        type="date" onSave={save} />
+                <F label="Data de Emissão"            field="data_emissao_cert"          value={property.data_emissao_cert}          type="date" onSave={save} />
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Conclusão — Valores Finais</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Valor de Mercado (€)"              field="valor_mercado"            value={property.valor_mercado}            type="number" onSave={save} />
+                <F label="V.V.R. — Valor Venda Rápida (€)"   field="valor_venda_rapida"       value={property.valor_venda_rapida}       type="number" onSave={save} />
+                <F label="Valor de Seguro (€)"               field="valor_seguro"             value={property.valor_seguro}             type="number" onSave={save} />
+                <F label="% Obra"                            field="pct_obra"                 value={property.pct_obra}                 type="number" onSave={save} />
+                <F label="Valor de Mercado Actual (€)"       field="valor_mercado_atual"      value={property.valor_mercado_atual}      type="number" onSave={save} />
+                <F label="V.V.R. Actual (€)"                 field="valor_venda_rapida_atual" value={property.valor_venda_rapida_atual} type="number" onSave={save} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 5: CARACTERÍSTICAS DA CONSTRUÇÃO ──────────────────────── */}
+        {tab === 'sec5' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">5. Características da Construção</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <F label="N.º Quartos"              field="nr_quartos"             value={property.nr_quartos}             type="number" onSave={save} />
+              <F label="N.º Casas de Banho"       field="nr_inst_sanitarias"     value={property.nr_inst_sanitarias}     type="number" onSave={save} />
+              <F label="N.º Pisos"                field="nr_pisos"               value={property.nr_pisos}               type="number" onSave={save} />
+              <F label="Qualidade de Construção"  field="qualidade_construcao"   value={property.qualidade_construcao}
+                opts={['Muito boa','Boa','Média','Baixa','Muito baixa']} onSave={save} />
+              <F label="Orientação Solar"         field="orientacao_solar"       value={property.orientacao_solar}
+                opts={['Norte','Sul','Este','Oeste','Norte/Sul','Este/Oeste','Não influi no valor']} onSave={save} />
+              <F label="Ano de Construção"        field="year_built"             value={property.year_built}             type="number" onSave={save} />
+              <F label="Ano Licença Utilização"   field="ano_licenca_utilizacao" value={property.ano_licenca_utilizacao} type="number" onSave={save} />
+              <F label="Data Licença Construção"  field="data_licenca_construcao" value={property.data_licenca_construcao} type="date" onSave={save} />
+              <F label="Data Conclusão Prevista"  field="data_conclusao_obras"   value={property.data_conclusao_obras}   type="date" onSave={save} />
+              <F label="Data Última Remodelação"  field="data_ultima_remod"      value={property.data_ultima_remod}      type="date" onSave={save} />
+              <F label="Imóvel de Interesse Cultural" field="interesse_cultural" value={property.interesse_cultural}
+                opts={['Sim','Não']} onSave={save} />
+              <F label="Potencial Alteração de Uso" field="potencial_alteracao_uso" value={property.potencial_alteracao_uso}
+                opts={['Sim','Não']} onSave={save} />
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Certificado Energético</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <F label="Classe Energética"        field="classe_energetica"    value={property.classe_energetica}
+                  opts={['A+','A','B','B-','C','D','E','F','Isento','Em curso']} onSave={save} />
+                <F label="N.º Certificado"          field="nr_certificado_energ" value={property.nr_certificado_energ}  onSave={save} />
+                <F label="Data de Emissão"          field="data_emissao_cert"    value={property.data_emissao_cert}     type="date" onSave={save} />
+                <F label="Data de Validade"         field="data_validade_cert"   value={property.data_validade_cert}    type="date" onSave={save} />
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Qualificação do Solo</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Qualificação do Solo"     field="qualificacao_solo"    value={property.qualificacao_solo}     onSave={save} />
+                <F label="Classificação do Solo"    field="classificacao_solo"   value={property.classificacao_solo}    onSave={save} />
+                <F label="Condição de Lote"         field="condicao_lote"        value={property.condicao_lote}
+                  opts={['Sim','Não']} onSave={save} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 6: ÁREAS DO IMÓVEL ────────────────────────────────────── */}
+        {tab === 'sec6' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">6. Áreas do Imóvel</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <F label="Área Considerada (m²)"    field="area_considerada"  value={property.area_considerada}  type="number" onSave={save} />
+              <F label="Área Bruta Construída (m²)" field="area_m2"         value={property.area_m2}           type="number" onSave={save} />
+              <F label="Área Bruta Privativa (m²)" field="gross_area"       value={property.gross_area}        type="number" onSave={save} />
+              <F label="Área Útil (m²)"           field="useful_area"       value={property.useful_area}       type="number" onSave={save} />
+              <F label="Área do Terreno (m²)"     field="land_area"         value={property.land_area}         type="number" onSave={save} />
+              <F label="Área Garagem (m²)"        field="area_garage_m2"    value={property.area_garage_m2}    type="number" onSave={save} />
+              <F label="Área Arrumos/Anexo (m²)"  field="area_annex_m2"     value={property.area_annex_m2}     type="number" onSave={save} />
+              <F label="Área Caderneta Predial (m²)" field="area_caderneta" value={property.area_caderneta}    type="number" onSave={save} />
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Tipo de Superfície Adoptada</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Tipo de Superfície"       field="tipo_superficie"   value={property.tipo_superficie}
+                  opts={['Área bruta construída','Área bruta privativa','Área útil','Área do terreno']} onSave={save} />
+                <F label="Tipo de Parcela"          field="tipo_parcela"      value={property.tipo_parcela}              onSave={save} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 7: MÉTODOS DE AVALIAÇÃO ───────────────────────────────── */}
+        {tab === 'sec7' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">7. Métodos de Avaliação</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Método Principal"          field="metodo_avaliacao"      value={property.metodo_avaliacao}
+                opts={['Comparação/Mercado','Rendimento','Custo','Residual estático','Residual dinâmico']} onSave={save} />
+              <F label="Método Secundário"         field="metodo_avaliacao_2"    value={property.metodo_avaliacao_2}
+                opts={['Comparação/Mercado','Rendimento','Custo','Residual estático','Residual dinâmico','N/A']} onSave={save} />
+            </div>
+            <F label="Justificação da escolha dos Métodos de Avaliação" field="justificacao_metodo" value={property.justificacao_metodo} span textarea onSave={save} />
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Valores por Método</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Valor Comparativo Ajustado (€)"    field="valor_comparativo"       value={property.valor_comparativo}       type="number" onSave={save} />
+                <F label="Ajuste Aplicado (%)"               field="ajuste_comparativo"      value={property.ajuste_comparativo}      type="number" onSave={save} />
+                <F label="Valor Comparativo s/ Ajuste (€)"   field="valor_comparativo_bruto" value={property.valor_comparativo_bruto} type="number" onSave={save} />
+                <F label="Valor por Rendas (€)"              field="valor_rendas"            value={property.valor_rendas}            type="number" onSave={save} />
+                <F label="Valor Residual Dinâmico (€)"       field="valor_residual_din"      value={property.valor_residual_din}      type="number" onSave={save} />
+                <F label="Valor Patrimonial Tributário (€)"  field="valor_patrimonial"       value={property.valor_patrimonial}       type="number" onSave={save} />
+                <F label="Valor de Substituição Bruto (€)"   field="valor_subs_bruto"        value={property.valor_subs_bruto}        type="number" onSave={save} />
+                <F label="Valor de Substituição Líquido (€)" field="valor_subs_liquido"      value={property.valor_subs_liquido}      type="number" onSave={save} />
+                <F label="Valor Máximo Legal (€)"            field="valor_maximo_legal"      value={property.valor_maximo_legal}      type="number" onSave={save} />
+                <F label="Renda Ótima (€)"                   field="valor_renda_otima"       value={property.valor_renda_otima}       type="number" onSave={save} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 8: DOCUMENTOS ENTREGUES ───────────────────────────────── */}
+        {tab === 'sec8' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">8. Documentos Entregues para Avaliação</h2>
+            <F label="Documentação" field="documentacao" value={property.documentacao} span textarea onSave={save} />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Caderneta Predial"             field="doc_caderneta"         value={property.doc_caderneta}
+                opts={['Entregue','Não entregue','N/A']} onSave={save} />
+              <F label="Certidão Permanente"           field="doc_certidao"          value={property.doc_certidao}
+                opts={['Entregue','Não entregue','N/A']} onSave={save} />
+              <F label="Licença de Utilização"         field="doc_licenca_util"      value={property.doc_licenca_util}
+                opts={['Entregue','Não entregue','N/A']} onSave={save} />
+              <F label="Licença de Construção"         field="doc_licenca_constr"    value={property.doc_licenca_constr}
+                opts={['Entregue','Não entregue','N/A']} onSave={save} />
+              <F label="Certificado Energético"        field="doc_cert_energetico"   value={property.doc_cert_energetico}
+                opts={['Entregue','Não entregue','N/A']} onSave={save} />
+              <F label="Planta do Imóvel"              field="doc_planta"            value={property.doc_planta}
+                opts={['Entregue','Não entregue','N/A']} onSave={save} />
+              <F label="Tipo de Documento a Enviar"    field="tipo_doc_enviar"       value={property.tipo_doc_enviar}       onSave={save} />
+              <F label="Tipo de Documento a Descarregar" field="tipo_doc_descarregar" value={property.tipo_doc_descarregar} onSave={save} />
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 9: CONDICIONALISMOS ───────────────────────────────────── */}
+        {tab === 'sec9' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">9. Condicionalismos da Avaliação</h2>
+            <p className="text-xs text-gray-400">Incluir esclarecimentos urbanísticos, diligências com organismos, data prevista de resolução.</p>
+            <F label="Condicionalismos" field="prev_valuation_conditions" value={property.prev_valuation_conditions} span textarea onSave={save} />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Data Prevista de Levantamento" field="data_levantamento_cond" value={property.data_levantamento_cond} type="date" onSave={save} />
+              <F label="Condicionante Sanável"         field="cond_sanavel"           value={property.cond_sanavel}
+                opts={['Sim','Não']} onSave={save} />
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 10: ADVERTÊNCIAS ──────────────────────────────────────── */}
+        {tab === 'sec10' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">10. Advertências, Considerações Gerais e Pressupostos de Avaliação</h2>
+            <F label="Advertências e Considerações Gerais" field="advertencias" value={property.advertencias} span textarea onSave={save} />
+            <F label="Pressupostos de Avaliação"           field="pressupostos" value={property.pressupostos} span textarea onSave={save} />
+          </div>
+        )}
+
+        {/* ── SEC 11: CONCLUSÃO ─────────────────────────────────────────── */}
+        {tab === 'sec11' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">11. Conclusão</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Valor de Mercado (€)"                        field="valor_mercado"            value={property.valor_mercado}            type="number" onSave={save} />
+              <F label="V.V.R. — Valor de Venda Rápida (€)"         field="valor_venda_rapida"       value={property.valor_venda_rapida}       type="number" onSave={save} />
+              <F label="Valor de Seguro (€)"                        field="valor_seguro"             value={property.valor_seguro}             type="number" onSave={save} />
+              <F label="Valor de Mercado Actual (€)"                field="valor_mercado_atual"      value={property.valor_mercado_atual}      type="number" onSave={save} />
+              <F label="V.V.R. Actual (€)"                          field="valor_venda_rapida_atual" value={property.valor_venda_rapida_atual} type="number" onSave={save} />
+              <F label="% Obra Executada"                           field="pct_obra"                 value={property.pct_obra}                 type="number" onSave={save} />
+              <F label="Valor HEC — Hipótese Edifício Concluído (€)" field="valor_hec"               value={property.valor_hec}                type="number" onSave={save} />
+              <F label="Valor V.V.R. HEC (€)"                       field="valor_vvr_hec"            value={property.valor_vvr_hec}            type="number" onSave={save} />
+              <F label="Valor do Empreendimento Completo HEC (€)"   field="valor_emp_hec"            value={property.valor_emp_hec}            type="number" onSave={save} />
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 12: JUSTIFICAÇÃO ──────────────────────────────────────── */}
+        {tab === 'sec12' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">12. Justificação da Escolha dos Métodos de Avaliação</h2>
+            <F label="Justificação" field="justificacao_metodo" value={property.justificacao_metodo} span textarea onSave={save} />
+          </div>
+        )}
+
+        {/* ── SEC 13: CERTIFICAÇÃO ──────────────────────────────────────── */}
+        {tab === 'sec13' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">13. Certificação e Assinatura</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Data do Pedido"             field="data_pedido_relatorio"   value={property.data_pedido_relatorio}   type="date" onSave={save} />
+              <F label="Data da Visita"             field="data_visita"             value={property.data_visita}             type="date" onSave={save} />
+              <F label="Data de Conclusão/Entrega"  field="data_conclusao"          value={property.data_conclusao}          type="date" onSave={save} />
+              <F label="Data de Certificação"       field="data_certificacao"       value={property.data_certificacao}       type="date" onSave={save} />
+              <F label="Data de Caducidade"         field="data_caducidade"         value={property.data_caducidade}         type="date" onSave={save} />
+              <F label="Data do Contrato"           field="data_contrato"           value={property.data_contrato}           type="date" onSave={save} />
+              <F label="Perito Avaliador"           field="perito_avaliador"        value={property.perito_avaliador}                   onSave={save} />
+              <F label="NIF do Perito"              field="perito_nif"              value={property.perito_nif}                         onSave={save} />
+              <F label="N.º CMVM"                   field="perito_cmvm"             value={property.perito_cmvm}                        onSave={save} />
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 14: FATURAÇÃO ─────────────────────────────────────────── */}
+        {tab === 'sec14' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">14. Faturação</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="label">Estado de Faturação</label>
+                <select className="input text-sm" value={property.billing_status || ''} onChange={e => { save({ billing_status: e.target.value }); toast.success('Guardado') }}>
+                  <option value="">—</option>
+                  {Object.entries(BILLING_STATUS_LABELS).map(([k,v]) => <option key={k} value={k}>{v as string}</option>)}
+                </select>
+              </div>
+              <F label="Honorário (€)"              field="fee_amount"          value={property.fee_amount}          type="number" onSave={save} />
+              <F label="Número PO"                  field="po_number"           value={property.po_number}                        onSave={save} />
+              <F label="Data PO"                    field="po_date"             value={property.po_date}             type="date"   onSave={save} />
+              <F label="N.º Fatura"                 field="invoice_number"      value={property.invoice_number}                   onSave={save} />
+              <F label="Data Fatura"                field="invoice_date"        value={property.invoice_date}        type="date"   onSave={save} />
+              <F label="Data Pagamento"             field="payment_date"        value={property.payment_date}        type="date"   onSave={save} />
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Detalhe da Fatura</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <F label="Recetor — Nome"           field="fatura_recetor_nome"  value={property.fatura_recetor_nome}              onSave={save} />
+                <F label="Recetor — NIF"            field="fatura_recetor_nif"   value={property.fatura_recetor_nif}               onSave={save} />
+                <F label="Emissor — Nome"           field="fatura_emissor_nome"  value={property.fatura_emissor_nome}              onSave={save} />
+                <F label="Emissor — NIF"            field="fatura_emissor_nif"   value={property.fatura_emissor_nif}               onSave={save} />
+                <F label="Base Tributável (€)"      field="fatura_base"          value={property.fatura_base}         type="number" onSave={save} />
+                <F label="IVA (%)"                  field="fatura_iva"           value={property.fatura_iva}          type="number" onSave={save} />
+                <F label="Valor Total Fatura (€)"   field="fatura_total"         value={property.fatura_total}        type="number" onSave={save} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SEC 15: FOTOS ─────────────────────────────────────────────── */}
+        {tab === 'sec15' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">Fotos do Imóvel</h2>
+            <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${isDragActive ? 'border-brand-400 bg-brand-50' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input {...getInputProps()} />
+              {uploading ? <Loader2 size={20} className="animate-spin mx-auto text-brand-400"/> : <><Upload size={20} className="mx-auto text-gray-300 mb-2"/><p className="text-sm text-gray-400">Arrasta fotos ou clica para seleccionar</p><p className="text-xs text-gray-300 mt-1">Máx. 5MB por foto · até 8 fotos</p></>}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {SLOTS.map(slot => {
-                const photo = photos.find((p: any) => p.slot === slot) || (photos[slot - 1] || null)
-                if (photo) {
-                  const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(photo.storage_path)
-                  return (
-                    <div key={slot} className="relative group rounded-xl overflow-hidden border border-gray-100 aspect-[4/3] bg-gray-50">
-                      <img src={publicUrl} alt={`Foto ${slot}`} className="w-full h-full object-cover" />
-                      <span className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">{slot}</span>
-                      <button className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => { if (confirm('Eliminar esta foto permanentemente?')) deletePhoto.mutate(photo.id) }}><Trash2 size={11} /></button>
-                    </div>
-                  )
-                }
+                const photo = photos.find((p: any) => p.slot === slot)
+                if (!photo) return (
+                  <div key={slot} className="aspect-video bg-gray-50 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
+                    <span className="text-xs text-gray-300">Foto {slot}</span>
+                  </div>
+                )
+                const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(photo.storage_path)
                 return (
-                  <div key={slot} className="rounded-xl border-2 border-dashed border-gray-200 aspect-[4/3] flex flex-col items-center justify-center gap-1 bg-gray-50 text-gray-300">
-                    <span className="text-2xl font-light">{slot}</span>
-                    <span className="text-xs">Foto {slot}</span>
+                  <div key={slot} className="relative group aspect-video rounded-lg overflow-hidden border border-gray-100">
+                    <img src={publicUrl} alt={`Foto ${slot}`} className="w-full h-full object-cover"/>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="btn bg-white/90 text-xs py-1 px-2"><ExternalLink size={11}/></a>
+                      <button className="btn bg-red-500/90 text-white text-xs py-1 px-2"
+                        onClick={() => { if (confirm('Eliminar esta foto permanentemente?')) deletePhoto.mutate(photo.id) }}><Trash2 size={11}/></button>
+                    </div>
+                    <span className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Foto {slot}</span>
                   </div>
                 )
               })}
@@ -376,209 +684,92 @@ export default function PropertyDetail() {
           </div>
         )}
 
-        {/* TAB: Construção */}
-        {tab === 'construction' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Estado e ocupação</h3>
-              <F label="Estado de construção" field="estado_construcao" value={property.estado_construcao} onSave={save}
-                opts={['Em construção','Em projeto','Em reabilitação','Terminado','Urbanização em curso','Urbanização terminada','N/A']} />
-              <F label="Estado de conservação" field="estado_conservacao" value={property.estado_conservacao} onSave={save}
-                opts={['Bom','Regular','Mau','Excelente estado','Bom estado','Necessita de manutenção/reparação','Liquidação']} />
-              <F label="Estado de ocupação" field="estado_ocupacao" value={property.estado_ocupacao} onSave={save}
-                opts={['Devoluto','Ocupado pelo proprietário','Arrendado','Ocupado por terceiros']} />
-              <F label="Ano de construção"    field="year_built"   value={property.year_built}   type="number" onSave={save} />
-              <F label="Nº Licença utilização" field="ano_licenca_utilizacao" value={property.ano_licenca_utilizacao} onSave={save} />
-              <F label="Data prevista conclusão" field="data_prevista_conclusao" value={property.data_prevista_conclusao} type="date" onSave={save} />
-            </div>
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Características</h3>
-              <F label="Nº quartos"             field="nr_quartos"          value={property.nr_quartos}          type="number" onSave={save} />
-              <F label="Nº instalações sanitárias" field="nr_inst_sanitarias" value={property.nr_inst_sanitarias} type="number" onSave={save} />
-              <F label="Nº pisos"               field="nr_pisos"            value={property.nr_pisos}            type="number" onSave={save} />
-              <F label="Qualidade de construção" field="qualidade_construcao" value={property.qualidade_construcao} onSave={save}
-                opts={['Muito alta','Alta','Média','Baixa','Luxo','Bons','Correntes','Maus','Modestos']} />
-              <F label="Orientação solar"        field="orientacao_solar"    value={property.orientacao_solar}    onSave={save}
-                opts={['Não influi no valor','Aumenta o valor','Diminui o valor']} />
-              <F label="Classe energética"       field="classe_energetica"   value={property.classe_energetica}  onSave={save}
-                opts={['A+','A','B','B-','C','D','E','F','G']} />
-              <F label="Nº certificado energético" field="nr_certificado_energ" value={property.nr_certificado_energ} onSave={save} />
-              <F label="Data emissão certificado" field="data_emissao_cert"   value={property.data_emissao_cert}  type="date" onSave={save} />
-              <F label="Data validade certificado" field="data_validade_cert"  value={property.data_validade_cert} type="date" onSave={save} />
-            </div>
-            <div className="card md:col-span-2 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Materiais de construção</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <F label="Estrutura"         field="estrutura"      value={property.estrutura}      onSave={save} />
-                <F label="Cobertura"         field="cobertura"      value={property.cobertura}      onSave={save} />
-                <F label="Paredes exteriores" field="paredes_ext"   value={property.paredes_ext}    onSave={save} />
-                <F label="Paredes interiores" field="paredes_int"   value={property.paredes_int}    onSave={save} />
-                <F label="Pavim. zonas secas" field="pavim_secas"   value={property.pavim_secas}    onSave={save} />
-                <F label="Pavim. zonas húmidas" field="pavim_humidas" value={property.pavim_humidas} onSave={save} />
-                <F label="Caixilharias"       field="caixilharias"  value={property.caixilharias}   onSave={save} />
-                <F label="Nível acabamento"   field="nivel_acabamento" value={property.nivel_acabamento} onSave={save}
-                  opts={['Luxo','Bons','Correntes','Maus','Modestos']} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB: Localização/Mercado */}
-        {tab === 'market_chars' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Características da localização</h3>
-              <F label="Características do mercado" field="caract_mercado" value={property.caract_mercado} onSave={save}
-                opts={['Residencial de 1ª Habitação','Residencial de 2ª Habitação','Rural','Mista','Industrial','Serviços']} />
-              <F label="Tipo de expectativa de mercado" field="tipo_expectativa_mercado" value={property.tipo_expectativa_mercado} onSave={save}
-                opts={['Positiva. Prevê-se uma valorização superior a 10% nos próximos 12 meses','Neutra. Não se prevê uma valorização/desvalorização superior a 10% nos próximos 12 meses','Negativa. Prevê-se uma desvalorização superior a 10% nos próximos 12 meses']} />
-              <F label="Ocupação laboral predominante" field="ocupacao_laboral" value={property.ocupacao_laboral} onSave={save}
-                opts={['Agricultura','Comércio','Industria','Serviços','Pesca','Turismo']} />
-              <F label="População do concelho" field="populacao_concelho" value={property.populacao_concelho} onSave={save}
-                opts={['Crescente','Decrescente','Estável']} />
-              <F label="Evolução do mercado" field="evolucao_mercado" value={property.evolucao_mercado} onSave={save}
-                opts={['Tendencialmente positiva','Crescente','Decrescente','Estável']} />
-              <F label="Infraestruturas urbanísticas" field="infraestruturas" value={property.infraestruturas} onSave={save}
-                opts={['Executadas','Em curso','Inexistentes']} />
-              <F label="Enquadramento paisagístico" field="enquadramento_paisagist" value={property.enquadramento_paisagist} onSave={save}
-                opts={['Frente à praia','Vistas panorâmicas','Centro da cidade','Deteriorado','Sem relevância']} />
-              <F label="Zona" field="zona" value={property.zona} onSave={save}
-                opts={['Residencial de 1ª Habitação','Residencial de 2ª Habitação','Rural','Mista','Industrial','Serviços']} />
-            </div>
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Datas do processo</h3>
-              <F label="Data do pedido"           field="data_pedido_relatorio" value={property.data_pedido_relatorio} type="date" onSave={save} />
-              <F label="Data da visita"           field="data_visita"           value={property.data_visita}           type="date" onSave={save} />
-              <F label="Data conclusão/entrega"   field="data_conclusao"        value={property.data_conclusao}        type="date" onSave={save} />
-              <F label="Data relatório"           field="data_relatorio"        value={property.data_relatorio}        type="date" onSave={save} />
-            </div>
-            <div className="card space-y-3 md:col-span-2">
-              <h3 className="text-sm font-semibold text-gray-700">Conclusão — Valores finais</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <F label="Valor de Mercado (€)"             field="valor_mercado"            value={property.valor_mercado}            type="number" onSave={save} />
-                <F label="V.V.R. — Valor Venda Rápida (€)"  field="valor_venda_rapida"       value={property.valor_venda_rapida}       type="number" onSave={save} />
-                <F label="Valor de Seguro (€)"              field="valor_seguro"             value={property.valor_seguro}             type="number" onSave={save} />
-                <F label="% Obra"                           field="pct_obra"                 value={property.pct_obra}                 type="number" onSave={save} />
-                <F label="Valor de Mercado actual (€)"      field="valor_mercado_atual"      value={property.valor_mercado_atual}      type="number" onSave={save} />
-                <F label="V.V.R. actual (€)"                field="valor_venda_rapida_atual" value={property.valor_venda_rapida_atual} type="number" onSave={save} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB: Avaliação anterior */}
-        {tab === 'prev' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Dados da avaliação anterior</h3>
-              <F label="Data avaliação anterior" field="prev_valuation_date"       value={property.prev_valuation_date}       type="date"   onSave={save} />
-              <F label="Valor de mercado (€)"    field="prev_valuation_value"      value={property.prev_valuation_value}      type="number" onSave={save} />
-              <F label="VVI (€)"                 field="prev_valuation_vvi"        value={property.prev_valuation_vvi}        type="number" onSave={save} />
-              <F label="Método"                  field="prev_valuation_method"     value={property.prev_valuation_method}                   onSave={save} />
-              <F label="Perito"                  field="prev_valuation_expert"     value={property.prev_valuation_expert}                   onSave={save} />
-              <F label="Entidade"                field="prev_valuation_entity"     value={property.prev_valuation_entity}                   onSave={save} />
-              <F label="Condicionalismos"        field="prev_valuation_conditions" value={property.prev_valuation_conditions}               onSave={save} />
-            </div>
-            {property.datatape_data && Object.keys(property.datatape_data).length > 0 && (
-              <div className="card">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Dados originais da data-tape</h3>
-                <div className="space-y-1 max-h-96 overflow-y-auto">
-                  {Object.entries(property.datatape_data as any).map(([k, v]) => (
-                    <div key={k} className="flex justify-between text-xs py-1 border-b border-gray-50">
-                      <span className="text-gray-400 font-mono truncate max-w-[45%]">{k}</span>
-                      <span className="text-gray-700 truncate max-w-[50%] text-right">{String(v ?? '—')}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB: Comparáveis */}
-        {tab === 'comps' && (
+        {/* ── SEC 16: COMPARÁVEIS ───────────────────────────────────────── */}
+        {tab === 'sec16' && (
           <div className="space-y-4">
-            <CompForm propertyId={property.id} onSaved={() => qc.invalidateQueries({ queryKey: ['property', id] })} />
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">Elementos Comparáveis</h2>
+            <CompForm propertyId={property.id} onAdded={() => qc.invalidateQueries({ queryKey: ['property', id] })} />
             {comps.length > 0 && (
-              <div className="card overflow-auto">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">Comparáveis registados</h3>
-                  {comps.length > 1 && (
-                    <span className="text-sm text-gray-600">
-                      Média €/m²: <strong className="text-brand-600">
-                        € {mean(comps.map((c: any) => c.price && c.area_m2 ? c.price / c.area_m2 : null).filter(Boolean))}
-                      </strong>
-                    </span>
-                  )}
-                </div>
-                <table className="table-base">
+              <div className="overflow-x-auto">
+                <table className="table-base text-xs">
                   <thead><tr>
-                    <th>Portal</th><th>Ref.</th><th>Link</th><th>Tipologia</th>
-                    <th>Área</th><th>Preço</th><th>€/m²</th><th>Notas</th><th></th>
+                    <th>Portal</th><th>Ref.</th><th>Morada</th><th>Área (m²)</th>
+                    <th>Preço (€)</th><th>€/m²</th><th>Notas</th><th></th>
                   </tr></thead>
                   <tbody>
-                    {comps.map((c: any) => (
-                      <tr key={c.id}>
-                        <td>{c.portal}</td>
-                        <td className="text-gray-500">{c.listing_ref || '—'}</td>
-                        <td>{c.url ? <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline flex items-center gap-1 text-xs"><ExternalLink size={11} /> Abrir</a> : '—'}</td>
-                        <td>{c.typology || '—'}</td>
-                        <td>{c.area_m2 ? `${c.area_m2} m²` : '—'}</td>
-                        <td>{c.price ? formatCurrency(c.price) : '—'}</td>
-                        <td className="font-medium text-brand-600">
-                          {c.price && c.area_m2 ? `€ ${(c.price / c.area_m2).toFixed(2).replace('.', ',')}` : '—'}
-                        </td>
-                        <td className="text-gray-500 text-xs max-w-[140px] truncate">{c.notes || '—'}</td>
-                        <td>
-                          <button className="text-red-400 hover:text-red-600" onClick={async () => {
-                            if (confirm('Eliminar este comparável?')) await supabase.from('market_comps').delete().eq('id', c.id)
-                            qc.invalidateQueries({ queryKey: ['property', id] })
-                          }}><Trash2 size={13} /></button>
-                        </td>
-                      </tr>
-                    ))}
+                    {comps.map((c: any) => {
+                      const epm2 = c.price && c.area_m2 ? (parseFloat(c.price)/parseFloat(c.area_m2)).toFixed(2).replace('.',',') : '—'
+                      return (
+                        <tr key={c.id}>
+                          <td>{c.portal || '—'}</td>
+                          <td>{c.listing_ref ? <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">{c.listing_ref}</a> : '—'}</td>
+                          <td className="max-w-[120px] truncate">{c.address || '—'}</td>
+                          <td>{c.area_m2 ? parseFloat(c.area_m2).toFixed(2).replace('.',',') : '—'}</td>
+                          <td>{c.price ? formatCurrency(c.price) : '—'}</td>
+                          <td>{epm2}</td>
+                          <td className="max-w-[120px] truncate">{c.notes || '—'}</td>
+                          <td>
+                            <button className="text-red-400 hover:text-red-600" onClick={async () => {
+                              if (confirm('Eliminar este comparável?')) {
+                                await supabase.from('market_comps').delete().eq('id', c.id)
+                                qc.invalidateQueries({ queryKey: ['property', id] })
+                              }
+                            }}><Trash2 size={12}/></button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
+                <p className="text-xs text-gray-400 mt-2">Média €/m²: {
+                  (() => {
+                    const valid = comps.filter((c: any) => c.price && c.area_m2)
+                    if (!valid.length) return '—'
+                    const avg = valid.reduce((s: number, c: any) => s + parseFloat(c.price)/parseFloat(c.area_m2), 0) / valid.length
+                    return avg.toFixed(2).replace('.',',') + ' €/m²'
+                  })()
+                }</p>
               </div>
             )}
           </div>
         )}
 
-        {/* TAB: Faturação */}
-        {tab === 'billing' && (
-          <div className="card space-y-4 max-w-lg">
-            <h3 className="text-sm font-semibold text-gray-700">Estado financeiro</h3>
-            <div>
-              <label className="label">Estado</label>
-              <select className="input" value={property.billing_status || ''} onChange={e => { save({ billing_status: e.target.value }); toast.success('Guardado') }}>
-                <option value="">—</option>
-                {Object.entries(BILLING_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v as string}</option>)}
-              </select>
+        {/* ── SEC 17: AVALIAÇÃO ANTERIOR ────────────────────────────────── */}
+        {tab === 'sec17' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">Avaliação Anterior</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <F label="Data da Avaliação Anterior"  field="prev_valuation_date"   value={property.prev_valuation_date}   type="date"   onSave={save} />
+              <F label="Valor da Avaliação (€)"      field="prev_valuation_value"  value={property.prev_valuation_value}  type="number" onSave={save} />
+              <F label="Método Utilizado"            field="prev_valuation_method" value={property.prev_valuation_method}               onSave={save} />
+              <F label="Perito Anterior"             field="prev_valuation_expert" value={property.prev_valuation_expert}               onSave={save} />
+              <F label="Entidade Anterior"           field="prev_valuation_entity" value={property.prev_valuation_entity}               onSave={save} />
             </div>
-            <F label="Honorário (€)"  field="fee_amount"     value={property.fee_amount}     type="number" onSave={save} />
-            <F label="Número PO"      field="po_number"      value={property.po_number}                    onSave={save} />
-            <F label="Data PO"        field="po_date"        value={property.po_date}        type="date"   onSave={save} />
-            <F label="Nº fatura"      field="invoice_number" value={property.invoice_number}              onSave={save} />
-            <F label="Data fatura"    field="invoice_date"   value={property.invoice_date}   type="date"   onSave={save} />
-            <F label="Data pagamento" field="payment_date"   value={property.payment_date}   type="date"   onSave={save} />
+            {property.datatape_data && (
+              <div className="border-t pt-4">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Dados originais da data-tape</h3>
+                <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto text-gray-500 max-h-64">
+                  {JSON.stringify(property.datatape_data, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         )}
 
-        {/* TAB: Notas */}
-        {tab === 'notes' && (
-          <div className="space-y-4 max-w-2xl">
-            <div className="card space-y-2">
-              <h3 className="text-sm font-semibold text-gray-700">Notas da visita</h3>
-              <textarea className="input min-h-[120px] resize-y text-sm" placeholder="Observações da visita…"
-                defaultValue={property.visit_notes || ''} key={`vn-${property.id}`}
-                onBlur={e => update.mutate({ visit_notes: e.target.value })} />
-            </div>
-            <div className="card space-y-2">
-              <h3 className="text-sm font-semibold text-gray-700">Notas internas</h3>
-              <textarea className="input min-h-[200px] resize-y text-sm" placeholder="Notas livres, follow-ups…"
-                defaultValue={property.notes_free || ''} key={`nf-${property.id}`}
-                onBlur={e => update.mutate({ notes_free: e.target.value })} />
-              <p className="text-xs text-gray-400">Guardado automaticamente ao sair do campo</p>
+        {/* ── SEC 18: NOTAS ─────────────────────────────────────────────── */}
+        {tab === 'sec18' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 border-b pb-2">Notas</h2>
+            <F label="Notas de Visita"   field="notas_visita"   value={property.notas_visita}   span textarea onSave={save} />
+            <F label="Notas Internas"    field="notas_internas" value={property.notas_internas} span textarea onSave={save} />
+            <div className="border-t pt-4">
+              <div>
+                <label className="label">Estado de Visita</label>
+                <select className="input text-sm max-w-xs" value={property.visit_status || ''} onChange={e => { save({ visit_status: e.target.value }); toast.success('Guardado') }}>
+                  <option value="">—</option>
+                  {Object.entries(VISIT_STATUS_LABELS).map(([k,v]) => <option key={k} value={k}>{v as string}</option>)}
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -588,50 +779,33 @@ export default function PropertyDetail() {
   )
 }
 
-function CompForm({ propertyId, onSaved }: { propertyId: string; onSaved: () => void }) {
-  const [f, setF] = useState({ portal: 'Idealista', listing_ref: '', url: '', typology: '', area_m2: '', price: '', notes: '' })
-  const save = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('market_comps').insert({
-        property_id: propertyId, portal: f.portal,
-        listing_ref: f.listing_ref || null, url: f.url || null,
-        typology: f.typology || null,
-        area_m2: f.area_m2 ? parseFloat(f.area_m2) : null,
-        price: f.price ? parseFloat(f.price) : null,
-        notes: f.notes || null,
-      })
-      if (error) throw error
-    },
-    onSuccess: () => { onSaved(); toast.success('Comparável adicionado'); setF({ portal: 'Idealista', listing_ref: '', url: '', typology: '', area_m2: '', price: '', notes: '' }) },
-    onError: (e: any) => toast.error(e.message)
-  })
+// ── Formulário de comparável ───────────────────────────────────────────────
+function CompForm({ propertyId, onAdded }: { propertyId: string; onAdded: () => void }) {
+  const [form, setForm] = useState({ portal:'', listing_ref:'', url:'', address:'', area_m2:'', price:'', notes:'' })
+  const [saving, setSaving] = useState(false)
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true)
+    const { error } = await supabase.from('market_comps').insert({ ...form, property_id: propertyId })
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    setForm({ portal:'', listing_ref:'', url:'', address:'', area_m2:'', price:'', notes:'' })
+    onAdded(); toast.success('Comparável adicionado')
+  }
   return (
     <div className="card">
-      <h4 className="text-sm font-medium text-gray-700 mb-3">Adicionar comparável</h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div><label className="label">Portal</label>
-          <select className="input" value={f.portal} onChange={e => setF(p => ({ ...p, portal: e.target.value }))}>
-            {['Idealista', 'Imovirtual', 'Casa Sapo', 'ERA', 'Remax', 'Outro'].map(v => <option key={v}>{v}</option>)}
-          </select></div>
-        <div><label className="label">Ref. anúncio</label><input className="input" value={f.listing_ref} onChange={e => setF(p => ({ ...p, listing_ref: e.target.value }))} /></div>
-        <div className="md:col-span-2"><label className="label flex items-center gap-1"><LinkIcon size={11} /> Link</label>
-          <input className="input" placeholder="https://…" value={f.url} onChange={e => setF(p => ({ ...p, url: e.target.value }))} /></div>
-        <div><label className="label">Tipologia</label><input className="input" placeholder="T2" value={f.typology} onChange={e => setF(p => ({ ...p, typology: e.target.value }))} /></div>
-        <div><label className="label">Área (m²)</label><input type="number" className="input" value={f.area_m2} onChange={e => setF(p => ({ ...p, area_m2: e.target.value }))} /></div>
-        <div><label className="label">Preço (€)</label><input type="number" className="input" value={f.price} onChange={e => setF(p => ({ ...p, price: e.target.value }))} /></div>
-        <div className="md:col-span-3"><label className="label">Notas</label><input className="input" placeholder="Observações…" value={f.notes} onChange={e => setF(p => ({ ...p, notes: e.target.value }))} /></div>
-        <div className="flex items-end">
-          <button className="btn btn-primary w-full" onClick={() => save.mutate()} disabled={!f.price || save.isPending}>
-            {save.isPending ? 'A guardar…' : '+ Adicionar'}
-          </button>
-        </div>
+      <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Adicionar Comparável</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <input className="input text-xs" placeholder="Portal" value={form.portal} onChange={e => setForm(f => ({...f, portal:e.target.value}))} />
+        <input className="input text-xs" placeholder="Ref. anúncio" value={form.listing_ref} onChange={e => setForm(f => ({...f, listing_ref:e.target.value}))} />
+        <input className="input text-xs col-span-2" placeholder="URL" value={form.url} onChange={e => setForm(f => ({...f, url:e.target.value}))} />
+        <input className="input text-xs col-span-2" placeholder="Morada" value={form.address} onChange={e => setForm(f => ({...f, address:e.target.value}))} />
+        <input className="input text-xs" placeholder="Área (m²)" type="number" value={form.area_m2} onChange={e => setForm(f => ({...f, area_m2:e.target.value}))} />
+        <input className="input text-xs" placeholder="Preço (€)" type="number" value={form.price} onChange={e => setForm(f => ({...f, price:e.target.value}))} />
+        <input className="input text-xs col-span-2 md:col-span-4" placeholder="Notas" value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} />
       </div>
+      <button className="btn btn-primary text-xs mt-2" onClick={submit} disabled={saving}>
+        {saving ? <Loader2 size={11} className="animate-spin"/> : 'Adicionar'}
+      </button>
     </div>
   )
-}
-
-function mean(arr: number[]) {
-  if (!arr.length) return '—'
-  const avg = arr.reduce((a, b) => a + b, 0) / arr.length
-  return avg.toFixed(2).replace('.', ',')
 }
