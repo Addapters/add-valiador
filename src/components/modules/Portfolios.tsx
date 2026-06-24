@@ -90,13 +90,13 @@ const ALIASES: Record<string, string> = {
 
 const NUMERIC = ['area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2','year_built','fee_amount','prev_valuation_value']
 const FIELDS = [
-  'external_ref','id_registo_predial','id_registo_matricial','fracao',
+  'external_ref','id_bien','id_registo_predial','id_registo_matricial','fracao',
   'street','number','block','floor_letter','address','parish','municipality','district','postal_code',
   'property_type','property_subtype','use_type','use_subtype','property_state','typology',
   'area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2',
   'year_built','condition','fee_amount','perito_avaliador',
   'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
-  'nuc_risco','data_pedido','tipo_reavaliacao','tipo_via','escada','ampliacao','lugar',
+  'nuc_risco','data_pedido','tipo_reavaliacao','tipo_via','escada','ampliacao','lugar','documentacao',
 ]
 
 function norm(s: string) { return s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'') }
