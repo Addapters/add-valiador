@@ -11,11 +11,13 @@ import { CheckCircle, AlertCircle } from 'lucide-react'
 
 const ALIASES: Record<string, string> = {
   // ABANCA exact column names
-  'id_bien':                        'external_ref',
+  'id_bien':                        'id_bien',
   'referência ':                    'external_ref',
   'referência':                     'external_ref',
   'referencia ':                    'external_ref',
   'referencia':                     'external_ref',
+  'documentação?':                  'documentacao',
+  'documentacao?':                  'documentacao',
   'nome_distrito':                  'district',
   'nome_concelho':                  'municipality',
   'freguesia':                      'parish',
