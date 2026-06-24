@@ -1,0 +1,454 @@
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import { PageHeader, VisitBadge, EmptyState } from '@/components/ui'
+import { Link } from 'react-router-dom'
+import { formatCurrency } from '@/lib/utils'
+import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pencil, Check, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+import {
+  getSavedFilters as _getSavedFilters, saveFilters as _saveFilters, clearFilters as _clearFilters, type PropertyFilters,
+  getSavedVisibleCols, saveVisibleCols, ALL_COLUMNS, type ColDef
+} from '@/lib/userPrefs'
+
+const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
+const BILLING_LABELS: Record<string,string> = { no_po:'Sem PO', awaiting_po:'A aguardar PO', po_received:'PO recebida', invoice_pending:'Fat. por emitir', invoice_issued:'Fat. emitida', paid:'Pago' }
+
+function MultiSelect({ label, options, selected, onChange }: { label:string; options:string[]; selected:string[]; onChange:(v:string[])=>void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [])
+  function toggle(v: string) { onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v]) }
+  const display = selected.length === 0 ? label : selected.length === 1 ? selected[0] : `${selected.length} seleccionados`
+  return (
+    <div ref={ref} className="relative">
+      <button className="input text-left flex items-center justify-between gap-2 min-w-[150px]" onClick={() => setOpen(o => !o)}>
+        <span className={`truncate text-sm ${selected.length ? 'text-gray-900' : 'text-gray-400'}`}>{display}</span>
+        <ChevronDown size={12} className="flex-shrink-0 text-gray-400"/>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px] max-h-60 overflow-y-auto">
+          {options.length === 0 ? <p className="text-xs text-gray-400 px-3 py-2">Sem opções</p> : (
+            <>
+              <button className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100" onClick={() => onChange([])}>Limpar</button>
+              {options.map(o => (
+                <button key={o} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => toggle(o)}>
+                  {selected.includes(o) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13} className="text-gray-300"/>}
+                  {o}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ColumnPicker({ visible, onChange }: { visible:string[]; onChange:(v:string[])=>void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [])
+  function toggle(col: string) {
+    const next = visible.includes(col) ? visible.filter(c => c !== col) : [...visible, col]
+    onChange(next); saveVisibleCols(next)
+  }
+  const baseCount   = Object.keys(ALL_COLUMNS).filter(k => ALL_COLUMNS[k].group === 'base').length
+  const abancaCount = Object.keys(ALL_COLUMNS).filter(k => ALL_COLUMNS[k].group === 'abanca').length
+  return (
+    <div ref={ref} className="relative">
+      <button className="btn flex items-center gap-1.5" onClick={() => setOpen(o => !o)}>
+        <Eye size={13}/> Colunas ({visible.length})
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 w-72 max-h-96 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+            <span className="text-xs font-semibold text-gray-600">Colunas visíveis</span>
+            <div className="flex gap-2">
+              <button className="text-xs text-brand-500 hover:underline" onClick={() => { const all = Object.keys(ALL_COLUMNS); onChange(all); saveVisibleCols(all) }}>Todas</button>
+              <button className="text-xs text-gray-400 hover:underline" onClick={() => { const min=['ref','district','municipality','parish','street','property_type','visit_status','billing_status','fee_amount']; onChange(min); saveVisibleCols(min) }}>Mínimo</button>
+            </div>
+          </div>
+
+          {/* Base columns */}
+          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 bg-gray-50">
+            Campos gerais ({baseCount})
+          </div>
+          {(Object.entries(ALL_COLUMNS) as [string, ColDef][]).filter(([,d]) => d.group === 'base').map(([col, def]) => (
+            <button key={col} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2" onClick={() => toggle(col)}>
+              {visible.includes(col) ? <Eye size={12} className="text-brand-400 flex-shrink-0"/> : <EyeOff size={12} className="text-gray-300 flex-shrink-0"/>}
+              <span className={visible.includes(col) ? 'text-gray-800' : 'text-gray-400'}>{def.label}</span>
+            </button>
+          ))}
+
+          {/* ABANCA columns */}
+          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-500 bg-blue-50 mt-1">
+            Campos ABANCA ({abancaCount})
+          </div>
+          {(Object.entries(ALL_COLUMNS) as [string, ColDef][]).filter(([,d]) => d.group === 'abanca').map(([col, def]) => (
+            <button key={col} className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex items-center gap-2 bg-blue-50/30" onClick={() => toggle(col)}>
+              {visible.includes(col) ? <Eye size={12} className="text-blue-400 flex-shrink-0"/> : <EyeOff size={12} className="text-gray-300 flex-shrink-0"/>}
+              <span className={visible.includes(col) ? 'text-blue-800' : 'text-gray-400'}>{def.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InlineEdit({ value, onSave, datalistId, options }: { value:string|null; onSave:(v:string)=>void; datalistId?:string; options?:string[] }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal]         = useState(value || '')
+  useEffect(() => setVal(value || ''), [value])
+  if (!editing) return (
+    <div className="flex items-center gap-1 group cursor-pointer whitespace-nowrap" onClick={() => setEditing(true)}>
+      <span className={value ? 'text-gray-600' : 'text-gray-300'}>{value || '—'}</span>
+      <Pencil size={10} className="opacity-0 group-hover:opacity-100 text-gray-400 flex-shrink-0"/>
+    </div>
+  )
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <input className="border border-brand-300 rounded px-1 py-0.5 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-brand-400"
+        value={val} onChange={e => setVal(e.target.value)} autoFocus
+        list={datalistId}
+        onKeyDown={e => { if (e.key==='Enter') { onSave(val); setEditing(false) } if (e.key==='Escape') setEditing(false) }}/>
+      {datalistId && options && (
+        <datalist id={datalistId}>{options.map(o => <option key={o} value={o}/>)}</datalist>
+      )}
+      <button onClick={() => { onSave(val); setEditing(false) }} className="text-emerald-500"><Check size={12}/></button>
+      <button onClick={() => { setVal(value||''); setEditing(false) }} className="text-gray-400"><X size={12}/></button>
+    </div>
+  )
+}
+
+const FILTER_KEY = 'addvaliador_props_filters'
+
+function loadFilters(): PropertyFilters {
+  try {
+    const r = sessionStorage.getItem(FILTER_KEY)
+    return r ? JSON.parse(r) : { search:'', visitFilter:'', billingFilter:'', districtFilter:[], parishFilter:[], peritoFilter:'' }
+  } catch { return { search:'', visitFilter:'', billingFilter:'', districtFilter:[], parishFilter:[], peritoFilter:'' } }
+}
+function persistFilters(f: PropertyFilters) {
+  try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(f)) } catch {}
+}
+
+export default function Properties() {
+  const qc = useQueryClient()
+  const [filters,     setFiltersRaw] = useState<PropertyFilters>(loadFilters)
+  const [visibleCols, setVisibleCols] = useState<string[]>(getSavedVisibleCols)
+  const [collapsed,   setCollapsed]   = useState<Record<string,boolean>>({})
+  const [selected,    setSelected]    = useState<Set<string>>(new Set())
+  const [bulkVisit,   setBulkVisit]   = useState('')
+  const [bulkBilling, setBulkBilling] = useState('')
+  const [bulkPerito,  setBulkPerito]  = useState('')
+  const [showBulkPerito, setShowBulkPerito] = useState(false)
+
+  function setFilters(f: PropertyFilters | ((prev: PropertyFilters) => PropertyFilters)) {
+    setFiltersRaw(prev => {
+      const next = typeof f === 'function' ? f(prev) : f
+      persistFilters(next)
+      return next
+    })
+  }
+
+  function updateFilters(partial: Partial<PropertyFilters>) {
+    setFilters(prev => { const next = {...prev,...partial}; return next })
+  }
+
+  // Lista de peritos vem da tabela profiles (utilizadores reais)
+  const { data: profilesData = [] } = useQuery({
+    queryKey: ['profiles-peritos'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('name, role')
+        .order('name')
+      return (data || []) as { name: string; role: string }[]
+    }
+  })
+  const peritos = profilesData
+    .filter(p => p.role === 'perito' && p.name)
+    .map(p => p.name) as string[]
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['properties-all'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('properties')
+        .select(`
+          id, ref, external_ref,
+          street, number, block, floor_letter, fracao,
+          address, parish, municipality, district, postal_code,
+          property_type, property_subtype, use_type, use_subtype, property_state,
+          typology, year_built, condition,
+          area_m2, gross_area, useful_area, land_area, area_garage_m2, area_annex_m2,
+          id_registo_predial, id_registo_matricial,
+          perito_avaliador, visit_status, visit_date,
+          billing_status, fee_amount, po_number, invoice_number, payment_date,
+          latitude, longitude,
+          nuc_risco, data_pedido, tipo_reavaliacao, tipo_via, escada, ampliacao, lugar,
+          prev_valuation_date, prev_valuation_value, prev_valuation_method,
+          prev_valuation_expert, prev_valuation_entity,
+          portfolios(id, name, clients(name))
+        `)
+        .order('portfolio_id').order('ref')
+      return (data||[]) as any[]
+    }
+  })
+
+  const districts = useMemo(() => [...new Set(rows.map((r: any) => r.district).filter(Boolean))].sort(), [rows])
+  const parishes  = useMemo(() => {
+    const base = filters.districtFilter.length ? rows.filter((r: any) => filters.districtFilter.includes(r.district)) : rows
+    return [...new Set(base.map((r: any) => r.parish).filter(Boolean))].sort()
+  }, [rows, filters.districtFilter])
+
+
+  const filtered = useMemo(() => rows.filter((r: any) => {
+    if (filters.visitFilter   && r.visit_status     !== filters.visitFilter)   return false
+    if (filters.billingFilter && r.billing_status   !== filters.billingFilter) return false
+    if (filters.districtFilter.length && !filters.districtFilter.includes(r.district)) return false
+    if (filters.parishFilter.length   && !filters.parishFilter.includes(r.parish))     return false
+    if (filters.peritoFilter  && r.perito_avaliador !== filters.peritoFilter)  return false
+    if (filters.search) {
+      const s = filters.search.toLowerCase()
+      return [r.ref, r.external_ref, r.address, r.street, r.municipality,
+              r.district, r.parish, r.typology, r.property_type, r.perito_avaliador]
+        .some(v => v?.toLowerCase().includes(s))
+    }
+    return true
+  }), [rows, filters])
+
+  const grouped = useMemo(() => {
+    const map: Record<string,{portfolio:any;items:any[]}> = {}
+    filtered.forEach((r: any) => {
+      const pid = r.portfolios?.id || 'sem-portfolio'
+      if (!map[pid]) map[pid] = { portfolio: r.portfolios, items: [] }
+      map[pid].items.push(r)
+    })
+    return Object.entries(map)
+  }, [filtered])
+
+  function toggleGroup(pid: string) { setCollapsed(prev => ({...prev, [pid]: !prev[pid]})) }
+  function toggleSelect(id: string) { setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  function selectGroup(items: any[]) {
+    const ids = items.map((i: any) => i.id)
+    const allSel = ids.every(id => selected.has(id))
+    setSelected(prev => { const n = new Set(prev); allSel ? ids.forEach(id => n.delete(id)) : ids.forEach(id => n.add(id)); return n })
+  }
+  function selectAll() {
+    const allIds = filtered.map((r: any) => r.id)
+    setSelected(prev => prev.size === allIds.length ? new Set() : new Set(allIds))
+  }
+
+  const updatePerito = useMutation({
+    mutationFn: async ({ id, value }: { id:string; value:string }) => {
+      const { error } = await supabase.from('properties').update({ perito_avaliador: value||null }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey:['properties-all'] }),
+    onError: (e: any) => toast.error(e.message)
+  })
+
+  const bulkUpdate = useMutation({
+    mutationFn: async ({ field, value }: { field:string; value:string }) => {
+      const ids = [...selected]
+      for (let i = 0; i < ids.length; i += 50) {
+        const { error } = await supabase.from('properties').update({ [field]: value||null }).in('id', ids.slice(i, i+50))
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey:['properties-all'] })
+      toast.success(`${selected.size} actualizados`)
+      setSelected(new Set()); setBulkVisit(''); setBulkBilling(''); setBulkPerito(''); setShowBulkPerito(false)
+    },
+    onError: (e: any) => toast.error(e.message)
+  })
+
+  const bulkDelete = useMutation({
+    mutationFn: async () => {
+      const ids = [...selected]
+      const BATCH = 50
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const chunk = ids.slice(i, i + BATCH)
+        const { data: photos } = await supabase.from('property_photos').select('storage_path').in('property_id', chunk)
+        if (photos?.length) {
+          for (let j = 0; j < photos.length; j += 20)
+            await supabase.storage.from('photos').remove(photos.slice(j, j+20).map((p: any) => p.storage_path))
+        }
+        await supabase.from('property_photos').delete().in('property_id', chunk)
+        await supabase.from('market_comps').delete().in('property_id', chunk)
+        const { error } = await supabase.from('properties').delete().in('id', chunk)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey:['properties-all'] })
+      toast.success(`${selected.size} imóveis eliminados`)
+      setSelected(new Set())
+    },
+    onError: (e: any) => toast.error(e.message)
+  })
+
+  function cellVal(p: any, col: string) {
+    const isAbanca = ALL_COLUMNS[col]?.group === 'abanca'
+    const cls = isAbanca ? 'text-blue-700 whitespace-nowrap' : 'text-gray-600 whitespace-nowrap'
+    switch(col) {
+      case 'external_ref':    return <Link to={`/properties/${p.id}`} className="text-brand-600 hover:underline font-semibold whitespace-nowrap">{p.external_ref || p.ref || '—'}</Link>
+      case 'visit_status':     return <VisitBadge status={p.visit_status}/>
+      case 'billing_status':   return <span className="text-gray-600 whitespace-nowrap">{BILLING_LABELS[p.billing_status]||'—'}</span>
+      case 'fee_amount':       return <span className="font-medium text-gray-800 whitespace-nowrap">{p.fee_amount?formatCurrency(p.fee_amount):'—'}</span>
+      case 'geo':              return p.latitude ? <span className="text-emerald-500">✓</span> : <span className="text-gray-300">—</span>
+      case 'perito_avaliador': return <InlineEdit value={p.perito_avaliador} onSave={val => updatePerito.mutate({ id:p.id, value:val })} datalistId="peritos-inline" options={peritos}/>
+      case 'area_m2':          return <span className={cls}>{p.area_m2?`${p.area_m2} m²`:'—'}</span>
+      case 'area_garage_m2':   return <span className={cls}>{p.area_garage_m2?`${p.area_garage_m2} m²`:'—'}</span>
+      case 'area_annex_m2':    return <span className={cls}>{p.area_annex_m2?`${p.area_annex_m2} m²`:'—'}</span>
+      case 'prev_valuation_value': return <span className={cls}>{p.prev_valuation_value?`€ ${p.prev_valuation_value}`:'—'}</span>
+      default:                 return <span className={cls}>{(p as any)[col]||'—'}</span>
+    }
+  }
+
+  const hasFilters = filters.districtFilter.length || filters.parishFilter.length || filters.peritoFilter || filters.visitFilter || filters.billingFilter || filters.search
+
+  return (
+    <div>
+      <PageHeader title="Imóveis" subtitle={`${filtered.length} de ${rows.length} registos`}
+        actions={<ColumnPicker visible={visibleCols} onChange={setVisibleCols}/>}
+      />
+
+      <div className="bg-white border-b border-gray-100 px-6 py-3 flex flex-wrap gap-2 items-center">
+        <input className="input max-w-[180px]" placeholder="Ref, morada, perito…" value={filters.search} onChange={e => updateFilters({ search: e.target.value })}/>
+        <MultiSelect label="Distrito"  options={districts} selected={filters.districtFilter} onChange={v => updateFilters({ districtFilter:v, parishFilter:[] })}/>
+        <MultiSelect label="Freguesia" options={parishes}  selected={filters.parishFilter}   onChange={v => updateFilters({ parishFilter:v })}/>
+        <select className="input max-w-[150px]" value={filters.peritoFilter} onChange={e => updateFilters({ peritoFilter:e.target.value })}>
+          <option value="">Todos os peritos</option>
+          {peritos.map(p => <option key={p}>{p}</option>)}
+        </select>
+        <select className="input max-w-[150px]" value={filters.visitFilter} onChange={e => updateFilters({ visitFilter:e.target.value })}>
+          <option value="">Estado visita</option>
+          {Object.entries(VISIT_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select className="input max-w-[160px]" value={filters.billingFilter} onChange={e => updateFilters({ billingFilter:e.target.value })}>
+          <option value="">Estado financeiro</option>
+          {Object.entries(BILLING_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        {hasFilters && <button className="btn text-xs" onClick={() => { try { sessionStorage.removeItem(FILTER_KEY) } catch {} setFilters({ search:'', visitFilter:'', billingFilter:'', districtFilter:[], parishFilter:[], peritoFilter:'' }) }}>Limpar</button>}
+      </div>
+
+      {selected.size > 0 && (
+        <div className="fixed top-0 left-[220px] right-0 z-40 bg-brand-100 border-b border-brand-200 px-6 py-3 flex items-center gap-3 flex-wrap shadow-md">
+          <span className="text-sm font-medium text-brand-700">{selected.size} seleccionados</span>
+          <div className="flex items-center gap-1.5">
+            <select className="input text-xs py-1 max-w-[155px]" value={bulkVisit} onChange={e => setBulkVisit(e.target.value)}>
+              <option value="">Alterar visita…</option>
+              {Object.entries(VISIT_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            {bulkVisit && <button className="btn btn-primary text-xs py-1" onClick={() => bulkUpdate.mutate({ field:'visit_status', value:bulkVisit })}>OK</button>}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <select className="input text-xs py-1 max-w-[155px]" value={bulkBilling} onChange={e => setBulkBilling(e.target.value)}>
+              <option value="">Alterar faturação…</option>
+              {Object.entries(BILLING_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            {bulkBilling && <button className="btn btn-primary text-xs py-1" onClick={() => bulkUpdate.mutate({ field:'billing_status', value:bulkBilling })}>OK</button>}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {!showBulkPerito
+              ? <button className="btn text-xs py-1" onClick={() => setShowBulkPerito(true)}>Alterar perito…</button>
+              : <>
+                  <input className="input text-xs py-1 w-40" placeholder="Nome do perito" value={bulkPerito} onChange={e => setBulkPerito(e.target.value)} list="peritos-bulk"/>
+                  <datalist id="peritos-bulk">{peritos.map(p => <option key={p} value={p}/>)}</datalist>
+                  <button className="btn btn-primary text-xs py-1" onClick={() => bulkUpdate.mutate({ field:'perito_avaliador', value:bulkPerito })}>OK</button>
+                  <button className="btn text-xs py-1" onClick={() => { setShowBulkPerito(false); setBulkPerito('') }}>✕</button>
+                </>
+            }
+          </div>
+          <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 ml-auto"
+            onClick={() => { if (confirm(`Eliminar ${selected.size} imóveis permanentemente?`)) bulkDelete.mutate() }}>
+            <Trash2 size={12}/> Eliminar {selected.size}
+          </button>
+          <button className="btn text-xs" onClick={() => setSelected(new Set())}>Cancelar</button>
+        </div>
+      )}
+
+      <div className="p-6 space-y-4">
+        {isLoading ? <p className="text-sm text-gray-400">A carregar…</p>
+          : grouped.length === 0 ? <EmptyState message="Nenhum imóvel encontrado."/>
+          : grouped.map(([pid, { portfolio, items }]) => {
+            const isOpen      = !collapsed[pid]
+            const label       = portfolio ? `${portfolio.name}${portfolio.clients?.name ? ` — ${portfolio.clients.name}` : ''}` : 'Sem portfólio'
+            const groupAllSel = items.every((i: any) => selected.has(i.id))
+            return (
+              <div key={pid} className="rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center px-4 py-3 bg-gray-50 border-b border-gray-200 gap-2">
+                  <button onClick={() => selectGroup(items)} className="text-gray-400 hover:text-brand-500 flex-shrink-0">
+                    {groupAllSel ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
+                  </button>
+                  <button className="flex items-center gap-2 flex-1 text-left" onClick={() => toggleGroup(pid)}>
+                    {isOpen ? <ChevronDown size={14} className="text-gray-400"/> : <ChevronRight size={14} className="text-gray-400"/>}
+                    <span className="text-sm font-semibold text-gray-700">Data Tape + {label}</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{items.length}</span>
+                  </button>
+                </div>
+
+                {isOpen && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="sticky left-0 bg-gray-50 px-3 py-2 w-8 z-10">
+                            <button onClick={selectAll} className="text-gray-400 hover:text-brand-500">
+                              {selected.size === filtered.length && filtered.length > 0 ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
+                            </button>
+                          </th>
+                          {visibleCols.map(col => {
+                            const def = ALL_COLUMNS[col]
+                            const isAbanca = def?.group === 'abanca'
+                            return (
+                              <th key={col}
+                                className={`px-3 py-2 font-semibold whitespace-nowrap ${col==='ref'?'sticky left-8 z-10':''} ${isAbanca?'bg-blue-50 text-blue-700':'bg-gray-50 text-gray-600'}`}
+                                style={{ minWidth: col==='street'||col==='ampliacao'?'160px':'80px' }}>
+                                {def?.label || col}
+                              </th>
+                            )
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((p: any, idx: number) => (
+                          <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selected.has(p.id)?'bg-brand-50':idx%2===0?'bg-white':'bg-gray-50/30'}`}>
+                            <td className="sticky left-0 px-3 py-2 bg-inherit z-10">
+                              <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
+                                {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
+                              </button>
+                            </td>
+                            {visibleCols.map(col => {
+                              const isAbanca = ALL_COLUMNS[col]?.group === 'abanca'
+                              return (
+                                <td key={col} className={`px-3 py-2 ${col==='ref'?'sticky left-8 bg-inherit z-10':''} ${isAbanca&&!selected.has(p.id)?'bg-blue-50/40':''}`}>
+                                  {cellVal(p, col)}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        }
+      </div>
+    </div>
+  )
+}
