@@ -93,7 +93,7 @@ export default function Dashboard() {
       if (role === 'perito' && name) statsQ = statsQ.eq('perito_avaliador', name)
 
       let tableQ = supabase.from('properties')
-        .select('id, ref, external_ref, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado')
+        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado')
         .order('updated_at', { ascending: false })
       if (role === 'perito' && name) tableQ = tableQ.eq('perito_avaliador', name)
 
@@ -137,7 +137,7 @@ export default function Dashboard() {
     if (filterVerificado === 'nao' &&  p.verificado)         return false
     if (search) {
       const s = search.toLowerCase()
-      if (![p.external_ref, p.ref, p.address, p.municipality, p.property_type, p.perito_avaliador]
+      if (![p.external_ref, p.id_bien, p.ref, p.address, p.municipality, p.property_type, p.perito_avaliador]
         .some((v: any) => v?.toLowerCase().includes(s))) return false
     }
     return true
@@ -365,6 +365,7 @@ export default function Dashboard() {
                       </button>
                     </th>
                     <th>Ref. Externa</th>
+                    <th>ID Bem</th>
                     <th>Localização</th>
                     <th>Tipo</th>
                     {role === 'admin' && <th>Perito</th>}
@@ -393,6 +394,7 @@ export default function Dashboard() {
                           {p.external_ref || p.ref || p.id}
                         </Link>
                       </td>
+                      <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>
 
                       <td className="text-gray-600 max-w-[160px] truncate">{p.municipality || p.address || '—'}</td>
                       <td className="text-gray-600 whitespace-nowrap">{[p.property_type, p.typology].filter(Boolean).join(' ') || '—'}</td>
