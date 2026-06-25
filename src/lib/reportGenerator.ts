@@ -87,10 +87,18 @@ function traduzTipo(val: any): string {
   return map[upper] || val
 }
 
-// Traduz campos genéricos que possam conter texto em espanhol
+// Primeira letra maiúscula, resto minúsculas
+function titleCase(val: any): string {
+  if (!val) return ''
+  const s = String(val).trim()
+  if (!s) return ''
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
+
+// Traduz e aplica titleCase
 function tr(val: any): string {
   if (!val) return ''
-  return traduzTipo(val)
+  return titleCase(traduzTipo(val))
 }
 
 export async function generateAbancaReport(
@@ -147,7 +155,7 @@ export async function generateAbancaReport(
   set('O44',  tr(v(p.destino)))
   set('V44',  tr(v(p.estado_conservacao)))
   set('AC44', tr(v(p.estado_ocupacao)))
-  set('D50',  v(p.composicao_imovel, v(p.typology)))
+  set('D50',  titleCase(v(p.composicao_imovel, v(p.typology))))
   set('D56',  v(p.id_registo_predial))
   set('D62',  v(p.id_registo_matricial))
   set('G62',  v(p.fracao))
