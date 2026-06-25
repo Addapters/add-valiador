@@ -153,15 +153,15 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
     // feeRules vazio → calculateFee usa a tabela hardcoded do precário ABANCA
     const feeRules: any[] = []
 
-    // Get ALL existing properties for this portfolio with their external_ref
+    // Get ALL existing properties for this portfolio with their id_bien
     const { data: existing } = await supabase
       .from('properties')
-      .select('id, external_ref')
+      .select('id, id_bien, external_ref')
       .eq('portfolio_id', portfolioId)
 
     const existMap: Record<string,string> = {}
     ;(existing||[]).forEach((p: any) => {
-      if (p.external_ref) existMap[p.external_ref.trim()] = p.id
+      if (p.id_bien) existMap[String(p.id_bien).trim()] = p.id
     })
 
     console.log(`Found ${Object.keys(existMap).length} existing records`)
@@ -220,13 +220,14 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
         }
       }
 
-      const extRef = p.external_ref?.trim()
-      const existId = extRef ? existMap[extRef] : null
+      const idBien  = p.id_bien ? String(p.id_bien).trim() : null
+      const extRef  = p.external_ref?.trim()
+      const existId = idBien ? existMap[idBien] : null
 
       if (existId) {
-        updates.push({ ...p, _id: existId, _ref: extRef })
+        updates.push({ ...p, _id: existId, _ref: idBien || extRef })
       } else {
-        newRows.push({ ...p, _ref: extRef || `linha ${i+1}` })
+        newRows.push({ ...p, _ref: idBien || extRef || `linha ${i+1}` })
       }
     })
 
@@ -292,7 +293,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
     onDone()
   }
 
-  const refFieldMapped = Object.values(mapping).includes('external_ref')
+  const refFieldMapped = Object.values(mapping).includes('id_bien')
 
   return (
     <div className="mt-3 border border-gray-200 rounded-xl bg-gray-50 p-4 space-y-3">
@@ -315,7 +316,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
 
           {!refFieldMapped && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
-              ⚠️ Nenhuma coluna mapeada para <strong>external_ref</strong>. Sem referência externa, o sistema não consegue detectar duplicados e criará sempre novos registos. Verifica o mapeamento abaixo.
+              ⚠️ Nenhuma coluna mapeada para <strong>id_bien</strong>. Sem o ID do Bem, o sistema não consegue detectar duplicados e criará sempre novos registos. Verifica o mapeamento da coluna <strong>ID_BIEN</strong>.
             </div>
           )}
 
@@ -330,12 +331,12 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
           <div className="max-h-56 overflow-y-auto space-y-1.5 border border-gray-200 rounded-lg bg-white p-2">
             {headers.map(h => (
               <div key={h} className="flex items-center gap-2">
-                <span className={`text-xs font-mono w-36 truncate px-1 py-0.5 rounded ${mapping[h]==='external_ref'?'bg-brand-50 text-brand-700':'text-gray-400 bg-gray-50'}`}>{h}</span>
+                <span className={`text-xs font-mono w-36 truncate px-1 py-0.5 rounded ${mapping[h]==='id_bien'?'bg-brand-50 text-brand-700':'text-gray-400 bg-gray-50'}`}>{h}</span>
                 <select className="input flex-1 text-xs py-0.5" value={mapping[h]||''} onChange={e => setMapping(prev => ({...prev,[h]:e.target.value}))}>
                   <option value="">(ignorar)</option>
                   {FIELDS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
-                {mapping[h]==='external_ref'
+                {mapping[h]==='id_bien'
                   ? <span className="text-xs text-brand-600 font-bold flex-shrink-0">KEY</span>
                   : mapping[h]
                     ? <CheckCircle size={12} className="text-emerald-400 flex-shrink-0"/>
