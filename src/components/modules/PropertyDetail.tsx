@@ -188,22 +188,30 @@ export default function PropertyDetail() {
     }, 150)
   }, [mapReady, tab, property?.latitude, property?.longitude])
 
-  const onDrop = useCallback(async (files: File[]) => {
+  const onDrop = useCallback(async (files: globalThis.File[]) => {
     if (!property) return
     setUploading(true)
     for (const file of files) {
       try {
         const path = `${property.id}/${Date.now()}_${file.name}`
-        const { error } = await supabase.storage.from('photos').upload(path, file)
-        if (error) throw error
-        const used = photos.map((p: any) => p.slot).filter(Boolean)
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, file)
+        if (upErr) throw upErr
+        // Re-fetch used slots fresh from DB to avoid duplicates
+        const { data: existingPhotos } = await supabase
+          .from('property_photos').select('slot').eq('property_id', property.id)
+        const used = (existingPhotos||[]).map((p: any) => p.slot).filter(Boolean)
         const slot = SLOTS.find(s => !used.includes(s)) || null
-        await supabase.from('property_photos').insert({ property_id: property.id, storage_path: path, original_name: file.name, size_bytes: file.size, sort_order: photos.length, slot })
+        const { error: insErr } = await supabase.from('property_photos').insert({
+          property_id: property.id, storage_path: path,
+          original_name: file.name, size_bytes: file.size,
+          sort_order: used.length, slot
+        })
+        if (insErr) throw insErr
       } catch (e: any) { toast.error(e.message) }
     }
     qc.invalidateQueries({ queryKey: ['property', id] })
     setUploading(false); toast.success('Fotos guardadas')
-  }, [property, photos, id, qc])
+  }, [property, id, qc])
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxSize: 5_000_000 })
 
   const deletePhoto = useMutation({
@@ -254,7 +262,9 @@ export default function PropertyDetail() {
       let mapImageBlob: Blob | null = null
       if (mapRef.current && property.latitude) {
         try {
-          // Carrega html2canvas dinamicamente
+          // Garante zoom nível 15 para captura
+          if (mapInst.current) mapInst.current.setZoom(15)
+          await new Promise(r => setTimeout(r, 800)) // aguarda tiles carregarem
           const html2canvas = (await import('html2canvas')).default
           const canvas = await html2canvas(mapRef.current, {
             useCORS: true, allowTaint: true, logging: false,

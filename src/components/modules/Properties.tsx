@@ -184,7 +184,7 @@ export default function Properties() {
       const { data } = await supabase
         .from('properties')
         .select(`
-          id, ref, external_ref,
+          id, ref, external_ref, id_bien,
           street, number, block, floor_letter, fracao,
           address, parish, municipality, district, postal_code,
           property_type, property_subtype, use_type, use_subtype, property_state,
@@ -194,7 +194,7 @@ export default function Properties() {
           perito_avaliador, visit_status, visit_date,
           billing_status, fee_amount, po_number, invoice_number, payment_date,
           latitude, longitude,
-          nuc_risco, data_pedido, tipo_reavaliacao, tipo_via, escada, ampliacao, lugar,
+          nuc_risco, data_pedido, tipo_via, escada, ampliacao, lugar,
           prev_valuation_date, prev_valuation_value, prev_valuation_method,
           prev_valuation_expert, prev_valuation_entity,
           portfolios(id, name, clients(name))
@@ -219,7 +219,7 @@ export default function Properties() {
     if (filters.peritoFilter  && r.perito_avaliador !== filters.peritoFilter)  return false
     if (filters.search) {
       const s = filters.search.toLowerCase()
-      return [r.ref, r.external_ref, r.address, r.street, r.municipality,
+      return [r.ref, r.external_ref, r.id_bien, r.address, r.street, r.municipality,
               r.district, r.parish, r.typology, r.property_type, r.perito_avaliador]
         .some(v => v?.toLowerCase().includes(s))
     }

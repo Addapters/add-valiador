@@ -149,11 +149,8 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
   }
 
   async function buildPreview() {
-    let feeRules: any[] = []
-    if (feeScheduleId) {
-      const sched = feeSchedules.find((s: any) => s.id === feeScheduleId)
-      feeRules = sched?.rules || []
-    }
+    // feeRules vazio → calculateFee usa a tabela hardcoded do precário ABANCA
+    const feeRules: any[] = []
 
     // Get ALL existing properties for this portfolio with their external_ref
     const { data: existing } = await supabase
