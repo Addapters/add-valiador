@@ -324,6 +324,7 @@ export default function Properties() {
       case 'visit_status':     return <VisitBadge status={p.visit_status}/>
       case 'billing_status':   return <span className="text-gray-600 whitespace-nowrap">{BILLING_LABELS[p.billing_status]||'—'}</span>
       case 'fee_amount':       return <span className="font-medium text-gray-800 whitespace-nowrap">{p.fee_amount?formatCurrency(p.fee_amount):'—'}</span>
+      case 'honorarios_addapters': return <span className="font-medium text-emerald-700 whitespace-nowrap">{p.fee_amount?formatCurrency(Math.round(p.fee_amount*0.6)):'—'}</span>
       case 'geo':              return p.latitude ? <span className="text-emerald-500">✓</span> : <span className="text-gray-300">—</span>
       case 'perito_avaliador': return <InlineEdit value={p.perito_avaliador} onSave={val => updatePerito.mutate({ id:p.id, value:val })} datalistId="peritos-inline" options={peritos}/>
       case 'area_m2':          return <span className={cls}>{p.area_m2?`${p.area_m2} m²`:'—'}</span>

@@ -371,6 +371,7 @@ export default function Dashboard() {
                     <th>Visita</th>
                     <th>Faturação</th>
                     <th>Honorário</th>
+                    <th>Hon. Addapters</th>
                     <th className="text-center">Fotos</th>
                     <th className="text-center">Comparáveis</th>
                     <th className="text-center">Verificado</th>
@@ -424,6 +425,7 @@ export default function Dashboard() {
                       </td>
 
                       <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
+                      <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
 
                       <td className="text-center">
                         <BoolBadge value={!!p.tem_fotos} trueLabel="Sim" falseLabel="Não"
