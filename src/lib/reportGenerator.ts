@@ -219,24 +219,24 @@ export async function generateAbancaReport(
 
     compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
       const col  = IV_COLS[idx]
-      const price = parseFloat(c.price || 0)
-      const area  = parseFloat(c.area_m2 || 0)
-      const epm2  = price > 0 && area > 0 ? Math.round(price / area * 100) / 100 : null
 
       const noteParts = (c.notes || '').split('|').map((s: string) => s.trim())
-      const tipologia = noteParts[0] || ''
-      const uso       = noteParts[1] || ''
-      const anoEstado = noteParts[2] || ''
-      const descricao = noteParts[3] || c.notes || ''
+      const tipologia = c.tipologia || noteParts[0] || ''
+      const uso       = c.uso       || noteParts[1] || ''
+      const anoEstado = c.ano_estado || noteParts[2] || ''
+      const descricao = c.notes || ''
+      const price     = parseFloat(c.price || 0)
+      const area      = parseFloat(c.area_m2 || 0)
+      const epm2      = price > 0 && area > 0 ? Math.round(price / area * 100) / 100 : null
 
-      setIV(`${col}9`,  v(c.address))        // Localização
-      setIV(`${col}10`, uso || v(c.portal))   // Uso
-      setIV(`${col}11`, tipologia)            // Tipologia
-      setIV(`${col}12`, anoEstado)            // Ano/Estado
-      setIV(`${col}13`, fmtArea(c.area_m2))  // Área Privativa/Locável
-      if (epm2) setIV(`${col}14`, epm2)       // Asking Price (€/m²)
-      setIV(`${col}22`, descricao || tipologia) // Descrição Geral
-      setIV(`${col}34`, v(c.url))             // Fonte (Link)
+      setIV(`${col}9`,  v(c.address))    // Localização
+      setIV(`${col}10`, uso)             // Uso (tipo de imóvel)
+      setIV(`${col}11`, tipologia)       // Tipologia
+      setIV(`${col}12`, anoEstado)       // Ano/Estado
+      setIV(`${col}13`, fmtArea(c.area_m2)) // Área Privativa/Locável
+      if (price > 0) setIV(`${col}14`, price)  // Asking Price = preço total €
+      setIV(`${col}22`, descricao)       // Descrição Geral
+      setIV(`${col}34`, v(c.url))        // Fonte (Link)
     })
   }
 
@@ -316,12 +316,35 @@ export async function generateAbancaReport(
     }
   }
 
-  // Descarregar ficheiro
-  const buf = await wb.xlsx.writeBuffer()
+  // Descarregar ficheiro + guardar no Supabase Storage
+  const buf  = await wb.xlsx.writeBuffer()
   const ref  = v(p.external_ref, v(p.ref, 'imovel')).replace(/[^a-zA-Z0-9_-]/g, '_')
   const date = new Date().toISOString().slice(0, 10)
+  const filename = `Relatorio_${ref}_${date}.xlsx`
+
+  // Guarda no bucket reports para acesso online
+  try {
+    const { createClient } = await import('@supabase/supabase-js')
+    const sb = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY
+    )
+    const storagePath = `${ref}/${filename}`
+    await sb.storage.from('reports').upload(storagePath, new Blob([buf as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }), { upsert: true })
+    const { data: urlData } = sb.storage.from('reports').getPublicUrl(storagePath)
+    if (urlData?.publicUrl) {
+      console.log('Relatório disponível online:', urlData.publicUrl)
+      // Guarda URL no imóvel
+      try {
+        await sb.from('properties').update({ report_url: urlData.publicUrl }).eq('id', p.id)
+      } catch {}
+    }
+  } catch { /* continua mesmo se falhar o upload */ }
+
   saveAs(
     new Blob([buf as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    `Relatorio_${ref}_${date}.xlsx`
+    filename
   )
 }
