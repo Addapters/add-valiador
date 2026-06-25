@@ -686,7 +686,7 @@ export default function PropertyDetail() {
         )}
 
         {/* SEC 13 ── Certificação */}
-        {tab==='sec13' && (
+        {tab==='sec13' && (<>
           <Section title="Certificação e Assinatura">
             <F label="Data do Pedido"            field="data_pedido_relatorio" value={property.data_pedido_relatorio} type="date" onSave={save}/>
             <F label="Data da Visita"            field="data_visita"           value={property.data_visita}           type="date" onSave={save}/>
@@ -707,7 +707,7 @@ export default function PropertyDetail() {
               </a>
             </div>
           )}
-        )}
+        </> )}
 
         {/* SEC 14 ── Faturação */}
         {tab==='sec14' && (<>
