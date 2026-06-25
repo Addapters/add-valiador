@@ -173,7 +173,7 @@ export default function PropertyDetail() {
       const [pR, phR, cR, docR] = await Promise.all([
         supabase.from('properties').select('*, portfolios(name, clients(name))').eq('id', id as string).single(),
         supabase.from('property_photos').select('*').eq('property_id', id as string).order('slot').order('sort_order'),
-        supabase.from('market_comps').select('*').eq('property_id', id as string).order('created_at', { ascending: false }),
+        supabase.from('market_comps').select('*, selected, chauvenet_rejected').eq('property_id', id as string).order('created_at', { ascending: false }),
         supabase.from('property_documents').select('*').eq('property_id', id as string).order('created_at', { ascending: false }),
       ])
       return {
@@ -1143,27 +1143,43 @@ function CompsSection({ propertyId, comps, onRefresh }: {
 
 // ── Formulário de comparável ───────────────────────────────────────────────
 function CompForm({ propertyId, onAdded }: { propertyId: string; onAdded: () => void }) {
-  const [form, setForm] = useState({ portal:'', listing_ref:'', url:'', address:'', area_m2:'', price:'', notes:'' })
+  const [form, setForm] = useState({
+    portal:'', listing_ref:'', url:'', address:'',
+    area_m2:'', price:'', notes:'',
+    uso:'', tipologia:'', ano_estado:''
+  })
   const [saving, setSaving] = useState(false)
   async function submit() {
     setSaving(true)
-    const { error } = await supabase.from('market_comps').insert({ ...form, property_id: propertyId })
+    const { error } = await supabase.from('market_comps').insert({
+      property_id: propertyId,
+      portal:      form.portal,
+      listing_ref: form.listing_ref,
+      url:         form.url,
+      address:     form.address,
+      area_m2:     form.area_m2 ? parseFloat(form.area_m2) : null,
+      price:       form.price   ? parseFloat(form.price)   : null,
+      notes:       [form.tipologia, form.uso, form.ano_estado, form.notes].filter(Boolean).join(' | '),
+    })
     setSaving(false)
     if (error) { toast.error(error.message); return }
-    setForm({ portal:'', listing_ref:'', url:'', address:'', area_m2:'', price:'', notes:'' })
+    setForm({ portal:'', listing_ref:'', url:'', address:'', area_m2:'', price:'', notes:'', uso:'', tipologia:'', ano_estado:'' })
     onAdded(); toast.success('Comparável adicionado')
   }
   return (
     <div className="card">
       <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Adicionar Comparável</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <input className="input text-xs" placeholder="Portal" value={form.portal} onChange={e => setForm(f=>({...f,portal:e.target.value}))}/>
+        <input className="input text-xs" placeholder="Portal (ex: Idealista)" value={form.portal} onChange={e => setForm(f=>({...f,portal:e.target.value}))}/>
         <input className="input text-xs" placeholder="Ref. anúncio" value={form.listing_ref} onChange={e => setForm(f=>({...f,listing_ref:e.target.value}))}/>
-        <input className="input text-xs col-span-2" placeholder="URL" value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))}/>
-        <input className="input text-xs col-span-2" placeholder="Morada" value={form.address} onChange={e => setForm(f=>({...f,address:e.target.value}))}/>
+        <input className="input text-xs col-span-2" placeholder="URL / Fonte" value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))}/>
+        <input className="input text-xs col-span-2" placeholder="Localização" value={form.address} onChange={e => setForm(f=>({...f,address:e.target.value}))}/>
+        <input className="input text-xs" placeholder="Uso (ex: Residencial)" value={form.uso} onChange={e => setForm(f=>({...f,uso:e.target.value}))}/>
+        <input className="input text-xs" placeholder="Tipologia (ex: T3)" value={form.tipologia} onChange={e => setForm(f=>({...f,tipologia:e.target.value}))}/>
+        <input className="input text-xs" placeholder="Ano / Estado (ex: 2005 / Usado)" value={form.ano_estado} onChange={e => setForm(f=>({...f,ano_estado:e.target.value}))}/>
         <input className="input text-xs" placeholder="Área (m²)" type="number" value={form.area_m2} onChange={e => setForm(f=>({...f,area_m2:e.target.value}))}/>
         <input className="input text-xs" placeholder="Preço (€)" type="number" value={form.price} onChange={e => setForm(f=>({...f,price:e.target.value}))}/>
-        <input className="input text-xs col-span-2 md:col-span-4" placeholder="Notas" value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))}/>
+        <input className="input text-xs col-span-2 md:col-span-4" placeholder="Descrição Geral" value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))}/>
       </div>
       <button className="btn btn-primary text-xs mt-2" onClick={submit} disabled={saving}>
         {saving ? <Loader2 size={11} className="animate-spin"/> : 'Adicionar'}
