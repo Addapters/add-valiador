@@ -214,9 +214,9 @@ export default function PropertyDetail() {
   // Carrega Leaflet sempre (necessário para captura do mapa no relatório)
   useLeaflet(true, () => setMapReady(true))
   useEffect(() => {
-    if (!mapReady || !mapRef.current || tab !== 'sec2' || !property) return
+    if (!mapReady || !mapRef.current || !property) return
+    if (mapInst.current) return // já inicializado
     setTimeout(() => {
-      if (mapInst.current) { mapInst.current.remove(); mapInst.current = null }
       const L = window.L
       const lat = property.latitude||39.5, lon = property.longitude||-8.0
       mapInst.current = L.map(mapRef.current).setView([lat,lon], property.latitude?16:7)
@@ -235,7 +235,7 @@ export default function PropertyDetail() {
         }).addTo(mapInst.current)
       }
     }, 150)
-  }, [mapReady, tab, property?.latitude, property?.longitude])
+  }, [mapReady, property?.id])
 
   const onDrop = useCallback(async (files: globalThis.File[]) => {
     if (!property) return
