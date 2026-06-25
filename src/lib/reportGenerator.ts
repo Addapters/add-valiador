@@ -121,7 +121,8 @@ export async function generateAbancaReport(
   set('F10', v(p.nr_relatorio, v(p.ref)))
   set('X9',  v(p.tipo_servico, 'Avaliação'))
   set('X10', v(p.finalidade, 'Adjudicado sem visita interior'))
-  set('X11', v(p.external_ref, v(p.ref)))
+  set('X11', v(p.external_ref, v(p.ref)))   // IdRel = Referência externa
+  set('X8',  v(p.id_bien))                   // Id = ID do Bem (id_bien)
 
   // 2. MORADA
   set('D19',  tr(v(p.tipo_via)))
@@ -217,20 +218,13 @@ export async function generateAbancaReport(
       try {
         const mapBuf = await mapImageBlob.arrayBuffer()
         const mapId  = wb.addImage({ buffer: mapBuf as ArrayBuffer, extension: 'png' })
-        // Slot: col B(1) a AI(34), linhas 406-423 → 18 linhas
-        // Dimensões slot: 33 colunas × ~64px = ~2100px wide, 18 linhas × ~20px = ~360px high
-        // Imagem centrada sem esticar: max 600×280px
-        const MAP_W  = 600
-        const MAP_H  = 280
-        const SLOT_W = 1050 // aprox px
-        const SLOT_H = 320
-        const EMU    = 9525
-        const offX   = Math.max(0, Math.round((SLOT_W - MAP_W) / 2)) * EMU
-        const offY   = Math.max(0, Math.round((SLOT_H - MAP_H) / 2)) * EMU
+        // Slot B(col 1) a AI(col 34) = 33 colunas, linhas 406-423 = 18 linhas
+        // Usa tl + br para preencher o slot todo mantendo proporção
         wsm.addImage(mapId, {
-          tl:  { col: 1, row: 405, colOff: offX, rowOff: offY } as any,
-          ext: { width: MAP_W, height: MAP_H },
-        })
+          tl:  { col: 1,  row: 405 } as any,
+          br:  { col: 34, row: 423 } as any,
+          editAs: 'oneCell',
+        } as any)
       } catch { /* ignorar erro do mapa */ }
     }
   }
@@ -244,29 +238,18 @@ export async function generateAbancaReport(
   if (photos.length > 0) {
     const wsf = wb.getWorksheet('RELATÓRIO - PT')
     if (wsf) {
-      // Posições das 8 fotos: { col (0-indexed), row (1-indexed início), rowEnd }
+      // Posições das 8 fotos com tl+br para preencher o slot sem esticar
+      // ExcelJS com tl+br preenche o espaço disponível mantendo aspect ratio
       const PHOTO_SLOTS = [
-        { col: 1,  rowStart: 350, rowEnd: 362 }, // Foto 1 — B350:Q362
-        { col: 17, rowStart: 350, rowEnd: 362 }, // Foto 2 — R350:AI362
-        { col: 1,  rowStart: 363, rowEnd: 375 }, // Foto 3 — B363:Q375
-        { col: 17, rowStart: 363, rowEnd: 375 }, // Foto 4 — R363:AI375
-        { col: 1,  rowStart: 376, rowEnd: 388 }, // Foto 5 — B376:Q388
-        { col: 17, rowStart: 376, rowEnd: 388 }, // Foto 6 — R376:AI388
-        { col: 1,  rowStart: 389, rowEnd: 401 }, // Foto 7 — B389:Q401
-        { col: 17, rowStart: 389, rowEnd: 401 }, // Foto 8 — R389:AI401
+        { tl: { col: 1,  row: 349 }, br: { col: 16, row: 362 } }, // Foto 1 — B350:Q362
+        { tl: { col: 17, row: 349 }, br: { col: 35, row: 362 } }, // Foto 2 — R350:AI362
+        { tl: { col: 1,  row: 362 }, br: { col: 16, row: 375 } }, // Foto 3 — B363:Q375
+        { tl: { col: 17, row: 362 }, br: { col: 35, row: 375 } }, // Foto 4 — R363:AI375
+        { tl: { col: 1,  row: 375 }, br: { col: 16, row: 388 } }, // Foto 5 — B376:Q388
+        { tl: { col: 17, row: 375 }, br: { col: 35, row: 388 } }, // Foto 6 — R376:AI388
+        { tl: { col: 1,  row: 388 }, br: { col: 16, row: 401 } }, // Foto 7 — B389:Q401
+        { tl: { col: 17, row: 388 }, br: { col: 35, row: 401 } }, // Foto 8 — R389:AI401
       ]
-
-      // Dimensões aproximadas de cada slot em pixels
-      // 15 colunas × largura padrão (~64px) = 960px → mas Excel varia; usamos 280px para a foto
-      // 13 linhas × altura padrão (~20px)   = 260px → usamos 175px para a foto
-      // Offset para centrar: (slotW - imgW) / 2 em EMUs (1px = 9525 EMUs)
-      const IMG_W  = 280  // largura da imagem em px
-      const IMG_H  = 175  // altura da imagem em px
-      const SLOT_W = 480  // largura aproximada do slot em px (15 cols × ~32px col padrão Excel)
-      const SLOT_H = 240  // altura aproximada do slot em px (13 linhas × ~18.5px)
-      const EMU    = 9525
-      const offX   = Math.max(0, Math.round((SLOT_W - IMG_W) / 2)) * EMU
-      const offY   = Math.max(0, Math.round((SLOT_H - IMG_H) / 2)) * EMU
 
       for (let i = 0; i < Math.min(photos.length, 8); i++) {
         const photo = photos[i]
@@ -278,9 +261,10 @@ export async function generateAbancaReport(
           const imgId = wb.addImage({ buffer: buf as ArrayBuffer, extension: ext })
           const slot  = PHOTO_SLOTS[i]
           wsf.addImage(imgId, {
-            tl:  { col: slot.col, row: slot.rowStart - 1, colOff: offX, rowOff: offY } as any,
-            ext: { width: IMG_W,  height: IMG_H },
-          })
+            tl:     slot.tl as any,
+            br:     slot.br as any,
+            editAs: 'oneCell',
+          } as any)
         } catch { /* ignorar foto com erro */ }
       }
     }
