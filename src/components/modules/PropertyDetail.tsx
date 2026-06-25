@@ -908,10 +908,10 @@ function CompsSection({ propertyId, comps, onRefresh }: {
     epm2: c.price && c.area_m2 ? parseFloat(c.price) / parseFloat(c.area_m2) : null
   }))
 
-  const selected     = compsWithEpm2.filter(c => c.selected && !c.chauvenet_rejected)
+  const selected      = compsWithEpm2.filter(c => c.selected)
   const selectedCount = selected.length
-  const avgSelected  = selected.length
-    ? selected.reduce((s: number, c: any) => s + c.epm2!, 0) / selected.length
+  const avgSelected   = selected.length
+    ? selected.reduce((s: number, c: any) => s + (c.epm2 || 0), 0) / selected.filter((c:any) => c.epm2).length
     : null
 
   function fmtPrice(val: any): string {
@@ -935,23 +935,31 @@ function CompsSection({ propertyId, comps, onRefresh }: {
     }
     const values   = withEpm2.map(c => c.epm2!)
     const rejected = chauvenet(values)
+
+    // Apenas marca outliers — NÃO altera a selecção
     for (let i = 0; i < withEpm2.length; i++) {
-      await supabase.from('market_comps').update({ chauvenet_rejected: rejected[i] }).eq('id', withEpm2[i].id)
-    }
-    const kept   = withEpm2.filter((_, i) => !rejected[i])
-    const mean   = kept.reduce((s, c) => s + c.epm2!, 0) / kept.length
-    const sorted = [...kept].sort((a, b) => Math.abs(a.epm2! - mean) - Math.abs(b.epm2! - mean))
-    const top5   = new Set(sorted.slice(0, 5).map(c => c.id))
-    for (const c of comps) {
-      await supabase.from('market_comps').update({ selected: top5.has(c.id) }).eq('id', c.id)
+      await supabase.from('market_comps')
+        .update({ chauvenet_rejected: rejected[i] })
+        .eq('id', withEpm2[i].id)
     }
     onRefresh()
     setApplying(false)
-    toast.success(`${rejected.filter(Boolean).length} outlier(s) rejeitado(s) · ${Math.min(5, kept.length)} seleccionados`)
+    const rejCount = rejected.filter(Boolean).length
+    if (rejCount > 0) {
+      toast.success(`${rejCount} outlier(s) identificado(s) e marcado(s) a vermelho`)
+    } else {
+      toast.success('Nenhum outlier detectado — todos os comparáveis passam o critério')
+    }
   }
 
   async function toggleSelected(c: any) {
-    if (!c.selected && selectedCount >= 5) { toast.error('Máximo 5 comparáveis no relatório.'); return }
+    if (!c.selected && selectedCount >= 5) {
+      toast.error('Máximo 5 comparáveis no relatório.')
+      return
+    }
+    if (!c.selected && c.chauvenet_rejected) {
+      toast('Este comparável foi identificado como outlier pelo Critério de Chauvenet.', { icon: '⚠️' })
+    }
     await updateComp(c.id, { selected: !c.selected })
   }
 
@@ -964,15 +972,9 @@ function CompsSection({ propertyId, comps, onRefresh }: {
       {/* 2 ── Lista completa */}
       {comps.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-              Comparáveis Carregados ({comps.length})
-            </h3>
-            <button className="btn flex items-center gap-1.5 text-xs" onClick={applyChauvenet} disabled={applying}>
-              {applying ? <Loader2 size={11} className="animate-spin"/> : '📊'}
-              Aplicar Critério de Chauvenet
-            </button>
-          </div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Comparáveis Carregados ({comps.length})
+          </h3>
 
           <div className="overflow-x-auto">
             <table className="table-base text-xs">
@@ -992,23 +994,23 @@ function CompsSection({ propertyId, comps, onRefresh }: {
               <tbody>
                 {compsWithEpm2.map((c: any) => (
                   <tr key={c.id} className={
-                    c.chauvenet_rejected ? 'bg-red-50 opacity-60' :
-                    c.selected          ? 'bg-emerald-50'         : ''
+                    c.selected && c.chauvenet_rejected ? 'bg-red-50' :
+                    c.selected                        ? 'bg-emerald-50' :
+                    c.chauvenet_rejected               ? 'bg-red-50 opacity-60' : ''
                   }>
                     <td className="text-center">
                       <button onClick={() => toggleSelected(c)}
-                        disabled={c.chauvenet_rejected}
+                        title={c.selected ? 'Remover do relatório' : 'Incluir no relatório'}
                         className={`w-5 h-5 rounded border flex items-center justify-center mx-auto transition-colors
-                          ${c.chauvenet_rejected ? 'border-red-300 bg-red-100 cursor-not-allowed' :
-                            c.selected ? 'border-emerald-500 bg-emerald-500 text-white' :
+                          ${c.selected && c.chauvenet_rejected ? 'border-red-500 bg-red-500 text-white' :
+                            c.selected  ? 'border-emerald-500 bg-emerald-500 text-white' :
                             'border-gray-300 hover:border-brand-400'}`}>
-                        {c.selected && !c.chauvenet_rejected && <span className="text-[10px]">✓</span>}
-                        {c.chauvenet_rejected && <span className="text-[10px] text-red-400">✕</span>}
+                        {c.selected && <span className="text-[10px]">✓</span>}
                       </button>
                     </td>
-                    <td><EditCell value={c.portal}   onSave={v => updateComp(c.id, { portal: v })}/></td>
-                    <td className="max-w-[130px]"><EditCell value={c.address}  onSave={v => updateComp(c.id, { address: v })}/></td>
-                    <td><EditCell value={c.area_m2}  type="number" onSave={v => updateComp(c.id, { area_m2: v })}/></td>
+                    <td><EditCell value={c.portal}  onSave={v => updateComp(c.id, { portal: v })}/></td>
+                    <td className="max-w-[130px]"><EditCell value={c.address} onSave={v => updateComp(c.id, { address: v })}/></td>
+                    <td><EditCell value={c.area_m2} type="number" onSave={v => updateComp(c.id, { area_m2: v })}/></td>
                     <td className="whitespace-nowrap">
                       <EditCell
                         value={c.price ? parseFloat(c.price).toLocaleString('pt-PT', { minimumFractionDigits:0, maximumFractionDigits:0 }) : ''}
@@ -1016,10 +1018,13 @@ function CompsSection({ propertyId, comps, onRefresh }: {
                         onSave={v => updateComp(c.id, { price: v })}
                       />
                     </td>
-                    <td className={`font-medium whitespace-nowrap ${c.chauvenet_rejected ? 'text-red-400' : c.selected ? 'text-emerald-700' : ''}`}>
+                    <td className={`font-medium whitespace-nowrap
+                      ${c.selected && c.chauvenet_rejected ? 'text-red-600' :
+                        c.chauvenet_rejected ? 'text-red-400' :
+                        c.selected ? 'text-emerald-700' : ''}`}>
                       {c.epm2 ? c.epm2.toFixed(2).replace('.',',') : '—'}
                     </td>
-                    <td className="max-w-[180px]"><EditCell value={c.notes}  onSave={v => updateComp(c.id, { notes: v })}/></td>
+                    <td className="max-w-[180px]"><EditCell value={c.notes} onSave={v => updateComp(c.id, { notes: v })}/></td>
                     <td className="text-center">
                       {c.url
                         ? <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-500 hover:text-brand-700"><ExternalLink size={11}/></a>
@@ -1042,13 +1047,27 @@ function CompsSection({ propertyId, comps, onRefresh }: {
 
           <div className="flex gap-4 text-xs text-gray-400">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300 inline-block"></span>Seleccionado</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block"></span>Rejeitado (Chauvenet)</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block"></span>Outlier (Chauvenet)</span>
             <span className="italic">Clica em qualquer célula para editar</span>
           </div>
         </div>
       )}
 
-      {/* 3 ── Comparáveis seleccionados — recap para relatório */}
+      {/* 3 ── Botão Chauvenet */}
+      {comps.length >= 3 && (
+        <div className="flex items-center justify-between gap-3 py-3 border-t border-b border-gray-100">
+          <div className="text-xs text-gray-400">
+            O Critério de Chauvenet identifica comparáveis com €/m² estatisticamente improvável para a amostra.
+            Podes na mesma seleccioná-los — ficam marcados a vermelho como aviso.
+          </div>
+          <button className="btn flex items-center gap-1.5 text-xs whitespace-nowrap" onClick={applyChauvenet} disabled={applying}>
+            {applying ? <Loader2 size={11} className="animate-spin"/> : '📊'}
+            Aplicar Critério de Chauvenet
+          </button>
+        </div>
+      )}
+
+      {/* 4 ── Comparáveis seleccionados — recap para relatório */}
       {selected.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
@@ -1069,17 +1088,19 @@ function CompsSection({ propertyId, comps, onRefresh }: {
               </thead>
               <tbody>
                 {selected.map((c: any, i: number) => (
-                  <tr key={c.id} className="bg-emerald-50">
+                  <tr key={c.id} className={c.chauvenet_rejected ? 'bg-red-50' : 'bg-emerald-50'}>
                     <td className="font-medium text-emerald-700">{i + 1}</td>
                     <td>{c.portal || '—'}</td>
                     <td>{c.address || '—'}</td>
                     <td>{c.area_m2 ? parseFloat(c.area_m2).toFixed(2).replace('.',',') : '—'}</td>
                     <td className="whitespace-nowrap font-medium">{fmtPrice(c.price)}</td>
-                    <td className="font-semibold text-emerald-700">{c.epm2 ? c.epm2.toFixed(2).replace('.',',') : '—'}</td>
+                    <td className={`font-semibold ${c.chauvenet_rejected ? 'text-red-600' : 'text-emerald-700'}`}>
+                      {c.epm2 ? c.epm2.toFixed(2).replace('.',',') : '—'}
+                      {c.chauvenet_rejected && <span className="ml-1 text-red-400 font-normal">⚠️</span>}
+                    </td>
                     <td className="max-w-[200px] truncate">{c.notes || '—'}</td>
                   </tr>
                 ))}
-                {/* Linha de média */}
                 <tr className="bg-emerald-100 font-semibold">
                   <td colSpan={5} className="text-right text-emerald-800">Média €/m²</td>
                   <td className="text-emerald-800">{avgSelected ? avgSelected.toFixed(2).replace('.',',') + ' €' : '—'}</td>
@@ -1088,6 +1109,9 @@ function CompsSection({ propertyId, comps, onRefresh }: {
               </tbody>
             </table>
           </div>
+          {selected.some((c:any) => c.chauvenet_rejected) && (
+            <p className="text-xs text-red-500">⚠️ Um ou mais comparáveis seleccionados foram identificados como outliers pelo Critério de Chauvenet.</p>
+          )}
         </div>
       )}
 
