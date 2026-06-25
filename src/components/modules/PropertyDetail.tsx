@@ -166,7 +166,8 @@ export default function PropertyDetail() {
     toast.success('Coordenadas guardadas')
   }
 
-  useLeaflet(tab === 'sec2', () => setMapReady(true))
+  // Carrega Leaflet sempre (necessário para captura do mapa no relatório)
+  useLeaflet(true, () => setMapReady(true))
   useEffect(() => {
     if (!mapReady || !mapRef.current || tab !== 'sec2' || !property) return
     setTimeout(() => {
@@ -248,12 +249,28 @@ export default function PropertyDetail() {
     try {
       const templateUrl = import.meta.env.VITE_REPORT_TEMPLATE_URL
       if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada.')
+
+      // Captura do mapa com html2canvas
+      let mapImageBlob: Blob | null = null
+      if (mapRef.current && property.latitude) {
+        try {
+          // Carrega html2canvas dinamicamente
+          const html2canvas = (await import('html2canvas')).default
+          const canvas = await html2canvas(mapRef.current, {
+            useCORS: true, allowTaint: true, logging: false,
+            width: mapRef.current.offsetWidth, height: mapRef.current.offsetHeight,
+          })
+          mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
+        } catch { /* mapa não disponível, continua sem ele */ }
+      }
+
       const { data: freshPhotos } = await supabase.from('property_photos').select('*').eq('property_id', property.id).order('slot').order('sort_order')
       const photoUrls = (freshPhotos||[]).map((ph: any) => {
         const { data } = supabase.storage.from('photos').getPublicUrl(ph.storage_path)
         return { ...ph, url: data.publicUrl }
       }).filter((ph: any) => ph.url)
-      await generateAbancaReport(property, photoUrls, comps, templateUrl)
+
+      await generateAbancaReport(property, photoUrls, comps, templateUrl, mapImageBlob)
       toast.success('Relatório gerado com sucesso')
     } catch (e: any) { toast.error(e.message) }
     finally { setGenerating(false) }
