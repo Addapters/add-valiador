@@ -180,8 +180,20 @@ export async function generateAbancaReport(
   set('Q105', fmtArea(areaVal))
   set('T105', fmtArea(p.area_annex_m2))
 
-  // 7. ELEMENTOS COMPARÁVEIS
-  comps.slice(0, 3).forEach((c: any, idx: number) => {
+  // 7. ELEMENTOS COMPARÁVEIS (folha principal — 3 primeiros seleccionados)
+  // Usa apenas os comparáveis seleccionados (selected=true), ordenados por epm2
+  const selectedComps = comps
+    .filter((c: any) => c.selected)
+    .sort((a: any, b: any) => {
+      const epmA = a.price && a.area_m2 ? parseFloat(a.price)/parseFloat(a.area_m2) : 0
+      const epmB = b.price && b.area_m2 ? parseFloat(b.price)/parseFloat(b.area_m2) : 0
+      return epmA - epmB
+    })
+
+  // Se não houver seleccionados, usa todos (compatibilidade)
+  const compsToUse = selectedComps.length > 0 ? selectedComps : comps
+
+  compsToUse.slice(0, 3).forEach((c: any, idx: number) => {
     const row  = 116 + idx
     const desc = v(c.notes, `${v(c.portal)} ref.${v(c.listing_ref)}`)
     set(`D${row}`, desc)
@@ -193,6 +205,40 @@ export async function generateAbancaReport(
       set(`AE${row}`, price)
     }
   })
+
+  // TAB IV-IV — 5 comparáveis seleccionados
+  // Comp 1: col H, Comp 2: col L, Comp 3: col P, Comp 4: col T, Comp 5: col X
+  // (intervalo de 4 colunas entre cada comparável)
+  const IV_COLS = ['H', 'L', 'P', 'T', 'X']
+  const wsIV = wb.getWorksheet('IV - IV')
+  if (wsIV) {
+    function setIV(ref: string, val: any) {
+      if (val === null || val === undefined || val === '') return
+      wsIV.getCell(ref).value = val
+    }
+
+    compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
+      const col  = IV_COLS[idx]
+      const price = parseFloat(c.price || 0)
+      const area  = parseFloat(c.area_m2 || 0)
+      const epm2  = price > 0 && area > 0 ? Math.round(price / area * 100) / 100 : null
+
+      const noteParts = (c.notes || '').split('|').map((s: string) => s.trim())
+      const tipologia = noteParts[0] || ''
+      const uso       = noteParts[1] || ''
+      const anoEstado = noteParts[2] || ''
+      const descricao = noteParts[3] || c.notes || ''
+
+      setIV(`${col}9`,  v(c.address))        // Localização
+      setIV(`${col}10`, uso || v(c.portal))   // Uso
+      setIV(`${col}11`, tipologia)            // Tipologia
+      setIV(`${col}12`, anoEstado)            // Ano/Estado
+      setIV(`${col}13`, fmtArea(c.area_m2))  // Área Privativa/Locável
+      if (epm2) setIV(`${col}14`, epm2)       // Asking Price (€/m²)
+      setIV(`${col}22`, descricao || tipologia) // Descrição Geral
+      setIV(`${col}34`, v(c.url))             // Fonte (Link)
+    })
+  }
 
   // 14. CONDICIONALISMOS E ADVERTÊNCIAS
   set('B248', v(p.prev_valuation_conditions, 'Nenhum'))
