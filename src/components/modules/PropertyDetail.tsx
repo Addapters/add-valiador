@@ -284,7 +284,11 @@ export default function PropertyDetail() {
                 <h1 className="text-base font-semibold">{property.external_ref||property.ref}</h1>
                 {property.id_bien && <span className="text-xs text-gray-400 font-mono">ID: {property.id_bien}</span>}
                 <VisitBadge status={property.visit_status}/>
-                <BillingBadge status={property.billing_status}/>
+                {/* Badge de edição: verifica se algum campo do relatório foi preenchido */}
+                {(property.data_relatorio || property.nr_relatorio || property.perito_avaliador || property.valor_mercado || property.metodo_avaliacao)
+                  ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Em edição</span>
+                  : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">Por iniciar</span>
+                }
               </div>
               <p className="text-xs text-gray-400 truncate">{[property.property_type, property.municipality, property.district].filter(Boolean).join(' · ')}</p>
             </div>
