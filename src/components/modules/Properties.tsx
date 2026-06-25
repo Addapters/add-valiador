@@ -8,7 +8,7 @@ import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pe
 import toast from 'react-hot-toast'
 import {
   getSavedFilters as _getSavedFilters, saveFilters as _saveFilters, clearFilters as _clearFilters, type PropertyFilters,
-  getSavedVisibleCols, saveVisibleCols, ALL_COLUMNS, type ColDef
+  getSavedVisibleCols, saveVisibleCols, ALL_COLUMNS, DEFAULT_VISIBLE, type ColDef
 } from '@/lib/userPrefs'
 
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
