@@ -855,16 +855,32 @@ function chauvenet(values: number[]): boolean[] {
   const mean = values.reduce((a, b) => a + b, 0) / n
   const std  = Math.sqrt(values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n)
   if (std === 0) return values.map(() => false)
-  // Aproximação da função de erro complementar
-  function erfc(x: number): number {
-    const t = 1 / (1 + 0.3275911 * Math.abs(x))
-    const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))))
-    return 2 * poly * Math.exp(-x * x)
+
+  // Função de distribuição normal cumulativa — implementação precisa (algoritmo de Hart)
+  function normCDF(x: number): number {
+    const a1 =  0.254829592
+    const a2 = -0.284496736
+    const a3 =  1.421413741
+    const a4 = -1.453152027
+    const a5 =  1.061405429
+    const p  =  0.3275911
+    const sign = x < 0 ? -1 : 1
+    x = Math.abs(x) / Math.SQRT2
+    const t = 1 / (1 + p * x)
+    const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
+    return 0.5 * (1 + sign * y)
   }
+
+  // Probabilidade de estar fora do intervalo [mean-d, mean+d]
+  function probOutside(d: number): number {
+    return 2 * (1 - normCDF(d))
+  }
+
   return values.map(v => {
-    const d = Math.abs(v - mean) / std
-    const prob = erfc(d / Math.SQRT2)
-    return n * prob < 0.5 // rejeitar se probabilidade × n < 0.5
+    const d    = Math.abs(v - mean) / std
+    const prob = probOutside(d)
+    // Critério de Chauvenet: rejeitar se n × prob < 0.5
+    return n * prob < 0.5
   })
 }
 
