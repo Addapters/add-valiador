@@ -262,15 +262,25 @@ export default function PropertyDetail() {
       let mapImageBlob: Blob | null = null
       if (mapRef.current && property.latitude) {
         try {
-          // Garante zoom nível 15 para captura
-          if (mapInst.current) mapInst.current.setZoom(15)
-          await new Promise(r => setTimeout(r, 800)) // aguarda tiles carregarem
+          // Zoom 17 para captura
+          if (mapInst.current) mapInst.current.setZoom(17)
+          await new Promise(r => setTimeout(r, 1200)) // aguarda tiles carregarem
+
+          // Esconde controlos temporariamente
+          const controls = mapRef.current.querySelectorAll<HTMLElement>(
+            '.leaflet-control-container'
+          )
+          controls.forEach(el => { el.style.display = 'none' })
+
           const html2canvas = (await import('html2canvas')).default
           const canvas = await html2canvas(mapRef.current, {
             useCORS: true, allowTaint: true, logging: false,
             width: mapRef.current.offsetWidth, height: mapRef.current.offsetHeight,
           })
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
+
+          // Restaura controlos
+          controls.forEach(el => { el.style.display = '' })
         } catch { /* mapa não disponível, continua sem ele */ }
       }
 

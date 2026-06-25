@@ -188,7 +188,33 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
               else p[field] = null
             }
           } else {
-            p[field] = NUMERIC.includes(field) ? (parseFloat(String(v).replace(',','.')) || null) : String(v).trim()
+            if (NUMERIC.includes(field)) {
+              // Handle European number format: 99.000,00€ → 99000
+              // Remove currency symbols, spaces, then handle . and ,
+              const raw = String(v).replace(/[€$£\s]/g, '').trim()
+              // If has both . and ,: . is thousands separator, , is decimal (PT format)
+              // If has only .: could be decimal (EN) or thousands (PT) — if >3 digits after, it's thousands
+              // If has only ,: decimal separator
+              let normalized = raw
+              if (raw.includes('.') && raw.includes(',')) {
+                // PT format: 99.000,00 → remove dots, replace comma with dot
+                normalized = raw.replace(/\./g, '').replace(',', '.')
+              } else if (raw.includes(',') && !raw.includes('.')) {
+                // Comma as decimal: 99,50 → 99.50
+                normalized = raw.replace(',', '.')
+              } else if (raw.includes('.')) {
+                // Dot: check if thousands separator (e.g. 99.000 → digits after dot <= 3 and no more dots)
+                const parts = raw.split('.')
+                if (parts.length === 2 && parts[1].length <= 3 && parts[0].length >= 1) {
+                  // Likely thousands separator: 99.000 → 99000
+                  normalized = parts.join('')
+                }
+                // else treat as decimal: 99.5 stays
+              }
+              p[field] = parseFloat(normalized) || null
+            } else {
+              p[field] = String(v).trim()
+            }
           }
         }
       })
