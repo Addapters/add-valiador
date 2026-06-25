@@ -173,7 +173,7 @@ export default function PropertyDetail() {
       const [pR, phR, cR, docR] = await Promise.all([
         supabase.from('properties').select('*, portfolios(name, clients(name))').eq('id', id as string).single(),
         supabase.from('property_photos').select('*').eq('property_id', id as string).order('slot').order('sort_order'),
-        supabase.from('market_comps').select('*, selected, chauvenet_rejected').eq('property_id', id as string).order('created_at', { ascending: false }),
+        supabase.from('market_comps').select('*, selected, chauvenet_rejected, uso, tipologia, ano_estado').eq('property_id', id as string).order('created_at', { ascending: false }),
         supabase.from('property_documents').select('*').eq('property_id', id as string).order('created_at', { ascending: false }),
       ])
       return {
@@ -1116,33 +1116,39 @@ function CompsSection({ propertyId, comps, onRefresh }: {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Portal</th>
-                  <th>Morada</th>
+                  <th>Localização</th>
+                  <th>Uso</th>
+                  <th>Tipologia</th>
+                  <th>Ano/Estado</th>
                   <th>Área (m²)</th>
                   <th>Preço</th>
                   <th>€/m²</th>
-                  <th>Notas</th>
+                  <th>Descrição</th>
+                  <th>Fonte</th>
                 </tr>
               </thead>
               <tbody>
                 {selected.map((c: any, i: number) => (
                   <tr key={c.id} className={c.chauvenet_rejected ? 'bg-red-50' : 'bg-emerald-50'}>
                     <td className="font-medium text-emerald-700">{i + 1}</td>
-                    <td>{c.portal || '—'}</td>
                     <td>{c.address || '—'}</td>
+                    <td>{c.uso || '—'}</td>
+                    <td>{c.tipologia || '—'}</td>
+                    <td>{c.ano_estado || '—'}</td>
                     <td>{c.area_m2 ? parseFloat(c.area_m2).toFixed(2).replace('.',',') : '—'}</td>
                     <td className="whitespace-nowrap font-medium">{fmtPrice(c.price)}</td>
                     <td className={`font-semibold ${c.chauvenet_rejected ? 'text-red-600' : 'text-emerald-700'}`}>
                       {c.epm2 ? c.epm2.toFixed(2).replace('.',',') : '—'}
                       {c.chauvenet_rejected && <span className="ml-1 text-red-400 font-normal">⚠️</span>}
                     </td>
-                    <td className="max-w-[200px] truncate">{c.notes || '—'}</td>
+                    <td className="max-w-[180px] truncate">{c.notes || '—'}</td>
+                    <td>{c.url ? <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-500 hover:text-brand-700"><ExternalLink size={11}/></a> : '—'}</td>
                   </tr>
                 ))}
                 <tr className="bg-emerald-100 font-semibold">
-                  <td colSpan={5} className="text-right text-emerald-800">Média €/m²</td>
+                  <td colSpan={7} className="text-right text-emerald-800">Média €/m²</td>
                   <td className="text-emerald-800">{avgSelected ? avgSelected.toFixed(2).replace('.',',') + ' €' : '—'}</td>
-                  <td></td>
+                  <td colSpan={2}></td>
                 </tr>
               </tbody>
             </table>
