@@ -236,14 +236,14 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
 
   // Valid columns in the properties table — anything else goes to datatape_data only
   const VALID_PROPERTY_COLS = new Set([
-    'external_ref','street','number','block','floor_letter','fracao',
+    'external_ref','id_bien','street','number','block','floor_letter','fracao',
     'address','parish','municipality','district','postal_code',
     'property_type','property_subtype','use_type','use_subtype','property_state',
     'typology','year_built','condition','area_m2','gross_area','useful_area',
     'land_area','area_garage_m2','area_annex_m2','fee_amount',
     'perito_avaliador','id_registo_predial','id_registo_matricial',
     'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
-    'nuc_risco','data_pedido','tipo_reavaliacao','tipo_via','escada','ampliacao','lugar',
+    'nuc_risco','data_pedido','tipo_via','escada','ampliacao','lugar','documentacao',
   ])
 
   function sanitiseForDB(p: any) {
