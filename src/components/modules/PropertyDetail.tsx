@@ -180,10 +180,8 @@ export default function PropertyDetail() {
       satellite.addTo(mapInst.current)
       L.control.layers({'Satélite':satellite,'Mapa':street},{},{position:'topright'}).addTo(mapInst.current)
       if (property.latitude) {
-        L.marker([property.latitude, property.longitude], {
-          draggable: true,
-          icon: L.divIcon({ className:'', html:`<div style="width:16px;height:16px;border-radius:50%;background:#1D9E75;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`, iconSize:[16,16], iconAnchor:[8,8] })
-        }).addTo(mapInst.current).bindPopup(`<b>${property.external_ref||property.ref}</b>`).openPopup()
+        // Centra o mapa nas coordenadas sem marcador
+        mapInst.current.setView([property.latitude, property.longitude], 16)
       }
     }, 150)
   }, [mapReady, tab, property?.latitude, property?.longitude])
