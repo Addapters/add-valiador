@@ -97,7 +97,8 @@ export async function generateAbancaReport(
   property: any,
   photos: { url: string; slot?: number }[],
   comps: any[],
-  templateUrl: string
+  templateUrl: string,
+  mapImageBlob?: Blob | null
 ): Promise<void> {
   const tmplBuf = await fetchBuf(templateUrl)
   if (!tmplBuf) throw new Error('Não foi possível carregar o modelo. Verifique a variável VITE_REPORT_TEMPLATE_URL.')
@@ -208,6 +209,31 @@ export async function generateAbancaReport(
   set('V303',  fmtDate(p.data_conclusao || p.data_relatorio))
   set('AC303', fmtDate(p.prev_valuation_date))
   set('D306',  v(p.perito_avaliador))
+
+  // IMAGEM DO MAPA — B406:AI423 (centrada, sem esticar)
+  if (mapImageBlob) {
+    const wsm = wb.getWorksheet('RELATÓRIO - PT')
+    if (wsm) {
+      try {
+        const mapBuf = await mapImageBlob.arrayBuffer()
+        const mapId  = wb.addImage({ buffer: mapBuf as ArrayBuffer, extension: 'png' })
+        // Slot: col B(1) a AI(34), linhas 406-423 → 18 linhas
+        // Dimensões slot: 33 colunas × ~64px = ~2100px wide, 18 linhas × ~20px = ~360px high
+        // Imagem centrada sem esticar: max 600×280px
+        const MAP_W  = 600
+        const MAP_H  = 280
+        const SLOT_W = 1050 // aprox px
+        const SLOT_H = 320
+        const EMU    = 9525
+        const offX   = Math.max(0, Math.round((SLOT_W - MAP_W) / 2)) * EMU
+        const offY   = Math.max(0, Math.round((SLOT_H - MAP_H) / 2)) * EMU
+        wsm.addImage(mapId, {
+          tl:  { col: 1, row: 405, colOff: offX, rowOff: offY } as any,
+          ext: { width: MAP_W, height: MAP_H },
+        })
+      } catch { /* ignorar erro do mapa */ }
+    }
+  }
 
   // FOTOS DO IMÓVEL — posições exactas no template (folha RELATÓRIO - PT)
   // Foto 1: B350:Q362  Foto 2: R350:AI362
