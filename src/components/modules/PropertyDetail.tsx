@@ -765,47 +765,11 @@ export default function PropertyDetail() {
 
         {/* SEC 16 ── Comparáveis */}
         {tab==='sec16' && (
-          <div className="space-y-4">
-            <CompForm propertyId={property.id} onAdded={() => qc.invalidateQueries({ queryKey: ['property', id] })}/>
-            {comps.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="table-base text-xs">
-                  <thead><tr>
-                    <th>Portal</th><th>Ref.</th><th>Morada</th>
-                    <th>Área (m²)</th><th>Preço (€)</th><th>€/m²</th><th>Notas</th><th></th>
-                  </tr></thead>
-                  <tbody>
-                    {comps.map((c: any) => {
-                      const epm2 = c.price&&c.area_m2 ? (parseFloat(c.price)/parseFloat(c.area_m2)).toFixed(2).replace('.',',') : '—'
-                      return (
-                        <tr key={c.id}>
-                          <td>{c.portal||'—'}</td>
-                          <td>{c.listing_ref ? <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">{c.listing_ref}</a> : '—'}</td>
-                          <td className="max-w-[120px] truncate">{c.address||'—'}</td>
-                          <td>{c.area_m2 ? parseFloat(c.area_m2).toFixed(2).replace('.',',') : '—'}</td>
-                          <td>{c.price ? formatCurrency(c.price) : '—'}</td>
-                          <td>{epm2}</td>
-                          <td className="max-w-[120px] truncate">{c.notes||'—'}</td>
-                          <td><button className="text-red-400 hover:text-red-600" onClick={async () => {
-                            if (confirm('Eliminar este comparável?')) {
-                              await supabase.from('market_comps').delete().eq('id', c.id)
-                              qc.invalidateQueries({ queryKey: ['property', id] })
-                            }
-                          }}><Trash2 size={12}/></button></td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                <p className="text-xs text-gray-400 mt-2">Média €/m²: {(() => {
-                  const valid = comps.filter((c: any) => c.price&&c.area_m2)
-                  if (!valid.length) return '—'
-                  const avg = valid.reduce((s: number, c: any) => s + parseFloat(c.price)/parseFloat(c.area_m2), 0) / valid.length
-                  return avg.toFixed(2).replace('.',',') + ' €/m²'
-                })()}</p>
-              </div>
-            )}
-          </div>
+          <CompsSection
+            propertyId={property.id}
+            comps={comps}
+            onRefresh={() => qc.invalidateQueries({ queryKey: ['property', id] })}
+          />
         )}
 
         {/* SEC 17 ── Avaliação Anterior */}
@@ -880,6 +844,207 @@ export default function PropertyDetail() {
         )}
 
       </div>
+    </div>
+  )
+}
+
+// ── Critério de Chauvenet ──────────────────────────────────────────────────
+function chauvenet(values: number[]): boolean[] {
+  const n = values.length
+  if (n < 3) return values.map(() => false)
+  const mean = values.reduce((a, b) => a + b, 0) / n
+  const std  = Math.sqrt(values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n)
+  if (std === 0) return values.map(() => false)
+  // Aproximação da função de erro complementar
+  function erfc(x: number): number {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x))
+    const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))))
+    return 2 * poly * Math.exp(-x * x)
+  }
+  return values.map(v => {
+    const d = Math.abs(v - mean) / std
+    const prob = erfc(d / Math.SQRT2)
+    return n * prob < 0.5 // rejeitar se probabilidade × n < 0.5
+  })
+}
+
+// ── Inline editable cell ───────────────────────────────────────────────────
+function EditCell({ value, type='text', onSave, className='' }: {
+  value: any; type?: string; onSave: (v: any) => void; className?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value ?? '')
+  useEffect(() => setVal(value ?? ''), [value])
+
+  function save() {
+    const v = type === 'number' ? (val ? parseFloat(val) : null) : (val || null)
+    onSave(v); setEditing(false)
+  }
+
+  if (!editing) return (
+    <div className={`cursor-pointer hover:bg-brand-50 rounded px-1 py-0.5 min-h-[22px] ${className}`}
+      onClick={() => setEditing(true)}>
+      {value ?? <span className="text-gray-300 italic">—</span>}
+    </div>
+  )
+  return (
+    <input autoFocus type={type}
+      className="border border-brand-300 rounded px-1 py-0.5 text-xs w-full focus:outline-none focus:ring-1 focus:ring-brand-400"
+      value={val} onChange={e => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setVal(value??''); setEditing(false) } }}
+    />
+  )
+}
+
+// ── Comparáveis com Chauvenet e selecção ──────────────────────────────────
+function CompsSection({ propertyId, comps, onRefresh }: {
+  propertyId: string; comps: any[]; onRefresh: () => void
+}) {
+  const [applying, setApplying] = useState(false)
+  const selectedCount = comps.filter((c: any) => c.selected).length
+
+  // Calcula €/m² para cada comparável
+  const compsWithEpm2 = comps.map((c: any) => ({
+    ...c,
+    epm2: c.price && c.area_m2 ? parseFloat(c.price) / parseFloat(c.area_m2) : null
+  }))
+
+  // Stats para os seleccionados (não rejeitados)
+  const valid = compsWithEpm2.filter(c => c.epm2 && !c.chauvenet_rejected && c.selected)
+  const allValid = compsWithEpm2.filter(c => c.epm2 && !c.chauvenet_rejected)
+  const avg = allValid.length ? allValid.reduce((s, c) => s + c.epm2!, 0) / allValid.length : null
+  const avgSelected = valid.length ? valid.reduce((s, c) => s + c.epm2!, 0) / valid.length : null
+
+  async function updateComp(compId: string, patch: any) {
+    await supabase.from('market_comps').update(patch).eq('id', compId)
+    onRefresh()
+  }
+
+  async function applyChauvenet() {
+    setApplying(true)
+    const withEpm2 = compsWithEpm2.filter(c => c.epm2 !== null)
+    if (withEpm2.length < 3) { toast.error('Precisas de pelo menos 3 comparáveis com área e preço para aplicar o Critério de Chauvenet.'); setApplying(false); return }
+    const values = withEpm2.map(c => c.epm2!)
+    const rejected = chauvenet(values)
+    for (let i = 0; i < withEpm2.length; i++) {
+      await supabase.from('market_comps').update({ chauvenet_rejected: rejected[i] }).eq('id', withEpm2[i].id)
+    }
+    // Auto-seleccionar os 5 melhores (mais próximos da média, não rejeitados)
+    const kept = withEpm2.filter((_, i) => !rejected[i])
+    const mean = kept.reduce((s, c) => s + c.epm2!, 0) / kept.length
+    const sorted = [...kept].sort((a, b) => Math.abs(a.epm2! - mean) - Math.abs(b.epm2! - mean))
+    const top5ids = new Set(sorted.slice(0, 5).map(c => c.id))
+    for (const c of comps) {
+      await supabase.from('market_comps').update({ selected: top5ids.has(c.id) }).eq('id', c.id)
+    }
+    onRefresh()
+    setApplying(false)
+    const rejCount = rejected.filter(Boolean).length
+    toast.success(`Chauvenet aplicado — ${rejCount} outlier(s) rejeitado(s), ${Math.min(5, kept.length)} seleccionados`)
+  }
+
+  async function toggleSelected(c: any) {
+    if (!c.selected && selectedCount >= 5) { toast.error('Máximo de 5 comparáveis seleccionados para o relatório.'); return }
+    await updateComp(c.id, { selected: !c.selected })
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <span>{comps.length} comparáveis</span>
+          <span className="text-brand-600 font-medium">{selectedCount}/5 seleccionados para relatório</span>
+          {avg !== null && <span>Média €/m²: <strong>{avg.toFixed(2).replace('.',',')} €</strong></span>}
+          {avgSelected !== null && selectedCount > 0 && (
+            <span>Média seleccionados: <strong>{avgSelected.toFixed(2).replace('.',',')} €</strong></span>
+          )}
+        </div>
+        <button className="btn flex items-center gap-1.5 text-xs" onClick={applyChauvenet} disabled={applying}>
+          {applying ? <Loader2 size={11} className="animate-spin"/> : '📊'}
+          Aplicar Critério de Chauvenet
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="table-base text-xs">
+          <thead>
+            <tr>
+              <th className="w-8 text-center">✓</th>
+              <th>Portal</th>
+              <th>Morada</th>
+              <th>Tipo</th>
+              <th>Área (m²)</th>
+              <th>Preço (€)</th>
+              <th>€/m²</th>
+              <th>Notas</th>
+              <th>URL</th>
+              <th className="w-8"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {compsWithEpm2.map((c: any) => {
+              const isRejected = c.chauvenet_rejected
+              const isSelected = c.selected
+              return (
+                <tr key={c.id} className={
+                  isRejected ? 'bg-red-50 opacity-60' :
+                  isSelected ? 'bg-emerald-50' : ''
+                }>
+                  {/* Checkbox selecção */}
+                  <td className="text-center">
+                    <button onClick={() => toggleSelected(c)}
+                      title={isRejected ? 'Rejeitado pelo Critério de Chauvenet' : isSelected ? 'Remover do relatório' : 'Incluir no relatório'}
+                      className={`w-5 h-5 rounded border flex items-center justify-center mx-auto transition-colors
+                        ${isRejected ? 'border-red-300 bg-red-100 cursor-not-allowed' :
+                          isSelected ? 'border-emerald-500 bg-emerald-500 text-white' :
+                          'border-gray-300 hover:border-brand-400'}`}
+                      disabled={isRejected}>
+                      {isSelected && !isRejected && <span className="text-[10px]">✓</span>}
+                      {isRejected && <span className="text-[10px] text-red-400">✕</span>}
+                    </button>
+                  </td>
+                  <td><EditCell value={c.portal} onSave={v => updateComp(c.id, { portal: v })}/></td>
+                  <td className="max-w-[140px]"><EditCell value={c.address} onSave={v => updateComp(c.id, { address: v })}/></td>
+                  <td className="max-w-[100px]"><EditCell value={c.notes?.split('|')[0]?.trim()} onSave={v => updateComp(c.id, { notes: v })}/></td>
+                  <td><EditCell value={c.area_m2} type="number" onSave={v => updateComp(c.id, { area_m2: v })}/></td>
+                  <td><EditCell value={c.price} type="number" onSave={v => updateComp(c.id, { price: v })}/></td>
+                  <td className={`font-medium whitespace-nowrap ${isRejected ? 'text-red-400' : isSelected ? 'text-emerald-700' : ''}`}>
+                    {c.epm2 ? c.epm2.toFixed(2).replace('.',',') : '—'}
+                  </td>
+                  <td className="max-w-[160px]"><EditCell value={c.notes} onSave={v => updateComp(c.id, { notes: v })}/></td>
+                  <td>
+                    {c.url
+                      ? <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-500 hover:text-brand-700"><ExternalLink size={11}/></a>
+                      : <EditCell value={c.url} onSave={v => updateComp(c.id, { url: v })} className="text-gray-300"/>
+                    }
+                  </td>
+                  <td>
+                    <button className="text-red-400 hover:text-red-600" onClick={async () => {
+                      if (confirm('Eliminar este comparável?')) {
+                        await supabase.from('market_comps').delete().eq('id', c.id)
+                        onRefresh()
+                      }
+                    }}><Trash2 size={11}/></button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legenda */}
+      <div className="flex gap-4 text-xs text-gray-400">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300 inline-block"></span> Seleccionado para relatório</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block"></span> Rejeitado (Chauvenet)</span>
+        <span className="text-gray-300 italic">Clica em qualquer célula para editar</span>
+      </div>
+
+      {/* Add form */}
+      <CompForm propertyId={propertyId} onAdded={onRefresh}/>
     </div>
   )
 }
