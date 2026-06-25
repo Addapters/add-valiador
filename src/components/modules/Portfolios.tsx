@@ -131,7 +131,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
     const reader = new FileReader()
     reader.onload = ev => {
       const wb   = XLSX.read(ev.target!.result, { type:'array', cellDates:true })
-      const raw  = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:null, raw:false }) as any[]
+      const raw  = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:null, raw:true }) as any[]
       // Filtra linhas completamente vazias (todas as colunas null ou string vazia)
       const data = raw.filter((row: any) =>
         Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '' && String(v) !== 'null')

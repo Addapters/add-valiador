@@ -108,6 +108,51 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+// Traduz chaves da datatape de espanhol/inglês para português
+function translateDatatapeKey(key: string): string {
+  const map: Record<string, string> = {
+    'ID_BIEN':                    'ID do Bem',
+    'NUC_RIESGO':                 'NUC Risco',
+    'TIPO_BIEN':                  'Tipo de Bem',
+    'SUBTIPO_BIEN':               'Subtipo de Bem',
+    'USO_BIEN':                   'Uso do Bem',
+    'SUBUSO_BIEN':                'Subuso do Bem',
+    'ESTADO_BIEN':                'Estado do Bem',
+    'TIPO_REEVALUACION':          'Tipo de Reavaliação',
+    'SUPERFICIE_ADOPTADA_FINCA':  'Área Adoptada (Finca)',
+    'SUPERFICIE_ADOPTADA_GARAJE': 'Área Adoptada (Garagem)',
+    'SUPERFICIE_ADOPTADA_TRASTERO':'Área Adoptada (Arrumos)',
+    'TIPO_VIA':                   'Tipo de Via',
+    'CALLE':                      'Rua',
+    'NUMERO':                     'Número',
+    'BLOQUE':                     'Bloco',
+    'ESCALERA':                   'Escada',
+    'PISO':                       'Piso',
+    'PUERTA':                     'Porta',
+    'CODIGO_POSTAL':              'Código Postal',
+    'NOMBRE_MUNICIPIO':           'Município',
+    'NOMBRE_PROVINCIA':           'Província',
+    'NOMBRE_DISTRITO':            'Distrito',
+    'NOMBRE_CONCELHO':            'Concelho',
+    'REFERENCIA':                 'Referência',
+    'FECHA_SOLICITUD':            'Data do Pedido',
+    'FECHA_TASACION':             'Data da Avaliação',
+    'TASACION':                   'Valor da Avaliação',
+    'EMPRESA_TASADORA':           'Empresa Avaliadora',
+    'AVALIADORA':                 'Perito Avaliador',
+    'FRACCION_FISCAL':            'Fracção Fiscal',
+    'NUMERO_REGISTRO_PREDIAL':    'Nº Registo Predial',
+    'ARTIGO_MATRICIAL_FISCAL':    'Artigo Matricial',
+    'AÑO_CONSTRUCCION':           'Ano de Construção',
+    'ESTADO_CONSERVACION':        'Estado de Conservação',
+    'NOMBRE_LOCALIDAD':           'Localidade',
+    'NOMBRE_PAIS':                'País',
+    'LATITUD':                    'Latitude',
+    'LONGITUD':                   'Longitude',
+  }
+  return map[key.toUpperCase()] || key
+}
+
 const SLOTS = [1,2,3,4,5,6,7,8]
 
 export default function PropertyDetail() {
@@ -180,8 +225,14 @@ export default function PropertyDetail() {
       satellite.addTo(mapInst.current)
       L.control.layers({'Satélite':satellite,'Mapa':street},{},{position:'topright'}).addTo(mapInst.current)
       if (property.latitude) {
-        // Centra o mapa nas coordenadas sem marcador
-        mapInst.current.setView([property.latitude, property.longitude], 16)
+        L.circleMarker([property.latitude, property.longitude], {
+          radius: 8,
+          fillColor: '#1D9E75',
+          color: 'white',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 1,
+        }).addTo(mapInst.current)
       }
     }, 150)
   }, [mapReady, tab, property?.latitude, property?.longitude])
@@ -760,13 +811,6 @@ export default function PropertyDetail() {
         {/* SEC 17 ── Avaliação Anterior */}
         {tab==='sec17' && (
           <div className="space-y-6">
-            <Section title="Avaliação Anterior">
-              <F label="Data da Avaliação"   field="prev_valuation_date"   value={property.prev_valuation_date}   type="date"   onSave={save}/>
-              <F label="Valor (€)"           field="prev_valuation_value"  value={property.prev_valuation_value}  type="number" onSave={save}/>
-              <F label="Método"              field="prev_valuation_method" value={property.prev_valuation_method}               onSave={save}/>
-              <F label="Perito Anterior"     field="prev_valuation_expert" value={property.prev_valuation_expert}               onSave={save}/>
-              <F label="Entidade Anterior"   field="prev_valuation_entity" value={property.prev_valuation_entity}               onSave={save}/>
-            </Section>
 
             {/* Documentos de avaliações anteriores */}
             <div>
@@ -803,14 +847,14 @@ export default function PropertyDetail() {
               )}
             </div>
 
-            {/* Dados originais da datatape */}
+            {/* Dados originais da datatape traduzidos */}
             {datatapeFields.length > 0 && (
               <div>
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Dados Originais da Data-tape</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                   {datatapeFields.map(([k,v]) => (
                     <div key={k} className="flex gap-2 px-2.5 py-1.5 bg-gray-50 rounded text-xs">
-                      <span className="text-gray-400 font-mono min-w-[160px] flex-shrink-0">{k}</span>
+                      <span className="text-gray-400 font-mono min-w-[180px] flex-shrink-0">{translateDatatapeKey(k)}</span>
                       <span className="text-gray-700 truncate">{v}</span>
                     </div>
                   ))}
