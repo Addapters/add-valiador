@@ -340,7 +340,8 @@ export default function PropertyDetail() {
       }).filter((ph: any) => ph.url)
 
       await generateAbancaReport(property, photoUrls, comps, templateUrl, mapImageBlob)
-      toast.success('Relatório gerado com sucesso')
+      toast.success('Relatório gerado — verifica o teu computador e a tab 13. Certificação para o link online')
+      qc.invalidateQueries({ queryKey: ['property', id] })
     } catch (e: any) { toast.error(e.message) }
     finally { setGenerating(false) }
   }
@@ -697,6 +698,15 @@ export default function PropertyDetail() {
             <F label="NIF do Perito"             field="perito_nif"            value={property.perito_nif}                       onSave={save}/>
             <F label="N.º CMVM"                  field="perito_cmvm"           value={property.perito_cmvm}                      onSave={save}/>
           </Section>
+          {property.report_url && (
+            <div className="mt-3 p-3 bg-brand-50 rounded-lg border border-brand-100">
+              <p className="text-xs text-gray-500 mb-1">Relatório disponível online:</p>
+              <a href={property.report_url} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-brand-600 hover:underline break-all flex items-center gap-1">
+                <ExternalLink size={11}/> {property.report_url}
+              </a>
+            </div>
+          )}
         )}
 
         {/* SEC 14 ── Faturação */}
@@ -1004,11 +1014,14 @@ function CompsSection({ propertyId, comps, onRefresh }: {
                 <tr>
                   <th className="w-8 text-center">✓</th>
                   <th>Portal</th>
-                  <th>Morada</th>
+                  <th>Localização</th>
+                  <th>Uso</th>
+                  <th>Tipologia</th>
+                  <th>Ano/Estado</th>
                   <th>Área (m²)</th>
                   <th>Preço</th>
                   <th>€/m²</th>
-                  <th>Notas</th>
+                  <th>Descrição</th>
                   <th>Link</th>
                   <th className="w-8"></th>
                 </tr>
@@ -1030,9 +1043,12 @@ function CompsSection({ propertyId, comps, onRefresh }: {
                         {c.selected && <span className="text-[10px]">✓</span>}
                       </button>
                     </td>
-                    <td><EditCell value={c.portal}  onSave={v => updateComp(c.id, { portal: v })}/></td>
-                    <td className="max-w-[130px]"><EditCell value={c.address} onSave={v => updateComp(c.id, { address: v })}/></td>
-                    <td><EditCell value={c.area_m2} type="number" onSave={v => updateComp(c.id, { area_m2: v })}/></td>
+                    <td><EditCell value={c.portal}     onSave={v => updateComp(c.id, { portal: v })}/></td>
+                    <td className="max-w-[120px]"><EditCell value={c.address}    onSave={v => updateComp(c.id, { address: v })}/></td>
+                    <td><EditCell value={c.uso}        onSave={v => updateComp(c.id, { uso: v })}/></td>
+                    <td><EditCell value={c.tipologia}  onSave={v => updateComp(c.id, { tipologia: v })}/></td>
+                    <td><EditCell value={c.ano_estado} onSave={v => updateComp(c.id, { ano_estado: v })}/></td>
+                    <td><EditCell value={c.area_m2}    type="number" onSave={v => updateComp(c.id, { area_m2: v })}/></td>
                     <td className="whitespace-nowrap">
                       <EditCell
                         value={c.price ? parseFloat(c.price).toLocaleString('pt-PT', { minimumFractionDigits:0, maximumFractionDigits:0 }) : ''}
@@ -1046,7 +1062,7 @@ function CompsSection({ propertyId, comps, onRefresh }: {
                         c.selected ? 'text-emerald-700' : ''}`}>
                       {c.epm2 ? c.epm2.toFixed(2).replace('.',',') : '—'}
                     </td>
-                    <td className="max-w-[180px]"><EditCell value={c.notes} onSave={v => updateComp(c.id, { notes: v })}/></td>
+                    <td className="max-w-[160px]"><EditCell value={c.notes} onSave={v => updateComp(c.id, { notes: v })}/></td>
                     <td className="text-center">
                       {c.url
                         ? <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-500 hover:text-brand-700"><ExternalLink size={11}/></a>
