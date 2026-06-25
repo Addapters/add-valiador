@@ -335,11 +335,13 @@ export async function generateAbancaReport(
     }), { upsert: true })
     const { data: urlData } = sb.storage.from('reports').getPublicUrl(storagePath)
     if (urlData?.publicUrl) {
-      console.log('Relatório disponível online:', urlData.publicUrl)
       // Guarda URL no imóvel
       try {
         await sb.from('properties').update({ report_url: urlData.publicUrl }).eq('id', p.id)
       } catch {}
+      // Abre no Google Sheets para visualização online
+      const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(urlData.publicUrl)}`
+      window.open(viewerUrl, '_blank')
     }
   } catch { /* continua mesmo se falhar o upload */ }
 

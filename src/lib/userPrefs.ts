@@ -43,6 +43,7 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
   visit_date:             { label:'Data visita',           group:'base' },
   billing_status:         { label:'Est. faturação',        group:'base' },
   fee_amount:             { label:'Honorário',             group:'base' },
+  honorarios_addapters:   { label:'Honorários Addapters',  group:'base' },
   po_number:              { label:'Nº PO',                 group:'base' },
   invoice_number:         { label:'Nº Fatura',             group:'base' },
   payment_date:           { label:'Dt. Pagamento',         group:'base' },
@@ -66,7 +67,7 @@ export const DEFAULT_VISIBLE = [
   'external_ref','id_bien','district','municipality','parish',
   'street','number','postal_code',
   'property_type','typology','area_m2',
-  'perito_avaliador','visit_status','billing_status','fee_amount',
+  'perito_avaliador','visit_status','billing_status','fee_amount','honorarios_addapters',
   'nuc_risco','data_pedido',
 ]
 
