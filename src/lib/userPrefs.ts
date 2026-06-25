@@ -13,6 +13,7 @@ export const DEFAULT_FILTERS: PropertyFilters = {
 export const ALL_COLUMNS: Record<string, ColDef> = {
   // Base fields
   external_ref:           { label:'Ref. Externa',          group:'base' },
+  id_bien:                { label:'ID do Bem',             group:'base' },
   id_registo_predial:     { label:'Reg. Predial',          group:'base' },
   id_registo_matricial:   { label:'Reg. Matricial',        group:'base' },
   fracao:                 { label:'Fracção',               group:'base' },
@@ -62,11 +63,11 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
 }
 
 export const DEFAULT_VISIBLE = [
-  'external_ref','district','municipality','parish',
+  'external_ref','id_bien','district','municipality','parish',
   'street','number','postal_code',
   'property_type','typology','area_m2',
   'perito_avaliador','visit_status','billing_status','fee_amount',
-  'nuc_risco','data_pedido','tipo_reavaliacao',
+  'nuc_risco','data_pedido',
 ]
 
 // No-op stubs kept for compatibility — não usam localStorage
