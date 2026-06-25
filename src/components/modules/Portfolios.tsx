@@ -192,13 +192,12 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
         }
       })
 
-      if (feeRules.length && p.property_type && !p.fee_amount) {
+      if (p.property_type && !p.fee_amount) {
         const tipo    = (p.property_type    || '').toUpperCase().trim()
         const subtipo = (p.property_subtype || '').toUpperCase().trim()
         let activity  = ''
         const area    = p.area_m2 || p.gross_area || 0
 
-        // Mapeamento completo dos valores TIPO_BIEN do ABANCA
         if      (tipo === 'VIVIENDA (PISO)'       || tipo === 'VIVIENDA' || tipo === 'PISO' || tipo === 'ATICO' || tipo === 'DUPLEX' || tipo === 'ESTUDIO') activity = 'Apartamento'
         else if (tipo === 'VIVIENDA UNIFAMILIAR'  || tipo === 'CHALET'   || tipo === 'CASA')                                                               activity = 'Moradias unifamiliares'
         else if (tipo === 'CHALET ADOSADO'        || tipo === 'CHALET PAREADO' || tipo === 'CASA ADOSADA')                                                 activity = 'Moradias em banda'

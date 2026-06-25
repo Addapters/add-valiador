@@ -309,21 +309,22 @@ export default function PropertyDetail() {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-base font-semibold">{property.external_ref||property.ref}</h1>
-                {property.id_bien && <span className="text-xs text-gray-400 font-mono">ID: {property.id_bien}</span>}
+                {property.id_bien && <span className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">ID: {property.id_bien}</span>}
                 <VisitBadge status={property.visit_status}/>
-                {/* Badge de edição: verifica se algum campo do relatório foi preenchido */}
                 {(property.data_relatorio || property.nr_relatorio || property.perito_avaliador || property.valor_mercado || property.metodo_avaliacao)
                   ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Em edição</span>
                   : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">Por iniciar</span>
                 }
               </div>
-              <p className="text-xs text-gray-400 truncate">{[property.property_type, property.municipality, property.district].filter(Boolean).join(' · ')}</p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-xs text-gray-400 truncate">{[property.property_type, property.municipality, property.district].filter(Boolean).join(' · ')}</p>
+                <button className="btn btn-primary flex items-center gap-1.5 whitespace-nowrap text-xs py-1" onClick={generateReport} disabled={generating}>
+                  {generating ? <Loader2 size={12} className="animate-spin"/> : <FileSpreadsheet size={12}/>}
+                  Gerar relatório
+                </button>
+              </div>
             </div>
           </div>
-          <button className="btn btn-primary flex items-center gap-1.5 whitespace-nowrap text-xs" onClick={generateReport} disabled={generating}>
-            {generating ? <Loader2 size={12} className="animate-spin"/> : <FileSpreadsheet size={12}/>}
-            Gerar relatório
-          </button>
         </div>
 
         {/* Tabs — scroll horizontal */}

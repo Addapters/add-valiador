@@ -128,6 +128,19 @@ function InlineEdit({ value, onSave, datalistId, options }: { value:string|null;
   )
 }
 
+const COL_KEY = 'addvaliador_visible_cols'
+
+function loadVisibleCols(): string[] {
+  try {
+    const r = sessionStorage.getItem(COL_KEY)
+    return r ? JSON.parse(r) : [...DEFAULT_VISIBLE]
+  } catch { return [...DEFAULT_VISIBLE] }
+}
+
+function persistVisibleCols(cols: string[]) {
+  try { sessionStorage.setItem(COL_KEY, JSON.stringify(cols)) } catch {}
+}
+
 const FILTER_KEY = 'addvaliador_props_filters'
 
 function loadFilters(): PropertyFilters {
@@ -143,7 +156,12 @@ function persistFilters(f: PropertyFilters) {
 export default function Properties() {
   const qc = useQueryClient()
   const [filters,     setFiltersRaw] = useState<PropertyFilters>(loadFilters)
-  const [visibleCols, setVisibleCols] = useState<string[]>(getSavedVisibleCols)
+  const [visibleCols, setVisibleColsRaw] = useState<string[]>(loadVisibleCols)
+
+  function setVisibleCols(cols: string[]) {
+    persistVisibleCols(cols)
+    setVisibleColsRaw(cols)
+  }
   const [collapsed,   setCollapsed]   = useState<Record<string,boolean>>({})
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
   const [bulkVisit,   setBulkVisit]   = useState('')
