@@ -919,10 +919,16 @@ function CompsSection({ propertyId, comps, onRefresh }: {
 }) {
   const [applying, setApplying] = useState(false)
 
-  const compsWithEpm2 = comps.map((c: any) => ({
-    ...c,
-    epm2: c.price && c.area_m2 ? parseFloat(c.price) / parseFloat(c.area_m2) : null
-  }))
+  const compsWithEpm2 = [...comps]
+    .map((c: any) => ({
+      ...c,
+      epm2: c.price && c.area_m2 ? parseFloat(c.price) / parseFloat(c.area_m2) : null
+    }))
+    .sort((a, b) => {
+      if (a.epm2 === null) return 1
+      if (b.epm2 === null) return -1
+      return a.epm2 - b.epm2
+    })
 
   const selected      = compsWithEpm2.filter(c => c.selected)
   const selectedCount = selected.length
@@ -1077,7 +1083,7 @@ function CompsSection({ propertyId, comps, onRefresh }: {
             Podes na mesma seleccioná-los — ficam marcados a vermelho como aviso.
           </div>
           <button className="btn flex items-center gap-1.5 text-xs whitespace-nowrap" onClick={applyChauvenet} disabled={applying}>
-            {applying ? <Loader2 size={11} className="animate-spin"/> : '📊'}
+            {applying ? <Loader2 size={11} className="animate-spin"/> : null}
             Aplicar Critério de Chauvenet
           </button>
         </div>
