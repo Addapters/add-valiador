@@ -130,15 +130,17 @@ export async function generateAbancaReport(
 
   // Preenche os dados de cada imóvel nos blocos do template
   // O template tem linhas consecutivas: imóvel 1 na linha X, imóvel 2 em X+1, imóvel 3 em X+2
-  // idx=0 → offset 0, idx=1 → offset +1, idx=2 → offset +2
   function fillBlock(idx: number, prop: any) {
-    const off = idx // offset de linha
+    const off = idx
 
-    // Id fica em B19 (imóvel 1), B20 (imóvel 2), B21 (imóvel 3)
-    set(`B${19 + off}`, v(prop.id_bien))
+    const id    = v(prop.id_bien)
+    const idRel = v(prop.external_ref, v(prop.ref))
 
-    // Morada — linha base determinada pelo template actual
-    // Tipo de via, Morada, Nº, Piso, Porta, Bloco, Portal, Escada
+    // ── Morada ──────────────────────────────────────────────
+    // Id/IdRel
+    set(`B${19 + off}`, id)
+    set(`C${19 + off}`, idRel)
+    // Campos
     set(`D${19 + off}`,  tr(v(prop.tipo_via)))
     set(`I${19 + off}`,  v(prop.street, v(prop.address)))
     set(`AE${19 + off}`, v(prop.number))
@@ -148,13 +150,17 @@ export async function generateAbancaReport(
     set(`Z${19 + off}`,  v(prop.escada))
     set(`AB${19 + off}`, v(prop.portal))
 
-    // Código postal / localização — secção seguinte, mesma lógica de offset
+    // ── Código postal / Localização ──────────────────────────
+    set(`B${25 + off}`, id)
+    set(`C${25 + off}`, idRel)
     set(`D${25 + off}`,  v(prop.postal_code))
     set(`I${25 + off}`,  v(prop.district))
     set(`P${25 + off}`,  v(prop.municipality))
     set(`W${25 + off}`,  v(prop.parish))
 
-    // Coordenadas
+    // ── Coordenadas ──────────────────────────────────────────
+    set(`B${31 + off}`, id)
+    set(`C${31 + off}`, idRel)
     if (prop.longitude) set(`D${31 + off}`, prop.longitude)
     if (prop.latitude)  set(`G${31 + off}`, prop.latitude)
   }
