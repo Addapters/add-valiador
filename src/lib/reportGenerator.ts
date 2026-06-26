@@ -130,7 +130,7 @@ export async function generateAbancaReport(
   set('X9',  v(p.tipo_servico, 'Avaliação'))
   set('X10', v(p.finalidade, 'Adjudicado sem visita interior'))
   set('X11', v(p.external_ref, v(p.ref)))   // IdRel = Referência externa
-  set('X8',  v(p.id_bien))                   // Id = ID do Bem (id_bien)
+  set('D101', v(p.banco))                    // Banco
 
   // Id e IdRel — removido mapeamento automático (não preencher estas células)
 
