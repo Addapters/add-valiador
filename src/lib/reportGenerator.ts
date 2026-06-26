@@ -113,7 +113,31 @@ export async function generateAbancaReport(
   if (!tmplBuf) throw new Error('Não foi possível carregar o modelo. Verifique a variável VITE_REPORT_TEMPLATE_URL.')
 
   const wb = new ExcelJS.Workbook()
-  await wb.xlsx.load(tmplBuf)
+
+  // Pré-processa para remover shared formulas que o ExcelJS não suporta
+  async function cleanSharedFormulas(buf: ArrayBuffer): Promise<ArrayBuffer> {
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = await JSZip.loadAsync(buf)
+      const sheetFiles = Object.keys(zip.files).filter(f => /xl\/worksheets\/sheet\d+\.xml/.test(f))
+      for (const sf of sheetFiles) {
+        let xml: string = await zip.files[sf].async('string')
+        // Master shared formula: <f t="shared" ref="A1:A10" si="0">FORMULA</f> → <f>FORMULA</f>
+        xml = xml.replace(/<f\s[^>]*t="shared"[^>]*ref="[^"]*"[^>]*>([^<]*)<\/f>/g, '<f>$1</f>')
+        xml = xml.replace(/<f\s[^>]*ref="[^"]*"[^>]*t="shared"[^>]*>([^<]*)<\/f>/g, '<f>$1</f>')
+        // Clone shared formula (sem conteúdo) → remove
+        xml = xml.replace(/<f\s[^>]*t="shared"[^>]*\/>/g, '')
+        xml = xml.replace(/<f\s[^>]*si="\d+"[^>]*\/>/g, '')
+        zip.file(sf, xml)
+      }
+      return await zip.generateAsync({ type: 'arraybuffer' })
+    } catch {
+      return buf
+    }
+  }
+
+  const cleanBuf = await cleanSharedFormulas(tmplBuf as ArrayBuffer)
+  await wb.xlsx.load(cleanBuf)
 
   const ws = wb.getWorksheet('RELATÓRIO - PT')
   if (!ws) throw new Error('Folha "RELATÓRIO - PT" não encontrada no modelo.')
