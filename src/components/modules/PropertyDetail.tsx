@@ -14,14 +14,16 @@ declare global { interface Window { L: any } }
 
 const TABS = [
   'sec1','sec2','sec3','sec4','sec5','sec6','sec7','sec8',
-  'sec9','sec10','sec11','sec12','sec13','sec14','sec15','sec16','sec17','sec18'
+  'sec9','sec10','sec11','obras','residual',
+  'sec13','sec14','sec15','sec16','sec17','sec18'
 ] as const
 type Tab = typeof TABS[number]
 const TAB_LABELS: Record<Tab, string> = {
   sec1:'1. Identificação', sec2:'2. Morada', sec3:'3. Descrição',
   sec4:'4. Localização', sec5:'5. Construção', sec6:'6. Áreas',
   sec7:'7. Métodos', sec8:'8. Documentos', sec9:'9. Condicionalismos',
-  sec10:'10. Advertências', sec11:'11. Conclusão', sec12:'12. Justificação',
+  sec10:'10. Advertências', sec11:'11. Conclusão',
+  obras:'Obras de Beneficiação', residual:'Método Residual',
   sec13:'13. Certificação', sec14:'14. Faturação',
   sec15:'Fotos', sec16:'Comparáveis', sec17:'Aval. anterior', sec18:'Notas',
 }
@@ -215,7 +217,11 @@ export default function PropertyDetail() {
   useLeaflet(true, () => setMapReady(true))
   useEffect(() => {
     if (!mapReady || !mapRef.current || !property) return
-    if (mapInst.current) return // já inicializado
+    if (mapInst.current) {
+      // Já inicializado — quando volta à tab 2, faz invalidateSize
+      if (tab === 'sec2') setTimeout(() => mapInst.current?.invalidateSize(), 100)
+      return
+    }
     setTimeout(() => {
       const L = window.L
       const lat = property.latitude||39.5, lon = property.longitude||-8.0
@@ -226,16 +232,11 @@ export default function PropertyDetail() {
       L.control.layers({'Satélite':satellite,'Mapa':street},{},{position:'topright'}).addTo(mapInst.current)
       if (property.latitude) {
         L.circleMarker([property.latitude, property.longitude], {
-          radius: 8,
-          fillColor: '#1D9E75',
-          color: 'white',
-          weight: 2,
-          opacity: 1,
-          fillOpacity: 1,
+          radius: 8, fillColor: '#1D9E75', color: 'white', weight: 2, opacity: 1, fillOpacity: 1,
         }).addTo(mapInst.current)
       }
     }, 150)
-  }, [mapReady, property?.id])
+  }, [mapReady, property?.id, tab])
 
   const onDrop = useCallback(async (files: globalThis.File[]) => {
     if (!property) return
@@ -411,34 +412,18 @@ export default function PropertyDetail() {
             <F label="Banco / Entidade"           field="banco"                    value={property.banco}                                  onSave={save}/>
             <F label="Tipo de Relatório"          field="tipo_relatorio"           value={property.tipo_relatorio}
               opts={['Avaliação','Reavaliação','Vistoria','Portabilidade','Correção de erros']} onSave={save}/>
-            <F label="Subtipo de Relatório"       field="subtipo_relatorio"        value={property.subtipo_relatorio}                      onSave={save}/>
             <F label="Finalidade"                 field="finalidade"               value={property.finalidade}
               opts={['Adjudicado com visita interior','Adjudicado sem visita interior','Garantia hipotecária','Outros fins']} onSave={save}/>
-            <F label="Ref. Externa"               field="external_ref"             value={property.external_ref}                           onSave={save}/>
+            <F label="Ref. Avaliador"             field="external_ref"             value={property.external_ref}                           onSave={save}/>
             <F label="ID do Bem"                  field="id_bien"                  value={property.id_bien}                                onSave={save}/>
-            <F label="NUC Risco"                  field="nuc_risco"                value={property.nuc_risco}                              onSave={save}/>
             <F label="Tipo de Serviço"            field="tipo_servico"             value={property.tipo_servico}
               opts={['Avaliação','Vistoria','Portabilidade','Reavaliação']} onSave={save}/>
-          </Section>
-          <Section title="Perito Avaliador">
-            <F label="Nome do Perito"             field="perito_avaliador"         value={property.perito_avaliador}                       onSave={save}/>
-            <F label="NIF do Perito"              field="perito_nif"               value={property.perito_nif}                             onSave={save}/>
-            <F label="N.º CMVM"                   field="perito_cmvm"              value={property.perito_cmvm}                            onSave={save}/>
-            <F label="N.º Apólice Seguro"         field="nr_apolice"               value={property.nr_apolice}                             onSave={save}/>
-            <F label="Data Validade Seguro"       field="data_validade_seguro"     value={property.data_validade_seguro}     type="date"   onSave={save}/>
-            <F label="Seguradora"                 field="seguradora"               value={property.seguradora}                             onSave={save}/>
-          </Section>
-          <Section title="Requerente / Mandatário">
-            <F label="Requerente — Nome"          field="requerente_nome"          value={property.requerente_nome}                        onSave={save}/>
-            <F label="Requerente — NIF"           field="requerente_nif"           value={property.requerente_nif}                         onSave={save}/>
-            <F label="Mandatário — Nome"          field="mandatario_nome"          value={property.mandatario_nome}                        onSave={save}/>
-            <F label="Mandatário — NIF"           field="mandatario_nif"           value={property.mandatario_nif}                         onSave={save}/>
+            <F label="NUC Risco"                  field="nuc_risco"                value={property.nuc_risco}                              onSave={save}/>
           </Section>
         </>)}
 
-        {/* Mapa — sempre no DOM para captura, visível apenas na sec2 */}
-        <div className={tab === 'sec2' ? '' : 'hidden'}>
-          {tab==='sec2' && (<>
+        {/* Mapa — div sempre no DOM para captura pelo relatório */}
+        <div style={{ display: tab === 'sec2' ? 'block' : 'none' }}>
           <Section title="Morada">
             <F label="Tipo de Via"     field="tipo_via"     value={property.tipo_via}
               opts={['Rua','Avenida','Praça','Largo','Estrada','Travessa','Beco','Calçada','Caminho','Alameda','Outro']} onSave={save}/>
@@ -470,7 +455,6 @@ export default function PropertyDetail() {
             </div>
             <div ref={mapRef} style={{ height:'300px', borderRadius:'10px', border:'0.5px solid #e5e7eb' }}/>
           </div>
-          </>)}
         </div>
 
         {/* SEC 3 ── Descrição do Imóvel */}
@@ -484,7 +468,9 @@ export default function PropertyDetail() {
             <F label="Subuso"                field="use_subtype"        value={property.use_subtype}        onSave={save}/>
             <F label="Destino"               field="destino"            value={property.destino}
               opts={['1ª residência','2ª residência','VPO / Livre','Arrendamento']} onSave={save}/>
-            <F label="Estado do Bem"         field="property_state"     value={property.property_state}
+            <F label="Tipo de Prédio"        field="tipo_predio"        value={property.tipo_predio}
+              opts={['Prédio urbano','Prédio rústico','Prédio misto']} onSave={save}/>
+            <F label="Estado de Construção"  field="estado_construcao"  value={property.estado_construcao}
               opts={['Em projecto','Em construção','Em reabilitação','Terminado','Hipótese terminado']} onSave={save}/>
             <F label="Estado de Conservação" field="estado_conservacao" value={property.estado_conservacao}
               opts={['Muito Bom','Bom','Normal','Deficiente','Muito Deficiente','Ruinoso']} onSave={save}/>
@@ -495,32 +481,46 @@ export default function PropertyDetail() {
             <F label="Imóvel Singular"       field="imovel_singular"    value={property.imovel_singular}
               opts={['Sim','Não']} onSave={save}/>
           </Section>
-          <Section title="Registos">
-            <F label="Registo Predial"       field="id_registo_predial"   value={property.id_registo_predial}    onSave={save}/>
-            <F label="Artigo Matricial"      field="id_registo_matricial" value={property.id_registo_matricial}  onSave={save}/>
-            <F label="Fracção"               field="fracao"               value={property.fracao}                onSave={save}/>
-            <F label="Tipo de Prédio"        field="tipo_predio"          value={property.tipo_predio}
-              opts={['Prédio urbano','Prédio rústico','Prédio misto']} onSave={save}/>
-            <F label="Referência Cadastral"  field="ref_cadastral"        value={property.ref_cadastral}         onSave={save}/>
-          </Section>
+
           <div className="mb-4">
             <label className="label">Composição / Descrição do Imóvel</label>
             <F label="" field="composicao_imovel" value={property.composicao_imovel} textarea span onSave={save}/>
           </div>
+
+          <Section title="Conservatória de Registo Predial">
+            <F label="N.º Conservatória"     field="nr_conservatoria"     value={property.nr_conservatoria}                onSave={save}/>
+            <F label="Nome da Conservatória" field="nome_conservatoria"   value={property.nome_conservatoria}              onSave={save}/>
+            <F label="N.º Registo Predial"   field="id_registo_predial"   value={property.id_registo_predial}              onSave={save}/>
+            <F label="Freguesia"             field="parish"               value={property.parish}                          onSave={save}/>
+            <F label="Nome do Proprietário"  field="nome_proprietario"    value={property.nome_proprietario}               onSave={save}/>
+          </Section>
+
+          <Section title="Caderneta Predial das Finanças">
+            <F label="N.º Artigo"            field="id_registo_matricial" value={property.id_registo_matricial}            onSave={save}/>
+            <F label="Fracção"               field="fracao"               value={property.fracao}                          onSave={save}/>
+            <F label="Tipo"                  field="tipo_caderneta"       value={property.tipo_caderneta}                  onSave={save}/>
+            <F label="Secção"                field="seccao_caderneta"     value={property.seccao_caderneta}                onSave={save}/>
+            <F label="Ano Matriz"            field="ano_matriz"           value={property.ano_matriz}           type="number" onSave={save}/>
+            <F label="Valor Patrimonial (€)" field="valor_patrimonial"    value={property.valor_patrimonial}    type="number" onSave={save}/>
+            <F label="Cod-Freg."             field="cod_freg"             value={property.cod_freg}                        onSave={save}/>
+            <F label="Freguesia das Finanças" field="freguesia_financas"  value={property.freguesia_financas}              onSave={save}/>
+          </Section>
         </>)}
 
         {/* SEC 4 ── Características da Localização */}
         {tab==='sec4' && (<>
+          <div className="mb-4">
+            <label className="label">Características do Mercado</label>
+            <F label="" field="caract_mercado" value={property.caract_mercado} textarea span onSave={save}/>
+          </div>
           <Section title="Enquadramento no Mercado">
-            <F label="Características do Mercado"  field="caract_mercado"           value={property.caract_mercado}           onSave={save}/>
-            <F label="Zona Envolvente"              field="zona_envolvente"          value={property.zona_envolvente}          onSave={save}/>
-            <F label="Expectativas do Mercado"      field="tipo_expectativa_mercado" value={property.tipo_expectativa_mercado}
+            <F label="Tipo de expectativa de mercado"    field="tipo_expectativa_mercado" value={property.tipo_expectativa_mercado}
               opts={['Muito positiva','Positiva','Estável','Negativa','Muito negativa']} onSave={save}/>
-            <F label="Evolução do Mercado"          field="evolucao_mercado"         value={property.evolucao_mercado}
-              opts={['Tendencialmente positiva','Estável','Tendencialmente negativa']} onSave={save}/>
-            <F label="Ocupação Laboral"             field="ocupacao_laboral"         value={property.ocupacao_laboral}
+            <F label="Ocupação laboral predominante"     field="ocupacao_laboral"         value={property.ocupacao_laboral}
               opts={['Muito alta','Alta','Média','Baixa','Muito baixa']} onSave={save}/>
-            <F label="População do Concelho"        field="populacao_concelho"       value={property.populacao_concelho}       onSave={save}/>
+            <F label="População do Concelho"             field="populacao_concelho"       value={property.populacao_concelho}       onSave={save}/>
+            <F label="Evolução do Mercado"               field="evolucao_mercado"         value={property.evolucao_mercado}
+              opts={['Tendencialmente positiva','Estável','Tendencialmente negativa']} onSave={save}/>
           </Section>
         </>)}
 
@@ -534,25 +534,25 @@ export default function PropertyDetail() {
               opts={['Muito boa','Boa','Média','Baixa','Muito baixa']} onSave={save}/>
             <F label="Orientação Solar"           field="orientacao_solar"        value={property.orientacao_solar}
               opts={['Norte','Sul','Este','Oeste','Norte/Sul','Este/Oeste','Não influi no valor']} onSave={save}/>
-            <F label="Categorização"             field="categorizacao"           value={property.categorizacao}           onSave={save}/>
-            <F label="Tipo de Reparação"         field="tipo_reparacao"          value={property.tipo_reparacao}
+            <F label="Categorização"              field="categorizacao"           value={property.categorizacao}           onSave={save}/>
+            <F label="Tipo de Reparação"          field="tipo_reparacao"          value={property.tipo_reparacao}
               opts={['Conservação','Reabilitação','Remodelação','Ampliação','Construção nova']} onSave={save}/>
-            <F label="Ano de Construção"          field="year_built"              value={property.year_built}              type="number" onSave={save}/>
-            <F label="Ano Licença Utilização"     field="ano_licenca_utilizacao"  value={property.ano_licenca_utilizacao}  type="number" onSave={save}/>
-            <F label="Data Licença Construção"    field="data_licenca_construcao" value={property.data_licenca_construcao} type="date"   onSave={save}/>
-            <F label="Data Conclusão Prevista"    field="data_conclusao_obras"    value={property.data_conclusao_obras}    type="date"   onSave={save}/>
           </Section>
           <Section title="Certificado Energético">
-            <F label="Classe Energética"    field="classe_energetica"    value={property.classe_energetica}
+            <F label="N.º Certificado Energético" field="nr_certificado_energ"   value={property.nr_certificado_energ}              onSave={save}/>
+            <F label="Classe Energética"           field="classe_energetica"      value={property.classe_energetica}
               opts={['A+','A','B','B-','C','D','E','F','Isento','Em curso']} onSave={save}/>
-            <F label="N.º Certificado"      field="nr_certificado_energ" value={property.nr_certificado_energ}  onSave={save}/>
-            <F label="Data de Emissão"      field="data_emissao_cert"    value={property.data_emissao_cert}     type="date" onSave={save}/>
-            <F label="Data de Validade"     field="data_validade_cert"   value={property.data_validade_cert}    type="date" onSave={save}/>
+            <F label="Data Emissão"                field="data_emissao_cert"      value={property.data_emissao_cert}      type="date" onSave={save}/>
+            <F label="Data Validade"               field="data_validade_cert"     value={property.data_validade_cert}     type="date" onSave={save}/>
+            <F label="Nome PQ"                     field="nome_pq"                value={property.nome_pq}                           onSave={save}/>
+            <F label="N.º PQ"                      field="nr_pq"                  value={property.nr_pq}                             onSave={save}/>
           </Section>
-          <Section title="Qualificação do Solo">
-            <F label="Qualificação do Solo"  field="qualificacao_solo"   value={property.qualificacao_solo}   onSave={save}/>
-            <F label="Classificação do Solo" field="classificacao_solo"  value={property.classificacao_solo}  onSave={save}/>
-            <F label="Condição de Lote"      field="condicao_lote"       value={property.condicao_lote}
+          <Section title="Licença e Construção">
+            <F label="N.º Licença de Utilização"  field="nr_licenca_utilizacao"  value={property.nr_licenca_utilizacao}             onSave={save}/>
+            <F label="Data Emissão"                field="data_licenca_construcao" value={property.data_licenca_construcao} type="date" onSave={save}/>
+            <F label="Ano Construção"              field="year_built"             value={property.year_built}             type="number" onSave={save}/>
+            <F label="Data Prevista Conclusão"     field="data_conclusao_obras"   value={property.data_conclusao_obras}   type="date" onSave={save}/>
+            <F label="Obra Parada"                 field="obra_parada"            value={property.obra_parada}
               opts={['Sim','Não']} onSave={save}/>
           </Section>
         </>)}
@@ -574,71 +574,94 @@ export default function PropertyDetail() {
         {/* SEC 7 ── Métodos de Avaliação */}
         {tab==='sec7' && (<>
           <div className="mb-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">
-              Método Comparativo de Mercado
-            </h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Método Comparativo de Mercado</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
-              <F label="Descrição"                          field="metodo_comp_descricao"   value={property.metodo_comp_descricao}   onSave={save}/>
-              <F label="Área (m²)"                         field="metodo_comp_area"        value={property.metodo_comp_area}        type="number" onSave={save}/>
-              <F label="Valor (€/m²)"                      field="metodo_comp_valor_m2"    value={property.metodo_comp_valor_m2}    type="number" onSave={save}/>
-              <F label="Valor Total (€)"                   field="metodo_comp_valor_total" value={property.metodo_comp_valor_total} type="number" onSave={save}/>
-              <F label="Valor Comparativo Ajustado (€)"    field="valor_comparativo"       value={property.valor_comparativo}       type="number" onSave={save}/>
-              <F label="Ajuste Aplicado (%)"               field="ajuste_comparativo"      value={property.ajuste_comparativo}      type="number" onSave={save}/>
-              <F label="Valor Comparativo s/ Ajuste (€)"   field="valor_comparativo_bruto" value={property.valor_comparativo_bruto} type="number" onSave={save}/>
+              <F label="Descrição"                        field="metodo_comp_descricao"   value={property.metodo_comp_descricao}   onSave={save}/>
+              <F label="Área (m²)"                       field="metodo_comp_area"        value={property.metodo_comp_area}        type="number" onSave={save}/>
+              <F label="Valor (€/m²)"                    field="metodo_comp_valor_m2"    value={property.metodo_comp_valor_m2}    type="number" onSave={save}/>
+              <F label="Valor Total (€)"                 field="metodo_comp_valor_total" value={property.metodo_comp_valor_total} type="number" onSave={save}/>
+              <F label="Valor Comparativo Ajustado (€)"  field="valor_comparativo"       value={property.valor_comparativo}       type="number" onSave={save}/>
             </div>
           </div>
           <div className="mb-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">
-              Método do Rendimento / Capitalização de Rendas
-            </h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Valor de Renda Efetiva</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
-              <F label="Renda Mensal (€)"                  field="renda_mensal"            value={property.renda_mensal}            type="number" onSave={save}/>
-              <F label="Renda Anual (€)"                   field="renda_anual"             value={property.renda_anual}             type="number" onSave={save}/>
-              <F label="Taxa de Capitalização (%)"         field="taxa_capitalizacao"      value={property.taxa_capitalizacao}      type="number" onSave={save}/>
-              <F label="Valor por Rendimento (€)"          field="valor_rendas"            value={property.valor_rendas}            type="number" onSave={save}/>
-              <F label="Renda Ótima (€)"                   field="valor_renda_otima"       value={property.valor_renda_otima}       type="number" onSave={save}/>
+              <F label="Descrição"           field="renda_ef_descricao"   value={property.renda_ef_descricao}              onSave={save}/>
+              <F label="Área (m²)"           field="renda_ef_area"        value={property.renda_ef_area}        type="number" onSave={save}/>
+              <F label="Renda (€/m²)"        field="renda_ef_valor_m2"    value={property.renda_ef_valor_m2}    type="number" onSave={save}/>
+              <F label="Renda Mensal (€)"    field="renda_ef_mensal"      value={property.renda_ef_mensal}      type="number" onSave={save}/>
+              <F label="Taxa Capit. (%)"     field="renda_ef_taxa"        value={property.renda_ef_taxa}        type="number" onSave={save}/>
+              <F label="Valor Total (€)"     field="renda_ef_total"       value={property.renda_ef_total}       type="number" onSave={save}/>
             </div>
           </div>
-          <div className="mb-4">
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Valor de Renda Potencial</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+              <F label="Descrição"           field="renda_pot_descricao"  value={property.renda_pot_descricao}              onSave={save}/>
+              <F label="Área (m²)"           field="renda_pot_area"       value={property.renda_pot_area}       type="number" onSave={save}/>
+              <F label="Renda (€/m²)"        field="renda_pot_valor_m2"   value={property.renda_pot_valor_m2}   type="number" onSave={save}/>
+              <F label="Renda Mensal (€)"    field="renda_pot_mensal"     value={property.renda_pot_mensal}     type="number" onSave={save}/>
+              <F label="Taxa Capit. (%)"     field="renda_pot_taxa"       value={property.renda_pot_taxa}       type="number" onSave={save}/>
+              <F label="Valor Total (€)"     field="renda_pot_total"      value={property.renda_pot_total}      type="number" onSave={save}/>
+            </div>
+          </div>
+          <div className="mb-6">
             <label className="label">Justificação da escolha dos Métodos de Avaliação</label>
             <F label="" field="justificacao_metodo" value={property.justificacao_metodo} textarea span onSave={save}/>
+          </div>
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">9. Método do Custo de Construção ou Reposição — Estado Terminado</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+              <F label="Custo do Terreno (€/m²)"         field="custo_terreno_m2"       value={property.custo_terreno_m2}       type="number" onSave={save}/>
+              <F label="Custo de Construção (€/m²)"      field="custo_construcao_m2"    value={property.custo_construcao_m2}    type="number" onSave={save}/>
+              <F label="Custos Indirectos (%)"           field="custos_indiretos_pct"   value={property.custos_indiretos_pct}   type="number" onSave={save}/>
+              <F label="Margem do Promotor (%)"          field="margem_promotor_pct"    value={property.margem_promotor_pct}    type="number" onSave={save}/>
+              <F label="Depreciação (%)"                 field="depreciacao_pct"        value={property.depreciacao_pct}        type="number" onSave={save}/>
+              <F label="Área (m²)"                       field="custo_area"             value={property.custo_area}             type="number" onSave={save}/>
+              <F label="C. Terreno (€)"                  field="custo_terreno_total"    value={property.custo_terreno_total}    type="number" onSave={save}/>
+              <F label="C. Const. CC (€)"                field="custo_construcao_total" value={property.custo_construcao_total} type="number" onSave={save}/>
+              <F label="C. Repos. Bruto (€)"             field="custo_repos_bruto"      value={property.custo_repos_bruto}      type="number" onSave={save}/>
+              <F label="Depreciação (€)"                 field="depreciacao_valor"      value={property.depreciacao_valor}      type="number" onSave={save}/>
+              <F label="C. Repos. Líquido (€)"           field="custo_repos_liquido"    value={property.custo_repos_liquido}    type="number" onSave={save}/>
+              <F label="Valor de Seguro CC+CI (€)"       field="valor_seguro_cc_ci"     value={property.valor_seguro_cc_ci}     type="number" onSave={save}/>
+            </div>
+          </div>
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">9. Método do Custo — Estado Em Projecto / Em Construção</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+              <F label="Custo do Terreno (€/m²)"         field="hec_custo_terreno_m2"       value={property.hec_custo_terreno_m2}       type="number" onSave={save}/>
+              <F label="Custo de Construção (€/m²)"      field="hec_custo_construcao_m2"    value={property.hec_custo_construcao_m2}    type="number" onSave={save}/>
+              <F label="Custos Indirectos (%)"           field="hec_custos_indiretos_pct"   value={property.hec_custos_indiretos_pct}   type="number" onSave={save}/>
+              <F label="Margem do Promotor (%)"          field="hec_margem_promotor_pct"    value={property.hec_margem_promotor_pct}    type="number" onSave={save}/>
+              <F label="% Obra"                          field="pct_obra"                   value={property.pct_obra}                   type="number" onSave={save}/>
+              <F label="C. Repos. Bruto HEC (€)"        field="hec_custo_repos_bruto"      value={property.hec_custo_repos_bruto}      type="number" onSave={save}/>
+              <F label="Valor Seguro HEC (€)"            field="hec_valor_seguro"           value={property.hec_valor_seguro}           type="number" onSave={save}/>
+              <F label="C. Repos. Bruto Actual (€)"     field="hec_custo_repos_actual"     value={property.hec_custo_repos_actual}     type="number" onSave={save}/>
+              <F label="Valor Investimento Pendente (€)" field="hec_invest_pendente"        value={property.hec_invest_pendente}        type="number" onSave={save}/>
+            </div>
+            <div className="mt-3">
+              <label className="label">Justificação da depreciação e outros parâmetros</label>
+              <F label="" field="justificacao_depreciacao" value={property.justificacao_depreciacao} textarea span onSave={save}/>
+            </div>
           </div>
         </>)}
 
         {/* SEC 8 ── Documentos Entregues */}
         {tab==='sec8' && (<>
-          <Section title="Documentação">
-            <F label="Caderneta Predial"              field="doc_caderneta"         value={property.doc_caderneta}
-              opts={['Entregue','Não entregue','N/A']} onSave={save}/>
-            <F label="Certidão Permanente"            field="doc_certidao"          value={property.doc_certidao}
-              opts={['Entregue','Não entregue','N/A']} onSave={save}/>
-            <F label="Licença de Utilização"          field="doc_licenca_util"      value={property.doc_licenca_util}
-              opts={['Entregue','Não entregue','N/A']} onSave={save}/>
-            <F label="Licença de Construção"          field="doc_licenca_constr"    value={property.doc_licenca_constr}
-              opts={['Entregue','Não entregue','N/A']} onSave={save}/>
-            <F label="Certificado Energético"         field="doc_cert_energetico"   value={property.doc_cert_energetico}
-              opts={['Entregue','Não entregue','N/A']} onSave={save}/>
-            <F label="Planta do Imóvel"               field="doc_planta"            value={property.doc_planta}
-              opts={['Entregue','Não entregue','N/A']} onSave={save}/>
-            <F label="Tipo de Documento a Enviar"     field="tipo_doc_enviar"       value={property.tipo_doc_enviar}       onSave={save}/>
-            <F label="Tipo de Documento a Descarregar" field="tipo_doc_descarregar" value={property.tipo_doc_descarregar}  onSave={save}/>
+          <Section title="Documentos para Avaliação">
+            {['Caderneta Predial','Certidão da CRP','Contrato de Arrendamento','Alvará de Loteamento','Planta de Loteamento','Licença de Construção/Obras','Licença de Utilização','Orçamento de obras','Memória Descritiva','Ficha Técnica Habitação','Projeto Aprovado','Projeto Não Aprovado','Certificado Energético','Outro'].map(doc => {
+              const field = 'doc_' + doc.toLowerCase().replace(/[^a-z0-9]/g,'_')
+              return <F key={field} label={doc} field={field} value={(property as any)[field]}
+                opts={['Entregue','Não entregue','N/A']} onSave={save}/>
+            })}
           </Section>
-          <div className="mb-4">
-            <label className="label">Notas sobre Documentação</label>
-            <F label="" field="documentacao" value={property.documentacao} textarea span onSave={save}/>
-          </div>
         </>)}
 
         {/* SEC 9 ── Condicionalismos */}
         {tab==='sec9' && (
           <div className="space-y-4">
-            <p className="text-xs text-gray-400">Incluir esclarecimentos urbanísticos, diligências com organismos, data prevista de resolução.</p>
             <F label="Condicionalismos" field="prev_valuation_conditions" value={property.prev_valuation_conditions} textarea span onSave={save}/>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <F label="Data Prevista de Levantamento" field="data_levantamento_cond" value={property.data_levantamento_cond} type="date" onSave={save}/>
-              <F label="Condicionante Sanável"         field="cond_sanavel"           value={property.cond_sanavel}
-                opts={['Sim','Não']} onSave={save}/>
-            </div>
+            <F label="Observações"      field="cond_observacoes"          value={property.cond_observacoes}          textarea span onSave={save}/>
           </div>
         )}
 
@@ -646,31 +669,75 @@ export default function PropertyDetail() {
         {tab==='sec10' && (
           <div className="space-y-4">
             <F label="Advertências e Considerações Gerais" field="advertencias" value={property.advertencias} textarea span onSave={save}/>
-            <F label="Pressupostos de Avaliação"           field="pressupostos" value={property.pressupostos} textarea span onSave={save}/>
           </div>
         )}
 
         {/* SEC 11 ── Conclusão */}
-        {tab==='sec11' && (
-          <Section title="Valores de Conclusão">
-            <F label="Valor de Mercado (€)"                         field="valor_mercado"            value={property.valor_mercado}            type="number" onSave={save}/>
-            <F label="V.V.R. — Valor de Venda Rápida (€)"          field="valor_venda_rapida"       value={property.valor_venda_rapida}       type="number" onSave={save}/>
-            <F label="Valor de Seguro (€)"                         field="valor_seguro"             value={property.valor_seguro}             type="number" onSave={save}/>
-            <F label="Valor de Mercado Actual (€)"                 field="valor_mercado_atual"      value={property.valor_mercado_atual}      type="number" onSave={save}/>
-            <F label="V.V.R. Actual (€)"                           field="valor_venda_rapida_atual" value={property.valor_venda_rapida_atual} type="number" onSave={save}/>
-            <F label="% Obra Executada"                            field="pct_obra"                 value={property.pct_obra}                 type="number" onSave={save}/>
-            <F label="Valor HEC — Hipótese Edifício Concluído (€)" field="valor_hec"               value={property.valor_hec}                type="number" onSave={save}/>
-            <F label="Valor V.V.R. HEC (€)"                        field="valor_vvr_hec"            value={property.valor_vvr_hec}            type="number" onSave={save}/>
-            <F label="Valor Empreendimento Completo HEC (€)"       field="valor_emp_hec"            value={property.valor_emp_hec}            type="number" onSave={save}/>
+        {tab==='sec11' && (<>
+          <Section title="Valor Terminado / Valor Hipótese Terminado">
+            <F label="Valor de Mercado (€)"              field="valor_mercado"        value={property.valor_mercado}        type="number" onSave={save}/>
+            <F label="V.V.R. — Valor de Venda Rápida (€)" field="valor_venda_rapida"  value={property.valor_venda_rapida}  type="number" onSave={save}/>
+            <F label="Valor de Seguro (€)"               field="valor_seguro"         value={property.valor_seguro}         type="number" onSave={save}/>
+            <F label="% Obra"                            field="pct_obra"             value={property.pct_obra}             type="number" onSave={save}/>
           </Section>
-        )}
+          <Section title="Valor Actual">
+            <F label="Valor de Mercado Actual (€)"       field="valor_mercado_atual"      value={property.valor_mercado_atual}      type="number" onSave={save}/>
+            <F label="V.V.R. Actual (€)"                 field="valor_venda_rapida_atual" value={property.valor_venda_rapida_atual} type="number" onSave={save}/>
+            <F label="Valor de Seguro Actual (€)"        field="valor_seguro_atual"       value={property.valor_seguro_atual}       type="number" onSave={save}/>
+            <F label="% Obra Actual"                     field="pct_obra_atual"           value={property.pct_obra_atual}           type="number" onSave={save}/>
+          </Section>
+        </>)}
 
-        {/* SEC 12 ── Justificação */}
-        {tab==='sec12' && (
+        {/* Obras de Beneficiação */}
+        {tab==='obras' && (
           <div className="space-y-4">
-            <F label="Justificação da Escolha dos Métodos de Avaliação" field="justificacao_metodo" value={property.justificacao_metodo} textarea span onSave={save}/>
+            <Section title="Obras de Beneficiação">
+              <F label="Valor do Orçamento apresentado c/ IVA (€)"   field="obras_orcamento_apres"    value={property.obras_orcamento_apres}    type="number" onSave={save}/>
+              <F label="Valor do Orçamento estimado c/ IVA (€)"      field="obras_orcamento_est"      value={property.obras_orcamento_est}      type="number" onSave={save}/>
+              <F label="Valorização após execução das obras (€)"      field="obras_valorizacao"        value={property.obras_valorizacao}        type="number" onSave={save}/>
+              <F label="Necessitam de licença camarária"              field="obras_licenca_camara"     value={property.obras_licenca_camara}
+                opts={['Sim','Não']} onSave={save}/>
+              <F label="Valor de Mercado antes das obras (€)"         field="obras_valor_antes"        value={property.obras_valor_antes}        type="number" onSave={save}/>
+              <F label="Valor de Mercado após conclusão das obras (€)" field="obras_valor_apos"        value={property.obras_valor_apos}         type="number" onSave={save}/>
+              <F label="% Obra realizada do orçamento"                field="obras_pct_realizada"      value={property.obras_pct_realizada}      type="number" onSave={save}/>
+              <F label="Valor de Mercado actual c/ % obra realizada (€)" field="obras_valor_atual"    value={property.obras_valor_atual}         type="number" onSave={save}/>
+            </Section>
+            <div>
+              <label className="label">Descrição das obras a realizar</label>
+              <F label="" field="obras_descricao" value={property.obras_descricao} textarea span onSave={save}/>
+            </div>
           </div>
         )}
+
+        {/* Método Residual */}
+        {tab==='residual' && (<>
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Método Residual Estático</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+              <F label="Descrição"      field="resid_est_descricao"  value={property.resid_est_descricao}              onSave={save}/>
+              <F label="Área (m²)"     field="resid_est_area"       value={property.resid_est_area}       type="number" onSave={save}/>
+              <F label="Valor (€/m²)"  field="resid_est_valor_m2"   value={property.resid_est_valor_m2}   type="number" onSave={save}/>
+              <F label="Valor Total (€)" field="resid_est_total"    value={property.resid_est_total}      type="number" onSave={save}/>
+            </div>
+            <div className="mt-3">
+              <label className="label">Observações</label>
+              <F label="" field="resid_est_obs" value={property.resid_est_obs} textarea span onSave={save}/>
+            </div>
+          </div>
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Método Residual Dinâmico</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+              <F label="Descrição"      field="resid_din_descricao"  value={property.resid_din_descricao}              onSave={save}/>
+              <F label="Área (m²)"     field="resid_din_area"       value={property.resid_din_area}       type="number" onSave={save}/>
+              <F label="Valor (€/m²)"  field="resid_din_valor_m2"   value={property.resid_din_valor_m2}   type="number" onSave={save}/>
+              <F label="Valor Total (€)" field="resid_din_total"    value={property.resid_din_total}      type="number" onSave={save}/>
+            </div>
+            <div className="mt-3">
+              <label className="label">Observações</label>
+              <F label="" field="resid_din_obs" value={property.resid_din_obs} textarea span onSave={save}/>
+            </div>
+          </div>
+        </>)}
 
         {/* SEC 13 ── Certificação */}
         {tab==='sec13' && (<>
