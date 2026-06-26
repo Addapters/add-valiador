@@ -158,15 +158,16 @@ export async function generateAbancaReport(
     const off = idx
     const id = v(prop.id_bien)
 
-    // Todas as linhas base onde deve aparecer o Id (coluna B apenas, sem IdRel)
+    // Linhas base do primeiro imóvel — segundo fica em +1, terceiro em +2
     const ID_BASE_ROWS = [
       19, 25, 31,
-      39, 44, 51, 56,
-      63, 68, 86, 93, 99,
-      105, 116, 153, 158,
-      173, 178, 184, 190,
-      213, 225,
-      266, 286, 292,
+      38, 50, 62,
+      92, 98,
+      105, 116,
+      152, 157,
+      172, 177, 183, 189,
+      212, 224,
+      265, 285, 291,
     ]
     for (const baseRow of ID_BASE_ROWS) {
       set(`B${baseRow + off}`, id)
