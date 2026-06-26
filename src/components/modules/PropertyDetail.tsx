@@ -323,16 +323,19 @@ export default function PropertyDetail() {
           // Zoom 17 e aguarda tiles
           mapInst.current.setZoom(17)
           mapInst.current.invalidateSize()
-          // Adiciona marcador circular temporário se não existir
+
+          // Adiciona marcador circular
           const L = window.L
           let tempMarker: any = null
           if (property.latitude) {
             tempMarker = L.circleMarker([property.latitude, property.longitude], {
-              radius: 10, fillColor: '#1D9E75', color: 'white', weight: 3,
-              opacity: 1, fillOpacity: 0.9,
+              radius: 12, fillColor: '#1D9E75', color: 'white', weight: 3,
+              opacity: 1, fillOpacity: 1,
             }).addTo(mapInst.current)
           }
-          await new Promise(r => setTimeout(r, 1500))
+
+          // Aguarda tiles e renderização do marcador
+          await new Promise(r => setTimeout(r, 2000))
 
           // Esconde controlos
           const controls = mapRef.current.querySelectorAll<HTMLElement>('.leaflet-control-container')
@@ -340,9 +343,14 @@ export default function PropertyDetail() {
 
           const html2canvas = (await import('html2canvas')).default
           const canvas = await html2canvas(mapRef.current, {
-            useCORS: true, allowTaint: true, logging: false,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            scale: 1,
+            imageTimeout: 0,
             width: mapRef.current.offsetWidth || 600,
             height: mapRef.current.offsetHeight || 300,
+            foreignObjectRendering: false,
           })
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
 
