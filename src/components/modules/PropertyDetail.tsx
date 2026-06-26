@@ -324,18 +324,26 @@ export default function PropertyDetail() {
           mapInst.current.setZoom(17)
           mapInst.current.invalidateSize()
 
-          // Adiciona marcador circular
+          // Adiciona marcador circular permanente durante captura
           const L = window.L
           let tempMarker: any = null
           if (property.latitude) {
             tempMarker = L.circleMarker([property.latitude, property.longitude], {
-              radius: 12, fillColor: '#1D9E75', color: 'white', weight: 3,
-              opacity: 1, fillOpacity: 1,
+              radius: 14,
+              fillColor: '#22c55e',
+              color: '#ffffff',
+              weight: 3,
+              opacity: 1,
+              fillOpacity: 1,
             }).addTo(mapInst.current)
           }
 
-          // Aguarda tiles e renderização do marcador
-          await new Promise(r => setTimeout(r, 2000))
+          // Aguarda tiles e renderização completa
+          await new Promise(r => setTimeout(r, 2500))
+
+          // Captura usando o canvas nativo do Leaflet (evita problemas de CORS)
+          const mapPane = mapRef.current.querySelector('.leaflet-map-pane') as HTMLElement
+          const overlayPane = mapRef.current.querySelector('.leaflet-overlay-pane') as HTMLElement
 
           // Esconde controlos
           const controls = mapRef.current.querySelectorAll<HTMLElement>('.leaflet-control-container')
@@ -347,10 +355,14 @@ export default function PropertyDetail() {
             allowTaint: true,
             logging: false,
             scale: 1,
-            imageTimeout: 0,
+            imageTimeout: 15000,
             width: mapRef.current.offsetWidth || 600,
             height: mapRef.current.offsetHeight || 300,
-            foreignObjectRendering: false,
+            onclone: (clonedDoc: Document) => {
+              // Garante que o SVG do marcador fica visível no clone
+              const svgs = clonedDoc.querySelectorAll('.leaflet-overlay-pane svg')
+              svgs.forEach((svg: any) => { svg.style.overflow = 'visible' })
+            }
           })
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
 
