@@ -323,27 +323,7 @@ export default function PropertyDetail() {
           // Zoom 17 e aguarda tiles
           mapInst.current.setZoom(17)
           mapInst.current.invalidateSize()
-
-          // Adiciona marcador circular permanente durante captura
-          const L = window.L
-          let tempMarker: any = null
-          if (property.latitude) {
-            tempMarker = L.circleMarker([property.latitude, property.longitude], {
-              radius: 14,
-              fillColor: '#22c55e',
-              color: '#ffffff',
-              weight: 3,
-              opacity: 1,
-              fillOpacity: 1,
-            }).addTo(mapInst.current)
-          }
-
-          // Aguarda tiles e renderização completa
           await new Promise(r => setTimeout(r, 2500))
-
-          // Captura usando o canvas nativo do Leaflet (evita problemas de CORS)
-          const mapPane = mapRef.current.querySelector('.leaflet-map-pane') as HTMLElement
-          const overlayPane = mapRef.current.querySelector('.leaflet-overlay-pane') as HTMLElement
 
           // Esconde controlos
           const controls = mapRef.current.querySelectorAll<HTMLElement>('.leaflet-control-container')
@@ -358,17 +338,31 @@ export default function PropertyDetail() {
             imageTimeout: 15000,
             width: mapRef.current.offsetWidth || 600,
             height: mapRef.current.offsetHeight || 300,
-            onclone: (clonedDoc: Document) => {
-              // Garante que o SVG do marcador fica visível no clone
-              const svgs = clonedDoc.querySelectorAll('.leaflet-overlay-pane svg')
-              svgs.forEach((svg: any) => { svg.style.overflow = 'visible' })
-            }
           })
+
+          // Desenha o marcador directamente no canvas (html2canvas não captura SVG do Leaflet)
+          if (property.latitude && property.longitude) {
+            const point = mapInst.current.latLngToContainerPoint([property.latitude, property.longitude])
+            const ctx = canvas.getContext('2d')
+            if (ctx && point) {
+              const x = point.x, y = point.y
+              // Círculo exterior (branco)
+              ctx.beginPath()
+              ctx.arc(x, y, 12, 0, 2 * Math.PI)
+              ctx.fillStyle = 'white'
+              ctx.fill()
+              // Círculo interior (verde)
+              ctx.beginPath()
+              ctx.arc(x, y, 9, 0, 2 * Math.PI)
+              ctx.fillStyle = '#22c55e'
+              ctx.fill()
+            }
+          }
+
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
 
           // Restaura
           controls.forEach(el => { el.style.display = '' })
-          if (tempMarker) tempMarker.remove()
           if (wasHidden && mapContainer) mapContainer.style.display = 'none'
         } catch (e) { console.warn('Map capture failed:', e) }
       }
