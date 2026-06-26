@@ -132,13 +132,13 @@ export async function generateAbancaReport(
   set('X11', v(p.external_ref, v(p.ref)))   // IdRel = Referência externa
   set('X8',  v(p.id_bien))                   // Id = ID do Bem (id_bien)
 
-  // Id e IdRel — preencher em todas as células do template (RELATÓRIO - PT)
+  // Id e IdRel — preencher na linha ABAIXO do label em todas as ocorrências
   // Id = id_bien (ID do Bem), IdRel = external_ref (Ref. Avaliador)
-  const ID_CELLS    = ['B18','B24','B30','B37','B43','B49','B55','B61','B67',
-                        'B85','B91','B97','B104','B115','B124','B130','B137',
-                        'B151','B156','B163','B171','B176','B182','B188',
-                        'B211','B223','B264','B271','B284','B290']
-  const IDREL_CELLS = ['T115','P130','P137','H176','T211','T223']
+  const ID_CELLS    = ['D17','AI19','G28','D36','D41','AD44','C55','C61','D65',
+                        'D84','D89','Y97','D103','D114','M124','C130','C137',
+                        'C151','C156','C162','C171','C176','C182','C188',
+                        'D210','D222','C264','C271','C284','C290']
+  const IDREL_CELLS = ['E116','E131','E138','E177','E212','E224']
 
   const idVal    = v(p.id_bien)
   const idRelVal = v(p.external_ref, v(p.ref))
@@ -179,7 +179,7 @@ export async function generateAbancaReport(
   set('J78', tr(v(p.tipo_expectativa_mercado)))
   set('J79', tr(v(p.ocupacao_laboral)))
   set('J80', v(p.populacao_concelho))
-  set('J81', tr(v(p.evolucao_mercado, 'Tendencialmente positiva')))
+  set('J81', tr(v(p.evolucao_mercado)))
 
   // 5. CARACTERÍSTICAS DA CONSTRUÇÃO
   if (p.nr_quartos)         set('D86', Number(p.nr_quartos))
@@ -201,8 +201,7 @@ export async function generateAbancaReport(
   set('Q105', fmtArea(areaVal))
   set('T105', fmtArea(p.area_annex_m2))
 
-  // 7. ELEMENTOS COMPARÁVEIS (folha principal — 3 primeiros seleccionados)
-  // Usa apenas os comparáveis seleccionados (selected=true), ordenados por epm2
+  // COMPARÁVEIS — apenas na tab IV-IV (não na folha principal)
   const selectedComps = comps
     .filter((c: any) => c.selected)
     .sort((a: any, b: any) => {
@@ -210,26 +209,9 @@ export async function generateAbancaReport(
       const epmB = b.price && b.area_m2 ? parseFloat(b.price)/parseFloat(b.area_m2) : 0
       return epmA - epmB
     })
-
-  // Se não houver seleccionados, usa todos (compatibilidade)
   const compsToUse = selectedComps.length > 0 ? selectedComps : comps
 
-  compsToUse.slice(0, 3).forEach((c: any, idx: number) => {
-    const row  = 116 + idx
-    const desc = v(c.notes, `${v(c.portal)} ref.${v(c.listing_ref)}`)
-    set(`D${row}`, desc)
-    set(`T${row}`, fmtArea(c.area_m2))
-    const price = parseFloat(c.price || 0)
-    const area  = parseFloat(c.area_m2 || 0)
-    if (price > 0 && area > 0) {
-      set(`Z${row}`,  Math.round(price / area * 100) / 100)
-      set(`AE${row}`, price)
-    }
-  })
-
   // TAB IV-IV — 5 comparáveis seleccionados
-  // Comp 1: col H, Comp 2: col L, Comp 3: col P, Comp 4: col T, Comp 5: col X
-  // (intervalo de 4 colunas entre cada comparável)
   const IV_COLS = ['H', 'L', 'P', 'T', 'X']
   const wsIV = wb.getWorksheet('IV - IV')
   if (wsIV) {
@@ -239,25 +221,22 @@ export async function generateAbancaReport(
     }
 
     compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
-      const col  = IV_COLS[idx]
-
-      const noteParts = (c.notes || '').split('|').map((s: string) => s.trim())
-      const tipologia = c.tipologia || noteParts[0] || ''
-      const uso       = c.uso       || noteParts[1] || ''
-      const anoEstado = c.ano_estado || noteParts[2] || ''
-      const descricao = c.notes || ''
-      const price     = parseFloat(c.price || 0)
+      const col      = IV_COLS[idx]
+      const tipologia = c.tipologia || ''
+      const uso       = c.uso       || ''
+      const anoEstado = c.ano_estado || ''
+      const descricao = c.notes     || ''
+      const price     = parseFloat(c.price   || 0)
       const area      = parseFloat(c.area_m2 || 0)
-      const epm2      = price > 0 && area > 0 ? Math.round(price / area * 100) / 100 : null
 
-      setIV(`${col}9`,  v(c.address))    // Localização
-      setIV(`${col}10`, uso)             // Uso (tipo de imóvel)
-      setIV(`${col}11`, tipologia)       // Tipologia
-      setIV(`${col}12`, anoEstado)       // Ano/Estado
-      setIV(`${col}13`, fmtArea(c.area_m2)) // Área Privativa/Locável
-      if (price > 0) setIV(`${col}14`, price)  // Asking Price = preço total €
-      setIV(`${col}22`, descricao)       // Descrição Geral
-      setIV(`${col}34`, v(c.url))        // Fonte (Link)
+      setIV(`${col}9`,  v(c.address))           // Localização
+      setIV(`${col}10`, uso)                     // Uso
+      setIV(`${col}11`, tipologia)               // Tipologia
+      setIV(`${col}12`, anoEstado)               // Ano/Estado
+      setIV(`${col}13`, fmtArea(c.area_m2))     // Área
+      if (price > 0) setIV(`${col}14`, price)    // Asking Price
+      setIV(`${col}22`, descricao)               // Descrição
+      setIV(`${col}34`, v(c.url))                // Fonte
     })
   }
 
