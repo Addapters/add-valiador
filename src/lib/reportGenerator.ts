@@ -128,57 +128,59 @@ export async function generateAbancaReport(
     ws.getCell(ref).value = val
   }
 
-  // Preenche um bloco de dados para um imóvel (por índice 0, 1, 2)
-  // Cada secção tem 3 blocos de linhas no template
+  // Preenche os dados de cada imóvel nos blocos do template
+  // Bloco 0 = imóvel principal, Bloco 1 = 2º imóvel, Bloco 2 = 3º imóvel
+  // Estrutura determinada por análise do template RELATÓRIO-PT
   function fillBlock(idx: number, prop: any) {
-    // Offsets de linha para cada bloco (0=primeiro, 1=segundo, 2=terceiro)
-    // Determinado pela análise do template: blocos de morada em 113/129/136
-    const MORADA_ROWS    = [113, 129, 136]  // linhas do label Id para morada
-    const COD_POSTAL_ROWS = [123, 130, 137] // linhas do label Id para cód-postal
-    const DESCRICAO_ROWS  = [150, 161, 170] // linhas do label Id para descrição
-    const REGISTO_ROWS    = [155, 175, 181] // linhas do label Id para registo/caderneta
-    const AREAS_ROWS      = [263, 270, null]// linhas do label Id para áreas
-    const RENDAS_ROWS     = [283, 289, null]// linhas do label Id para rendas
+    // Células de dados para cada bloco (row onde os dados são escritos)
+    const BLOCKS = [
+      {
+        // Bloco 1 — imóvel principal
+        // Morada: Id label D113, dados na linha 115/116
+        tipo_via:    'U116', morada: 'AA116', numero: 'AE116',
+        piso:        'AG116', porta: 'AI116', bloco: 'D122',
+        // Cód-postal: Id label M123, dados linha 125
+        cod_postal:  'M125', distrito: 'Q125', concelho: 'U125', freguesia: 'Y125',
+        // Coordenadas linha 128
+        coord_x: 'D128', coord_y: 'G128',
+        // Id/IdRel
+        id_cell: 'D114', idrel_cell: 'F114',
+      },
+      {
+        // Bloco 2 — 2º imóvel
+        tipo_via:   'U131', morada: 'AC131', numero: 'D134',
+        piso: '', porta: '', bloco: '',
+        cod_postal: '', distrito: '', concelho: '', freguesia: '',
+        coord_x: 'D128', coord_y: 'Q131',
+        id_cell: 'C130', idrel_cell: 'F130',
+      },
+      {
+        // Bloco 3 — 3º imóvel
+        tipo_via:   'U138', morada: 'AC138', numero: 'D140',
+        piso: '', porta: '', bloco: '',
+        cod_postal: '', distrito: '', concelho: '', freguesia: '',
+        coord_x: '', coord_y: 'Q138',
+        id_cell: 'C137', idrel_cell: 'F137',
+      },
+    ]
 
-    // MORADA
-    const mr = MORADA_ROWS[idx]
-    if (mr) {
-      // linha do Id label é mr, dados ficam nas linhas seguintes
-      const dr = mr + 2  // linha de dados (ex: 115 para morada)
-      set(`D${dr}`,  tr(v(prop.tipo_via)))
-      set(`I${dr}`,  v(prop.street, v(prop.address)))
-      set(`AE${dr}`, v(prop.number))
-      set(`AG${dr}`, v(prop.floor_letter))
-      set(`AI${dr}`, v(prop.fracao))
-      set(`D${mr+1}`, v(prop.block))
-    }
+    const b = BLOCKS[idx]
+    if (!b) return
 
-    // CÓD-POSTAL / LOCALIZAÇÃO
-    const cr = COD_POSTAL_ROWS[idx]
-    if (cr) {
-      const dr = cr + 1
-      set(`M${dr}`, v(prop.postal_code))
-      set(`Q${dr}`, v(prop.district))
-      set(`U${dr}`, v(prop.municipality))
-      set(`Y${dr}`, v(prop.parish))
-    }
-
-    // DESCRIÇÃO
-    const descr = DESCRICAO_ROWS[idx]
-    if (descr) {
-      const dr = descr + 1
-      set(`E${dr}`,  tr(v(prop.estado_ocupacao)))
-    }
-
-    // REGISTO PREDIAL / CADERNETA
-    const rr = REGISTO_ROWS[idx]
-    if (rr) {
-      const dr = rr + 1
-      set(`E${dr}`,  v(prop.id_registo_predial))
-      set(`I${dr}`,  v(prop.id_registo_matricial))
-      set(`R${dr}`,  v(prop.ano_matriz))
-      set(`U${dr}`,  tr(v(prop.tipo_predio)))
-    }
+    if (b.id_cell)    set(b.id_cell,    v(prop.id_bien))
+    if (b.idrel_cell) set(b.idrel_cell, v(prop.external_ref, v(prop.ref)))
+    if (b.tipo_via)   set(b.tipo_via,   tr(v(prop.tipo_via)))
+    if (b.morada)     set(b.morada,     v(prop.street, v(prop.address)))
+    if (b.numero)     set(b.numero,     v(prop.number))
+    if (b.piso)       set(b.piso,       v(prop.floor_letter))
+    if (b.porta)      set(b.porta,      v(prop.fracao))
+    if (b.bloco)      set(b.bloco,      v(prop.block))
+    if (b.cod_postal) set(b.cod_postal, v(prop.postal_code))
+    if (b.distrito)   set(b.distrito,   v(prop.district))
+    if (b.concelho)   set(b.concelho,   v(prop.municipality))
+    if (b.freguesia)  set(b.freguesia,  v(prop.parish))
+    if (b.coord_x && prop.longitude) set(b.coord_x, prop.longitude)
+    if (b.coord_y && prop.latitude)  set(b.coord_y, prop.latitude)
   }
 
   // 1. IDENTIFICAÇÃO
