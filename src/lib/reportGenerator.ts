@@ -161,8 +161,8 @@ export async function generateAbancaReport(
     // Linhas base do primeiro imóvel — segundo fica em +1, terceiro em +2
     const ID_BASE_ROWS = [
       19, 25, 31,
-      38, 50, 62,
-      92, 98,
+      38, 44, 45, 50, 56, 62,
+      86, 92, 98,
       105, 116,
       152, 157,
       172, 177, 183, 189,
