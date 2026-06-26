@@ -132,18 +132,7 @@ export async function generateAbancaReport(
   set('X11', v(p.external_ref, v(p.ref)))   // IdRel = Referência externa
   set('X8',  v(p.id_bien))                   // Id = ID do Bem (id_bien)
 
-  // Id e IdRel — preencher na linha ABAIXO do label em todas as ocorrências
-  // Id = id_bien (ID do Bem), IdRel = external_ref (Ref. Avaliador)
-  const ID_CELLS    = ['D17','AI19','G28','D36','D41','AD44','C55','C61','D65',
-                        'D84','D89','Y97','D103','D114','M124','C130','C137',
-                        'C151','C156','C162','C171','C176','C182','C188',
-                        'D210','D222','C264','C271','C284','C290']
-  const IDREL_CELLS = ['E116','E131','E138','E177','E212','E224']
-
-  const idVal    = v(p.id_bien)
-  const idRelVal = v(p.external_ref, v(p.ref))
-  ID_CELLS.forEach(cell    => { if (idVal)    set(cell, idVal) })
-  IDREL_CELLS.forEach(cell => { if (idRelVal) set(cell, idRelVal) })
+  // Id e IdRel — removido mapeamento automático (não preencher estas células)
 
   // 2. MORADA
   set('D19',  tr(v(p.tipo_via)))
