@@ -33,55 +33,111 @@ function traduzTipo(val: any): string {
   if (!val) return ''
   const map: Record<string, string> = {
     // Tipos de imóvel
-    'VIVIENDA':              'Habitação',
-    'PISO':                  'Apartamento',
-    'CASA':                  'Moradia',
-    'GARAJE':                'Garagem',
-    'TRASTERO':              'Arrumos',
-    'LOCAL COMERCIAL':       'Loja Comercial',
-    'OFICINA':               'Escritório',
-    'NAVE INDUSTRIAL':       'Nave Industrial',
-    'TERRENO FINCA RUSTICA': 'Terreno Rústico',
-    'TERRENO FINCA URBANA':  'Terreno Urbano',
-    'SOLAR':                 'Terreno Urbano',
-    'FINCA RUSTICA':         'Propriedade Rústica',
-    'EDIFICIO':              'Edifício',
-    'CHALET':                'Moradia',
-    'DUPLEX':                'Duplex',
-    'ATICO':                 'Cobertura',
-    'ESTUDIO':               'Estúdio',
+    'VIVIENDA':                    'Habitação',
+    'VIVIENDA (PISO)':             'Apartamento',
+    'PISO':                        'Apartamento',
+    'CASA':                        'Moradia',
+    'GARAJE':                      'Garagem',
+    'PLAZA DE GARAJE':             'Garagem',
+    'TRASTERO':                    'Arrumos',
+    'LOCAL':                       'Loja',
+    'LOCAL COMERCIAL':             'Loja comercial',
+    'LOCAL DE NEGOCIO':            'Loja comercial',
+    'OFICINA':                     'Escritório',
+    'NAVE':                        'Nave industrial',
+    'NAVE INDUSTRIAL':             'Nave industrial',
+    'TERRENO':                     'Terreno',
+    'TERRENO FINCA RUSTICA':       'Terreno rústico',
+    'TERRENO FINCA RÚSTICA':       'Terreno rústico',
+    'TERRENO FINCA URBANA':        'Terreno urbano',
+    'SOLAR':                       'Terreno urbano',
+    'FINCA RUSTICA':               'Propriedade rústica',
+    'FINCA RÚSTICA':               'Propriedade rústica',
+    'EDIFICIO':                    'Edifício',
+    'CHALET':                      'Moradia',
+    'CHALET ADOSADO':              'Moradia em banda',
+    'CHALET PAREADO':              'Moradia geminada',
+    'DUPLEX':                      'Duplex',
+    'ATICO':                       'Cobertura',
+    'ÁTICO':                       'Cobertura',
+    'ESTUDIO':                     'Estúdio',
     // Finalidades
     'ADJUDICADO CON VISITA INTERIOR':    'Adjudicado com visita interior',
+    'ADJUDICADOS CON VISTORIA INTERIOR': 'Adjudicado com visita interior',
     'ADJUDICADO SIN VISITA INTERIOR':    'Adjudicado sem visita interior',
-    // Estados
-    'NUEVA CONSTRUCCION':  'Construção Nova',
-    'SEGUNDA MANO':        'Usado',
-    'EN PROYECTO':         'Em Projecto',
-    'EN CONSTRUCCION':     'Em Construção',
-    'REHABILITADO':        'Reabilitado',
+    'ADJUDICADOS SIN VISITA INTERIOR':   'Adjudicado sem visita interior',
+    'ADJUDICADOS SEM VISTORIA INTERIOR': 'Adjudicado sem visita interior',
+    // Estados de construção
+    'NUEVA CONSTRUCCION':          'Construção nova',
+    'NUEVA CONSTRUCCIÓN':          'Construção nova',
+    'SEGUNDA MANO':                'Usado',
+    'EN PROYECTO':                 'Em projecto',
+    'EN PROYETO':                  'Em projecto',
+    'EN CONSTRUCCION':             'Em construção',
+    'EN CONSTRUCCIÓN':             'Em construção',
+    'REHABILITADO':                'Reabilitado',
+    'TERMINADO':                   'Terminado',
+    'HIPOTESIS TERMINADO':         'Hipótese terminado',
+    'HIPÓTESIS TERMINADO':         'Hipótese terminado',
     // Conservação
-    'MUY BUENO':           'Muito Bom',
-    'BUENO':               'Bom',
-    'NORMAL':              'Normal',
-    'DEFICIENTE':          'Deficiente',
-    'MUY DEFICIENTE':      'Muito Deficiente',
-    'RUINOSO':             'Ruinoso',
+    'MUY BUENO':                   'Muito bom',
+    'BUENO':                       'Bom',
+    'NORMAL':                      'Normal',
+    'DEFICIENTE':                  'Deficiente',
+    'MUY DEFICIENTE':              'Muito deficiente',
+    'RUINOSO':                     'Ruinoso',
     // Ocupação
-    'OCUPADO':             'Ocupado',
-    'LIBRE':               'Livre',
-    'ARRENDADO':           'Arrendado',
+    'OCUPADO':                     'Ocupado',
+    'OCUPADO POR EL PROPIETARIO':  'Ocupado pelo proprietário',
+    'LIBRE':                       'Livre',
+    'ARRENDADO':                   'Arrendado',
+    'OCUPADO POR TERCEROS':        'Ocupado por terceiros',
+    // Uso
+    'RESIDENCIAL':                 'Residencial',
+    'COMERCIAL':                   'Comercial',
+    'INDUSTRIAL':                  'Industrial',
+    'SERVICIOS':                   'Serviços',
+    'MIXTO':                       'Misto',
+    'RUSTICO':                     'Rústico',
+    'RÚSTICO':                     'Rústico',
     // Mercado
-    'POSITIVA':            'Positiva',
-    'NEGATIVA':            'Negativa',
-    'ESTABLE':             'Estável',
-    'EN ALZA':             'Em Alta',
-    'EN BAJA':             'Em Baixa',
+    'POSITIVA':                    'Positiva',
+    'MUY POSITIVA':                'Muito positiva',
+    'NEGATIVA':                    'Negativa',
+    'MUY NEGATIVA':                'Muito negativa',
+    'ESTABLE':                     'Estável',
+    'EN ALZA':                     'Em alta',
+    'EN BAJA':                     'Em baixa',
+    'TENDENCIALMENTE POSITIVA':    'Tendencialmente positiva',
+    'TENDENCIALMENTE NEGATIVA':    'Tendencialmente negativa',
     // Tipo via
-    'CALLE':               'Rua',
-    'AVENIDA':             'Avenida',
-    'PLAZA':               'Praça',
-    'PASEO':               'Passeio',
-    'CARRETERA':           'Estrada',
+    'CALLE':                       'Rua',
+    'AVENIDA':                     'Avenida',
+    'PLAZA':                       'Praça',
+    'PASEO':                       'Passeio',
+    'CARRETERA':                   'Estrada',
+    'CAMINO':                      'Caminho',
+    'TRAVESIA':                    'Travessa',
+    'TRAVESÍA':                    'Travessa',
+    // Destino
+    '1ª RESIDENCIA':               '1ª residência',
+    '1ª RESIDÊNCIA':               '1ª residência',
+    '2ª RESIDENCIA':               '2ª residência',
+    '2ª RESIDÊNCIA':               '2ª residência',
+    'ARRENDAMIENTO':               'Arrendamento',
+    // Tipo prédio
+    'PREDIO URBANO':               'Prédio urbano',
+    'PRÉDIO URBANO':               'Prédio urbano',
+    'PREDIO RUSTICO':              'Prédio rústico',
+    'PRÉDIO RÚSTICO':              'Prédio rústico',
+    'PREDIO MIXTO':                'Prédio misto',
+    // Serviço
+    'TASACION':                    'Avaliação',
+    'TASACIÓN':                    'Avaliação',
+    'RETASACION':                  'Reavaliação',
+    'RETASACIÓN':                  'Reavaliação',
+    'VISTORIA':                    'Vistoria',
+    'PORTABILIDAD':                'Portabilidade',
   }
   const upper = String(val).toUpperCase().trim()
   return map[upper] || val
@@ -216,7 +272,7 @@ export async function generateAbancaReport(
   set('O44',  tr(v(p.destino)))
   set('V44',  tr(v(p.estado_conservacao)))
   set('AC44', tr(v(p.estado_ocupacao)))
-  set('D50',  titleCase(v(p.composicao_imovel, v(p.typology))))
+  set('D50',  tr(v(p.composicao_imovel, v(p.typology))))
   set('D56',  v(p.id_registo_predial))
   set('D62',  v(p.id_registo_matricial))
   set('G62',  v(p.fracao))
@@ -244,7 +300,7 @@ export async function generateAbancaReport(
 
   // 6. ÁREAS
   const areaVal = p.area_considerada || p.area_m2 || p.gross_area
-  set('D105', v(p.composicao_imovel, v(p.typology)))
+  set('D105', tr(v(p.composicao_imovel, v(p.typology))))
   set('L105', fmtArea(p.land_area))
   set('Q105', fmtArea(areaVal))
   set('T105', fmtArea(p.area_annex_m2))
