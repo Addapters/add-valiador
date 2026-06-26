@@ -359,7 +359,19 @@ export default function PropertyDetail() {
         return { ...ph, url: data.publicUrl }
       }).filter((ph: any) => ph.url)
 
-      await generateAbancaReport(property, photoUrls, comps, templateUrl, mapImageBlob)
+      // Vai buscar imóveis com a mesma external_ref (irmãos) — max 2 extra
+      let siblings: any[] = []
+      if (property.external_ref) {
+        const { data: siblingsData } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('external_ref', property.external_ref)
+          .neq('id', property.id)
+          .limit(2)
+        siblings = siblingsData || []
+      }
+
+      await generateAbancaReport(property, photoUrls, comps, templateUrl, mapImageBlob, siblings)
       toast.success('Relatório gerado — verifica o teu computador e a tab 13. Certificação para o link online')
       qc.invalidateQueries({ queryKey: ['property', id] })
     } catch (e: any) { toast.error(e.message) }
