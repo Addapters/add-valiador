@@ -310,28 +310,37 @@ export default function PropertyDetail() {
 
       // Captura do mapa com html2canvas
       let mapImageBlob: Blob | null = null
-      if (mapRef.current && property.latitude) {
+      if (mapRef.current && property.latitude && mapInst.current) {
         try {
-          // Zoom 17 para captura
-          if (mapInst.current) mapInst.current.setZoom(17)
-          await new Promise(r => setTimeout(r, 1200)) // aguarda tiles carregarem
+          // Mostra temporariamente o div do mapa para captura (pode estar hidden)
+          const mapContainer = mapRef.current.closest('[style*="display"]') as HTMLElement | null
+          const wasHidden = mapContainer?.style.display === 'none'
+          if (wasHidden && mapContainer) {
+            mapContainer.style.display = 'block'
+            await new Promise(r => setTimeout(r, 100))
+          }
 
-          // Esconde controlos temporariamente
-          const controls = mapRef.current.querySelectorAll<HTMLElement>(
-            '.leaflet-control-container'
-          )
+          // Zoom 17 e aguarda tiles
+          mapInst.current.setZoom(17)
+          mapInst.current.invalidateSize()
+          await new Promise(r => setTimeout(r, 1500))
+
+          // Esconde controlos
+          const controls = mapRef.current.querySelectorAll<HTMLElement>('.leaflet-control-container')
           controls.forEach(el => { el.style.display = 'none' })
 
           const html2canvas = (await import('html2canvas')).default
           const canvas = await html2canvas(mapRef.current, {
             useCORS: true, allowTaint: true, logging: false,
-            width: mapRef.current.offsetWidth, height: mapRef.current.offsetHeight,
+            width: mapRef.current.offsetWidth || 600,
+            height: mapRef.current.offsetHeight || 300,
           })
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
 
-          // Restaura controlos
+          // Restaura
           controls.forEach(el => { el.style.display = '' })
-        } catch { /* mapa não disponível, continua sem ele */ }
+          if (wasHidden && mapContainer) mapContainer.style.display = 'none'
+        } catch (e) { console.warn('Map capture failed:', e) }
       }
 
       const { data: freshPhotos } = await supabase.from('property_photos').select('*').eq('property_id', property.id).order('slot').order('sort_order')
