@@ -163,6 +163,12 @@ export async function generateAbancaReport(
     set(`C${31 + off}`, idRel)
     if (prop.longitude) set(`D${31 + off}`, prop.longitude)
     if (prop.latitude)  set(`G${31 + off}`, prop.latitude)
+
+    // ── Secções adicionais com Id/IdRel ─────────────────────
+    for (const baseRow of [44, 56, 68, 86, 105, 116]) {
+      set(`B${baseRow + off}`, id)
+      set(`C${baseRow + off}`, idRel)
+    }
   }
 
   // 1. IDENTIFICAÇÃO
