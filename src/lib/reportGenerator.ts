@@ -156,15 +156,23 @@ export async function generateAbancaReport(
   // O template tem linhas consecutivas: imóvel 1 na linha X, imóvel 2 em X+1, imóvel 3 em X+2
   function fillBlock(idx: number, prop: any) {
     const off = idx
+    const id = v(prop.id_bien)
 
-    const id    = v(prop.id_bien)
-    const idRel = v(prop.external_ref, v(prop.ref))
+    // Todas as linhas base onde deve aparecer o Id (coluna B apenas, sem IdRel)
+    const ID_BASE_ROWS = [
+      19, 25, 31,
+      39, 44, 51, 56,
+      63, 68, 86, 93, 99,
+      105, 116, 153, 158,
+      173, 178, 184, 190,
+      213, 225,
+      266, 286, 292,
+    ]
+    for (const baseRow of ID_BASE_ROWS) {
+      set(`B${baseRow + off}`, id)
+    }
 
-    // ── Morada ──────────────────────────────────────────────
-    // Id/IdRel
-    set(`B${19 + off}`, id)
-    set(`C${19 + off}`, idRel)
-    // Campos
+    // Campos de morada (linha 19)
     set(`D${19 + off}`,  tr(v(prop.tipo_via)))
     set(`I${19 + off}`,  v(prop.street, v(prop.address)))
     set(`AE${19 + off}`, v(prop.number))
@@ -174,25 +182,15 @@ export async function generateAbancaReport(
     set(`Z${19 + off}`,  v(prop.escada))
     set(`AB${19 + off}`, v(prop.portal))
 
-    // ── Código postal / Localização ──────────────────────────
-    set(`B${25 + off}`, id)
-    set(`C${25 + off}`, idRel)
+    // Código postal / localização (linha 25)
     set(`D${25 + off}`,  v(prop.postal_code))
     set(`I${25 + off}`,  v(prop.district))
     set(`P${25 + off}`,  v(prop.municipality))
     set(`W${25 + off}`,  v(prop.parish))
 
-    // ── Coordenadas ──────────────────────────────────────────
-    set(`B${31 + off}`, id)
-    set(`C${31 + off}`, idRel)
+    // Coordenadas (linha 31)
     if (prop.longitude) set(`D${31 + off}`, prop.longitude)
     if (prop.latitude)  set(`G${31 + off}`, prop.latitude)
-
-    // ── Secções adicionais com Id/IdRel ─────────────────────
-    for (const baseRow of [44, 56, 68, 86, 105, 116]) {
-      set(`B${baseRow + off}`, id)
-      set(`C${baseRow + off}`, idRel)
-    }
   }
 
   // 1. IDENTIFICAÇÃO
