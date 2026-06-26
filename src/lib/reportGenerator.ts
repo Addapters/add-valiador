@@ -106,7 +106,8 @@ export async function generateAbancaReport(
   photos: { url: string; slot?: number }[],
   comps: any[],
   templateUrl: string,
-  mapImageBlob?: Blob | null
+  mapImageBlob?: Blob | null,
+  siblings: any[] = []   // outros imóveis com a mesma external_ref
 ): Promise<void> {
   const tmplBuf = await fetchBuf(templateUrl)
   if (!tmplBuf) throw new Error('Não foi possível carregar o modelo. Verifique a variável VITE_REPORT_TEMPLATE_URL.')
@@ -117,11 +118,67 @@ export async function generateAbancaReport(
   const ws = wb.getWorksheet('RELATÓRIO - PT')
   if (!ws) throw new Error('Folha "RELATÓRIO - PT" não encontrada no modelo.')
 
+  // Todos os imóveis a preencher: principal + irmãos (max 3 total)
+  const allProps = [property, ...siblings].slice(0, 3)
+
   const p = property
 
   function set(ref: string, val: any) {
     if (val === null || val === undefined || val === '') return
     ws.getCell(ref).value = val
+  }
+
+  // Preenche um bloco de dados para um imóvel (por índice 0, 1, 2)
+  // Cada secção tem 3 blocos de linhas no template
+  function fillBlock(idx: number, prop: any) {
+    // Offsets de linha para cada bloco (0=primeiro, 1=segundo, 2=terceiro)
+    // Determinado pela análise do template: blocos de morada em 113/129/136
+    const MORADA_ROWS    = [113, 129, 136]  // linhas do label Id para morada
+    const COD_POSTAL_ROWS = [123, 130, 137] // linhas do label Id para cód-postal
+    const DESCRICAO_ROWS  = [150, 161, 170] // linhas do label Id para descrição
+    const REGISTO_ROWS    = [155, 175, 181] // linhas do label Id para registo/caderneta
+    const AREAS_ROWS      = [263, 270, null]// linhas do label Id para áreas
+    const RENDAS_ROWS     = [283, 289, null]// linhas do label Id para rendas
+
+    // MORADA
+    const mr = MORADA_ROWS[idx]
+    if (mr) {
+      // linha do Id label é mr, dados ficam nas linhas seguintes
+      const dr = mr + 2  // linha de dados (ex: 115 para morada)
+      set(`D${dr}`,  tr(v(prop.tipo_via)))
+      set(`I${dr}`,  v(prop.street, v(prop.address)))
+      set(`AE${dr}`, v(prop.number))
+      set(`AG${dr}`, v(prop.floor_letter))
+      set(`AI${dr}`, v(prop.fracao))
+      set(`D${mr+1}`, v(prop.block))
+    }
+
+    // CÓD-POSTAL / LOCALIZAÇÃO
+    const cr = COD_POSTAL_ROWS[idx]
+    if (cr) {
+      const dr = cr + 1
+      set(`M${dr}`, v(prop.postal_code))
+      set(`Q${dr}`, v(prop.district))
+      set(`U${dr}`, v(prop.municipality))
+      set(`Y${dr}`, v(prop.parish))
+    }
+
+    // DESCRIÇÃO
+    const descr = DESCRICAO_ROWS[idx]
+    if (descr) {
+      const dr = descr + 1
+      set(`E${dr}`,  tr(v(prop.estado_ocupacao)))
+    }
+
+    // REGISTO PREDIAL / CADERNETA
+    const rr = REGISTO_ROWS[idx]
+    if (rr) {
+      const dr = rr + 1
+      set(`E${dr}`,  v(prop.id_registo_predial))
+      set(`I${dr}`,  v(prop.id_registo_matricial))
+      set(`R${dr}`,  v(prop.ano_matriz))
+      set(`U${dr}`,  tr(v(prop.tipo_predio)))
+    }
   }
 
   // 1. IDENTIFICAÇÃO
@@ -134,7 +191,10 @@ export async function generateAbancaReport(
 
   // Id e IdRel — removido mapeamento automático (não preencher estas células)
 
-  // 2. MORADA
+  // 2. MORADA — preenche bloco por imóvel
+  allProps.forEach((prop, idx) => fillBlock(idx, prop))
+
+  // Manter também o preenchimento legado para compatibilidade (imóvel único)
   set('D19',  tr(v(p.tipo_via)))
   set('I19',  v(p.street, v(p.address)))
   set('X19',  v(p.number))
