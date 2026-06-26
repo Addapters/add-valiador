@@ -323,6 +323,15 @@ export default function PropertyDetail() {
           // Zoom 17 e aguarda tiles
           mapInst.current.setZoom(17)
           mapInst.current.invalidateSize()
+          // Adiciona marcador circular temporário se não existir
+          const L = window.L
+          let tempMarker: any = null
+          if (property.latitude) {
+            tempMarker = L.circleMarker([property.latitude, property.longitude], {
+              radius: 10, fillColor: '#1D9E75', color: 'white', weight: 3,
+              opacity: 1, fillOpacity: 0.9,
+            }).addTo(mapInst.current)
+          }
           await new Promise(r => setTimeout(r, 1500))
 
           // Esconde controlos
@@ -339,6 +348,7 @@ export default function PropertyDetail() {
 
           // Restaura
           controls.forEach(el => { el.style.display = '' })
+          if (tempMarker) tempMarker.remove()
           if (wasHidden && mapContainer) mapContainer.style.display = 'none'
         } catch (e) { console.warn('Map capture failed:', e) }
       }
