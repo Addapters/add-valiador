@@ -325,6 +325,15 @@ export default function PropertyDetail() {
           mapInst.current.invalidateSize()
           await new Promise(r => setTimeout(r, 2500))
 
+          // Calcula posição do marcador ANTES de esconder controlos
+          let markerPoint: { x: number; y: number } | null = null
+          if (property.latitude && property.longitude) {
+            const pt = mapInst.current.latLngToContainerPoint(
+              window.L.latLng(property.latitude, property.longitude)
+            )
+            markerPoint = { x: Math.round(pt.x), y: Math.round(pt.y) }
+          }
+
           // Esconde controlos
           const controls = mapRef.current.querySelectorAll<HTMLElement>('.leaflet-control-container')
           controls.forEach(el => { el.style.display = 'none' })
@@ -340,21 +349,24 @@ export default function PropertyDetail() {
             height: mapRef.current.offsetHeight || 300,
           })
 
-          // Desenha o marcador directamente no canvas (html2canvas não captura SVG do Leaflet)
-          if (property.latitude && property.longitude) {
-            const point = mapInst.current.latLngToContainerPoint([property.latitude, property.longitude])
+          // Desenha marcador directamente no canvas
+          if (markerPoint) {
             const ctx = canvas.getContext('2d')
-            if (ctx && point) {
-              const x = point.x, y = point.y
-              // Círculo exterior (branco)
+            if (ctx) {
+              const { x, y } = markerPoint
+              // Sombra
+              ctx.shadowColor = 'rgba(0,0,0,0.4)'
+              ctx.shadowBlur = 6
+              // Anel branco exterior
               ctx.beginPath()
-              ctx.arc(x, y, 12, 0, 2 * Math.PI)
+              ctx.arc(x, y, 11, 0, 2 * Math.PI)
               ctx.fillStyle = 'white'
               ctx.fill()
-              // Círculo interior (verde)
+              // Ponto verde interior
+              ctx.shadowBlur = 0
               ctx.beginPath()
-              ctx.arc(x, y, 9, 0, 2 * Math.PI)
-              ctx.fillStyle = '#22c55e'
+              ctx.arc(x, y, 8, 0, 2 * Math.PI)
+              ctx.fillStyle = '#16a34a'
               ctx.fill()
             }
           }
