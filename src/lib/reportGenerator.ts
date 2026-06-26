@@ -132,6 +132,19 @@ export async function generateAbancaReport(
   set('X11', v(p.external_ref, v(p.ref)))   // IdRel = Referência externa
   set('X8',  v(p.id_bien))                   // Id = ID do Bem (id_bien)
 
+  // Id e IdRel — preencher em todas as células do template (RELATÓRIO - PT)
+  // Id = id_bien (ID do Bem), IdRel = external_ref (Ref. Avaliador)
+  const ID_CELLS    = ['B18','B24','B30','B37','B43','B49','B55','B61','B67',
+                        'B85','B91','B97','B104','B115','B124','B130','B137',
+                        'B151','B156','B163','B171','B176','B182','B188',
+                        'B211','B223','B264','B271','B284','B290']
+  const IDREL_CELLS = ['T115','P130','P137','H176','T211','T223']
+
+  const idVal    = v(p.id_bien)
+  const idRelVal = v(p.external_ref, v(p.ref))
+  ID_CELLS.forEach(cell    => { if (idVal)    set(cell, idVal) })
+  IDREL_CELLS.forEach(cell => { if (idRelVal) set(cell, idRelVal) })
+
   // 2. MORADA
   set('D19',  tr(v(p.tipo_via)))
   set('I19',  v(p.street, v(p.address)))
