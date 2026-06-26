@@ -129,58 +129,34 @@ export async function generateAbancaReport(
   }
 
   // Preenche os dados de cada imóvel nos blocos do template
-  // Bloco 0 = imóvel principal, Bloco 1 = 2º imóvel, Bloco 2 = 3º imóvel
-  // Estrutura determinada por análise do template RELATÓRIO-PT
+  // O template tem linhas consecutivas: imóvel 1 na linha X, imóvel 2 em X+1, imóvel 3 em X+2
+  // idx=0 → offset 0, idx=1 → offset +1, idx=2 → offset +2
   function fillBlock(idx: number, prop: any) {
-    // Células de dados para cada bloco (row onde os dados são escritos)
-    const BLOCKS = [
-      {
-        // Bloco 1 — imóvel principal
-        // Morada: Id label D113, dados na linha 115/116
-        tipo_via:    'U116', morada: 'AA116', numero: 'AE116',
-        piso:        'AG116', porta: 'AI116', bloco: 'D122',
-        // Cód-postal: Id label M123, dados linha 125
-        cod_postal:  'M125', distrito: 'Q125', concelho: 'U125', freguesia: 'Y125',
-        // Coordenadas linha 128
-        coord_x: 'D128', coord_y: 'G128',
-        // Id/IdRel
-        id_cell: 'D114', idrel_cell: 'F114',
-      },
-      {
-        // Bloco 2 — 2º imóvel
-        tipo_via:   'U131', morada: 'AC131', numero: 'D134',
-        piso: '', porta: '', bloco: '',
-        cod_postal: '', distrito: '', concelho: '', freguesia: '',
-        coord_x: 'D128', coord_y: 'Q131',
-        id_cell: 'C130', idrel_cell: 'F130',
-      },
-      {
-        // Bloco 3 — 3º imóvel
-        tipo_via:   'U138', morada: 'AC138', numero: 'D140',
-        piso: '', porta: '', bloco: '',
-        cod_postal: '', distrito: '', concelho: '', freguesia: '',
-        coord_x: '', coord_y: 'Q138',
-        id_cell: 'C137', idrel_cell: 'F137',
-      },
-    ]
+    const off = idx // offset de linha
 
-    const b = BLOCKS[idx]
-    if (!b) return
+    // Id fica em B19 (imóvel 1), B20 (imóvel 2), B21 (imóvel 3)
+    set(`B${19 + off}`, v(prop.id_bien))
 
-    if (b.id_cell)    set(b.id_cell,    v(prop.id_bien))
-    if (b.idrel_cell) set(b.idrel_cell, v(prop.external_ref, v(prop.ref)))
-    if (b.tipo_via)   set(b.tipo_via,   tr(v(prop.tipo_via)))
-    if (b.morada)     set(b.morada,     v(prop.street, v(prop.address)))
-    if (b.numero)     set(b.numero,     v(prop.number))
-    if (b.piso)       set(b.piso,       v(prop.floor_letter))
-    if (b.porta)      set(b.porta,      v(prop.fracao))
-    if (b.bloco)      set(b.bloco,      v(prop.block))
-    if (b.cod_postal) set(b.cod_postal, v(prop.postal_code))
-    if (b.distrito)   set(b.distrito,   v(prop.district))
-    if (b.concelho)   set(b.concelho,   v(prop.municipality))
-    if (b.freguesia)  set(b.freguesia,  v(prop.parish))
-    if (b.coord_x && prop.longitude) set(b.coord_x, prop.longitude)
-    if (b.coord_y && prop.latitude)  set(b.coord_y, prop.latitude)
+    // Morada — linha base determinada pelo template actual
+    // Tipo de via, Morada, Nº, Piso, Porta, Bloco, Portal, Escada
+    set(`D${19 + off}`,  tr(v(prop.tipo_via)))
+    set(`I${19 + off}`,  v(prop.street, v(prop.address)))
+    set(`AE${19 + off}`, v(prop.number))
+    set(`AG${19 + off}`, v(prop.floor_letter))
+    set(`AI${19 + off}`, v(prop.fracao))
+    set(`X${19 + off}`,  v(prop.block))
+    set(`Z${19 + off}`,  v(prop.escada))
+    set(`AB${19 + off}`, v(prop.portal))
+
+    // Código postal / localização — secção seguinte, mesma lógica de offset
+    set(`D${25 + off}`,  v(prop.postal_code))
+    set(`I${25 + off}`,  v(prop.district))
+    set(`P${25 + off}`,  v(prop.municipality))
+    set(`W${25 + off}`,  v(prop.parish))
+
+    // Coordenadas
+    if (prop.longitude) set(`D${31 + off}`, prop.longitude)
+    if (prop.latitude)  set(`G${31 + off}`, prop.latitude)
   }
 
   // 1. IDENTIFICAÇÃO
@@ -193,22 +169,8 @@ export async function generateAbancaReport(
 
   // Id e IdRel — removido mapeamento automático (não preencher estas células)
 
-  // 2. MORADA — preenche bloco por imóvel
+  // Preenche blocos por imóvel (1, 2 ou 3)
   allProps.forEach((prop, idx) => fillBlock(idx, prop))
-
-  // Manter também o preenchimento legado para compatibilidade (imóvel único)
-  set('D19',  tr(v(p.tipo_via)))
-  set('I19',  v(p.street, v(p.address)))
-  set('X19',  v(p.number))
-  set('Z19',  v(p.floor_letter))
-  set('AB19', v(p.fracao))
-  set('AD19', v(p.block))
-  set('D25',  v(p.postal_code))
-  set('I25',  v(p.district))
-  set('P25',  v(p.municipality))
-  set('W25',  v(p.parish))
-  if (p.longitude) set('D31', p.longitude)
-  if (p.latitude)  set('G31', p.latitude)
 
   // 3. DESCRIÇÃO DO IMÓVEL
   set('D38',  tr(v(p.property_type)))
