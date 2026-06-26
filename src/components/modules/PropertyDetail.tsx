@@ -604,14 +604,6 @@ export default function PropertyDetail() {
             <F label="" field="justificacao_metodo" value={property.justificacao_metodo} textarea span onSave={save}/>
           </div>
         </>)}
-            <F label="Valor Residual Dinâmico (€)"       field="valor_residual_din"      value={property.valor_residual_din}      type="number" onSave={save}/>
-            <F label="Valor Patrimonial Tributário (€)"  field="valor_patrimonial"       value={property.valor_patrimonial}       type="number" onSave={save}/>
-            <F label="Valor de Substituição Bruto (€)"   field="valor_subs_bruto"        value={property.valor_subs_bruto}        type="number" onSave={save}/>
-            <F label="Valor de Substituição Líquido (€)" field="valor_subs_liquido"      value={property.valor_subs_liquido}      type="number" onSave={save}/>
-            <F label="Valor Máximo Legal (€)"            field="valor_maximo_legal"      value={property.valor_maximo_legal}      type="number" onSave={save}/>
-            <F label="Renda Ótima (€)"                   field="valor_renda_otima"       value={property.valor_renda_otima}       type="number" onSave={save}/>
-          </Section>
-        </>)}
 
         {/* SEC 8 ── Documentos Entregues */}
         {tab==='sec8' && (<>
