@@ -126,10 +126,10 @@ export async function generateAbancaReport(
 
   // 1. IDENTIFICAÇÃO
   set('F8',  fmtDate(p.data_relatorio || new Date().toISOString()))
-  set('F10', v(p.nr_relatorio, v(p.ref)))
+  set('F10', v(p.nr_relatorio, v(p.external_ref, v(p.ref))))  // Relatório N.º = Referência
   set('X9',  v(p.tipo_servico, 'Avaliação'))
   set('X10', v(p.finalidade, 'Adjudicado sem visita interior'))
-  set('X11', v(p.external_ref, v(p.ref)))   // IdRel = Referência externa
+  // Ref. Avaliador (X11) — não preencher por agora
   set('D101', v(p.banco))                    // Banco
 
   // Id e IdRel — removido mapeamento automático (não preencher estas células)
@@ -246,44 +246,35 @@ export async function generateAbancaReport(
   set('AC303', fmtDate(p.prev_valuation_date))
   set('D306',  v(p.perito_avaliador))
 
-  // IMAGEM DO MAPA — B406:AI423 (centrada, sem esticar)
+  // IMAGEM DO MAPA — linha 403 (template actualizado)
   if (mapImageBlob) {
     const wsm = wb.getWorksheet('RELATÓRIO - PT')
     if (wsm) {
       try {
         const mapBuf = await mapImageBlob.arrayBuffer()
         const mapId  = wb.addImage({ buffer: mapBuf as ArrayBuffer, extension: 'png' })
-        // Slot B(col 1) a AI(col 34) = 33 colunas, linhas 406-423 = 18 linhas
-        // Usa tl + br para preencher o slot todo mantendo proporção
         wsm.addImage(mapId, {
-          tl:  { col: 1,  row: 405 } as any,
-          br:  { col: 34, row: 423 } as any,
+          tl:  { col: 1,  row: 402 } as any,
+          br:  { col: 34, row: 420 } as any,
           editAs: 'oneCell',
         } as any)
       } catch { /* ignorar erro do mapa */ }
     }
   }
 
-  // FOTOS DO IMÓVEL — posições exactas no template (folha RELATÓRIO - PT)
-  // Foto 1: B350:Q362  Foto 2: R350:AI362
-  // Foto 3: B363:Q375  Foto 4: R363:AI375
-  // Foto 5: B376:Q388  Foto 6: R376:AI388
-  // Foto 7: B389:Q401  Foto 8: R389:AI401
-  // Colunas: B=1, Q=16, R=17, AI=34 (0-indexed: B=1, Q=16, R=17, AI=34)
+  // FOTOS DO IMÓVEL — primeira foto na linha 347 (template actualizado)
   if (photos.length > 0) {
     const wsf = wb.getWorksheet('RELATÓRIO - PT')
     if (wsf) {
-      // Posições das 8 fotos com tl+br para preencher o slot sem esticar
-      // ExcelJS com tl+br preenche o espaço disponível mantendo aspect ratio
       const PHOTO_SLOTS = [
-        { tl: { col: 1,  row: 349 }, br: { col: 16, row: 362 } }, // Foto 1 — B350:Q362
-        { tl: { col: 17, row: 349 }, br: { col: 35, row: 362 } }, // Foto 2 — R350:AI362
-        { tl: { col: 1,  row: 362 }, br: { col: 16, row: 375 } }, // Foto 3 — B363:Q375
-        { tl: { col: 17, row: 362 }, br: { col: 35, row: 375 } }, // Foto 4 — R363:AI375
-        { tl: { col: 1,  row: 375 }, br: { col: 16, row: 388 } }, // Foto 5 — B376:Q388
-        { tl: { col: 17, row: 375 }, br: { col: 35, row: 388 } }, // Foto 6 — R376:AI388
-        { tl: { col: 1,  row: 388 }, br: { col: 16, row: 401 } }, // Foto 7 — B389:Q401
-        { tl: { col: 17, row: 388 }, br: { col: 35, row: 401 } }, // Foto 8 — R389:AI401
+        { tl: { col: 1,  row: 346 }, br: { col: 16, row: 359 } }, // Foto 1 — B347:Q359
+        { tl: { col: 17, row: 346 }, br: { col: 35, row: 359 } }, // Foto 2 — R347:AI359
+        { tl: { col: 1,  row: 359 }, br: { col: 16, row: 372 } }, // Foto 3 — B360:Q372
+        { tl: { col: 17, row: 359 }, br: { col: 35, row: 372 } }, // Foto 4 — R360:AI372
+        { tl: { col: 1,  row: 372 }, br: { col: 16, row: 385 } }, // Foto 5 — B373:Q385
+        { tl: { col: 17, row: 372 }, br: { col: 35, row: 385 } }, // Foto 6 — R373:AI385
+        { tl: { col: 1,  row: 385 }, br: { col: 16, row: 398 } }, // Foto 7 — B386:Q398
+        { tl: { col: 17, row: 385 }, br: { col: 35, row: 398 } }, // Foto 8 — R386:AI398
       ]
 
       for (let i = 0; i < Math.min(photos.length, 8); i++) {
