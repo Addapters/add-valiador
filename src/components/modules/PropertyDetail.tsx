@@ -13,18 +13,18 @@ import toast from 'react-hot-toast'
 declare global { interface Window { L: any } }
 
 const TABS = [
-  'sec1','sec2','sec3','sec4','sec5','sec6','sec7','sec8',
-  'sec9','sec10','sec11','obras','residual',
+  'sec1','sec2','sec3','sec4','sec5','sec6','sec7','residual','obras','sec8',
+  'sec9','sec10','sec11',
   'sec13','sec14','sec15','sec16','sec17','sec18'
 ] as const
 type Tab = typeof TABS[number]
 const TAB_LABELS: Record<Tab, string> = {
-  sec1:'1. Identificação', sec2:'2. Morada', sec3:'3. Descrição',
-  sec4:'4. Localização', sec5:'5. Construção', sec6:'6. Áreas',
-  sec7:'7. Métodos', sec8:'8. Documentos', sec9:'9. Condicionalismos',
-  sec10:'10. Advertências', sec11:'11. Conclusão',
-  obras:'Obras de Beneficiação', residual:'Método Residual',
-  sec13:'13. Certificação', sec14:'14. Faturação',
+  sec1:'Identificação', sec2:'Morada', sec3:'Descrição',
+  sec4:'Localização', sec5:'Construção', sec6:'Áreas',
+  sec7:'Métodos', residual:'Método Residual', obras:'Obras de Beneficiação',
+  sec8:'Documentos', sec9:'Condicionalismos',
+  sec10:'Advertências', sec11:'Conclusão',
+  sec13:'Certificação', sec14:'Faturação',
   sec15:'Fotos', sec16:'Comparáveis', sec17:'Aval. anterior', sec18:'Notas',
 }
 
@@ -741,16 +741,32 @@ export default function PropertyDetail() {
 
         {/* SEC 13 ── Certificação */}
         {tab==='sec13' && (<>
-          <Section title="Certificação e Assinatura">
-            <F label="Data do Pedido"            field="data_pedido_relatorio" value={property.data_pedido_relatorio} type="date" onSave={save}/>
-            <F label="Data da Visita"            field="data_visita"           value={property.data_visita}           type="date" onSave={save}/>
-            <F label="Data de Conclusão/Entrega" field="data_conclusao"        value={property.data_conclusao}        type="date" onSave={save}/>
-            <F label="Data de Certificação"      field="data_certificacao"     value={property.data_certificacao}     type="date" onSave={save}/>
-            <F label="Data de Caducidade"        field="data_caducidade"       value={property.data_caducidade}       type="date" onSave={save}/>
-            <F label="Data do Contrato"          field="data_contrato"         value={property.data_contrato}         type="date" onSave={save}/>
-            <F label="Perito Avaliador"          field="perito_avaliador"      value={property.perito_avaliador}                 onSave={save}/>
-            <F label="NIF do Perito"             field="perito_nif"            value={property.perito_nif}                       onSave={save}/>
-            <F label="N.º CMVM"                  field="perito_cmvm"           value={property.perito_cmvm}                      onSave={save}/>
+          <Section title="Empresa de Avaliação">
+            <F label="Nome"           field="empresa_nome"            value={property.empresa_nome}                          onSave={save}/>
+            <F label="NIF Empresa"    field="empresa_nif"             value={property.empresa_nif}                           onSave={save}/>
+            <F label="N.º CMVM"       field="empresa_cmvm"            value={property.empresa_cmvm}                          onSave={save}/>
+            <F label="Apólice N.º"    field="empresa_apolice"         value={property.empresa_apolice}                       onSave={save}/>
+            <F label="Data Validade"  field="empresa_data_validade"   value={property.empresa_data_validade}   type="date"   onSave={save}/>
+            <F label="Seguradora"     field="empresa_seguradora"      value={property.empresa_seguradora}                    onSave={save}/>
+            <F label="Assinatura"     field="empresa_assinatura"      value={property.empresa_assinatura}                    onSave={save}/>
+          </Section>
+          <Section title="Perito Avaliador Certificado">
+            <F label="Nome"           field="pac_nome"                value={property.pac_nome}                              onSave={save}/>
+            <F label="Ordem/Ass."     field="pac_ordem"               value={property.pac_ordem}                             onSave={save}/>
+            <F label="N.º CMVM"       field="pac_cmvm"                value={property.pac_cmvm}                              onSave={save}/>
+            <F label="Apólice n.º"    field="pac_apolice"             value={property.pac_apolice}                           onSave={save}/>
+            <F label="Data Validade"  field="pac_data_validade"       value={property.pac_data_validade}       type="date"   onSave={save}/>
+            <F label="Seguradora"     field="pac_seguradora"          value={property.pac_seguradora}                        onSave={save}/>
+            <F label="Assinatura"     field="pac_assinatura"          value={property.pac_assinatura}                        onSave={save}/>
+          </Section>
+          <Section title="Perito Avaliador">
+            <F label="Nome"           field="perito_avaliador"        value={property.perito_avaliador}                      onSave={save}/>
+            <F label="Ordem/Ass."     field="perito_ordem"            value={property.perito_ordem}                          onSave={save}/>
+            <F label="N.º CMVM"       field="perito_cmvm"             value={property.perito_cmvm}                           onSave={save}/>
+            <F label="Apólice N.º"    field="nr_apolice"              value={property.nr_apolice}                            onSave={save}/>
+            <F label="Data Validade"  field="data_validade_seguro"    value={property.data_validade_seguro}    type="date"   onSave={save}/>
+            <F label="Seguradora"     field="seguradora"              value={property.seguradora}                            onSave={save}/>
+            <F label="Assinatura"     field="perito_assinatura"       value={property.perito_assinatura}                     onSave={save}/>
           </Section>
           {property.report_url && (
             <div className="mt-3 p-3 bg-brand-50 rounded-lg border border-brand-100">
