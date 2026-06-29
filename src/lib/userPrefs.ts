@@ -39,9 +39,11 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
   useful_area:            { label:'Área útil',             group:'base' },
   land_area:              { label:'Terreno',               group:'base' },
   perito_avaliador:       { label:'Perito Avaliador',      group:'base' },
-  visit_status:           { label:'Estado visita',         group:'base' },
+  visit_status:           { label:'Visita',               group:'base' },
+  tem_fotos:              { label:'Fotos',                 group:'base' },
+  tem_comparaveis:        { label:'Comparáveis',           group:'base' },
+  verificado:             { label:'Verificado',            group:'base' },
   visit_date:             { label:'Data visita',           group:'base' },
-  billing_status:         { label:'Est. faturação',        group:'base' },
   fee_amount:             { label:'Honorário',             group:'base' },
   honorarios_addapters:   { label:'Honorários Addapters',  group:'base' },
   po_number:              { label:'Nº PO',                 group:'base' },
@@ -67,7 +69,8 @@ export const DEFAULT_VISIBLE = [
   'external_ref','id_bien','district','municipality','parish',
   'street','number','postal_code',
   'property_type','typology','area_m2',
-  'perito_avaliador','visit_status','billing_status','fee_amount','honorarios_addapters',
+  'perito_avaliador','visit_status','tem_fotos','tem_comparaveis','verificado',
+  'fee_amount','honorarios_addapters',
   'nuc_risco','data_pedido',
 ]
 
