@@ -229,16 +229,15 @@ export async function generateAbancaReport(
     265, 285, 291,
   ]
 
-  // Linhas base para template multi (offset +1 por imóvel, max 18)
-  // Cada secção tem 18 linhas — as bases são do primeiro bem de cada tabela
+  // Linhas base para template multi — actualizadas
   const MULTI_BASE_ROWS = [
-    19, 40, 61, 83, 104, 125, 146, 167, 188,
-    221, 242, 263, 285,
-    333, 362, 382,
-    412, 432, 453, 474,
-    512, 539,
-    595, 617,
-    645, 666,
+    19, 42, 65, 89, 112, 135, 158, 181, 204,
+    239, 262, 285, 309,
+    359, 390, 412,
+    444, 466, 489, 512,
+    552, 581,
+    639, 663,
+    693, 716,
   ]
 
   function fillBlock(idx: number, prop: any) {
@@ -395,7 +394,7 @@ export async function generateAbancaReport(
       try {
         const mapBuf = await mapImageBlob.arrayBuffer()
         const mapId  = wb.addImage({ buffer: mapBuf as ArrayBuffer, extension: 'png' })
-        const mapRow = isMulti ? 792 : 402  // B793 no multi, B403 no standard
+        const mapRow = isMulti ? 844 : 402  // linha 845 no multi, 403 no standard
         wsm.addImage(mapId, {
           tl:  { col: 1,  row: mapRow } as any,
           br:  { col: 34, row: mapRow + 18 } as any,
@@ -409,8 +408,8 @@ export async function generateAbancaReport(
   if (photos.length > 0) {
     const wsf = wb.getWorksheet('RELATÓRIO - PT')
     if (wsf) {
-      // Template standard: começa linha 347; template multi: começa linha 737
-      const photoStartRow = isMulti ? 736 : 346
+      // Template standard: começa linha 347; template multi: começa linha 789
+      const photoStartRow = isMulti ? 788 : 346
 
       const PHOTO_SLOTS = [
         { tl: { col: 1,  row: photoStartRow },      br: { col: 16, row: photoStartRow + 13 } },
