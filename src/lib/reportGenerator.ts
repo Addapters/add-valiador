@@ -28,13 +28,22 @@ async function fetchBuf(url: string): Promise<ArrayBuffer | null> {
   } catch { return null }
 }
 
+// Primeira letra maiúscula, resto minúsculas
+function titleCase(val: any): string {
+  if (!val) return ''
+  const s = String(val).trim()
+  if (!s) return ''
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
+
 // Traduz termos em espanhol para português europeu
 function traduzTipo(val: any): string {
   if (!val) return ''
   const map: Record<string, string> = {
     // Tipos de imóvel
-    'VIVIENDA':                    'Habitação',
+    'VIVIENDA UNIFAMILIAR':        'Moradia unifamiliar',
     'VIVIENDA (PISO)':             'Apartamento',
+    'VIVIENDA':                    'Habitação',
     'PISO':                        'Apartamento',
     'CASA':                        'Moradia',
     'GARAJE':                      'Garagem',
@@ -75,6 +84,8 @@ function traduzTipo(val: any): string {
     'EN PROYETO':                  'Em projecto',
     'EN CONSTRUCCION':             'Em construção',
     'EN CONSTRUCCIÓN':             'Em construção',
+    'EN REHABILITACION':           'Em reabilitação',
+    'EN REHABILITACIÓN':           'Em reabilitação',
     'REHABILITADO':                'Reabilitado',
     'TERMINADO':                   'Terminado',
     'HIPOTESIS TERMINADO':         'Hipótese terminado',
@@ -140,21 +151,15 @@ function traduzTipo(val: any): string {
     'PORTABILIDAD':                'Portabilidade',
   }
   const upper = String(val).toUpperCase().trim()
-  return map[upper] || val
-}
-
-// Primeira letra maiúscula, resto minúsculas
-function titleCase(val: any): string {
-  if (!val) return ''
-  const s = String(val).trim()
-  if (!s) return ''
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  const translated = map[upper]
+  // Se traduzido, devolve a tradução; se não, aplica titleCase ao valor original
+  return translated || titleCase(val)
 }
 
 // Traduz e aplica titleCase
 function tr(val: any): string {
   if (!val) return ''
-  return titleCase(traduzTipo(val))
+  return traduzTipo(val)
 }
 
 export async function generateAbancaReport(
@@ -198,8 +203,12 @@ export async function generateAbancaReport(
   const ws = wb.getWorksheet('RELATÓRIO - PT')
   if (!ws) throw new Error('Folha "RELATÓRIO - PT" não encontrada no modelo.')
 
-  // Todos os imóveis a preencher: principal + irmãos (max 3 total)
-  const allProps = [property, ...siblings].slice(0, 3)
+  // Detecta se é template multi (4+ bens) pela URL
+  const isMulti = templateUrl.includes('multiplos') || templateUrl.includes('multi')
+
+  // Todos os imóveis a preencher
+  const maxProps = isMulti ? 18 : 3
+  const allProps = [property, ...siblings].slice(0, maxProps)
 
   const p = property
 
@@ -208,24 +217,36 @@ export async function generateAbancaReport(
     ws.getCell(ref).value = val
   }
 
-  // Preenche os dados de cada imóvel nos blocos do template
-  // O template tem linhas consecutivas: imóvel 1 na linha X, imóvel 2 em X+1, imóvel 3 em X+2
+  // Linhas base para template standard (offset +1 por imóvel, max 3)
+  const STANDARD_BASE_ROWS = [
+    19, 25, 31,
+    38, 44, 45, 50, 56, 62,
+    86, 92, 98,
+    105, 116,
+    152, 157,
+    172, 177, 183, 189,
+    212, 224,
+    265, 285, 291,
+  ]
+
+  // Linhas base para template multi (offset +1 por imóvel, max 18)
+  // Cada secção tem 18 linhas — as bases são do primeiro bem de cada tabela
+  const MULTI_BASE_ROWS = [
+    19, 40, 61, 83, 104, 125, 146, 167, 188,
+    221, 242, 263, 285,
+    333, 362, 382,
+    412, 432, 453, 474,
+    512, 539,
+    595, 617,
+    645, 666,
+  ]
+
   function fillBlock(idx: number, prop: any) {
     const off = idx
     const id = v(prop.id_bien)
+    const baseRows = isMulti ? MULTI_BASE_ROWS : STANDARD_BASE_ROWS
 
-    // Linhas base do primeiro imóvel — segundo fica em +1, terceiro em +2
-    const ID_BASE_ROWS = [
-      19, 25, 31,
-      38, 44, 45, 50, 56, 62,
-      86, 92, 98,
-      105, 116,
-      152, 157,
-      172, 177, 183, 189,
-      212, 224,
-      265, 285, 291,
-    ]
-    for (const baseRow of ID_BASE_ROWS) {
+    for (const baseRow of baseRows) {
       set(`B${baseRow + off}`, id)
     }
 
@@ -241,9 +262,9 @@ export async function generateAbancaReport(
 
     // Código postal / localização (linha 25)
     set(`D${25 + off}`,  v(prop.postal_code))
-    set(`I${25 + off}`,  v(prop.district))
-    set(`P${25 + off}`,  v(prop.municipality))
-    set(`W${25 + off}`,  v(prop.parish))
+    set(`I${25 + off}`,  titleCase(v(prop.district)))
+    set(`P${25 + off}`,  titleCase(v(prop.municipality)))
+    set(`W${25 + off}`,  titleCase(v(prop.parish)))
 
     // Coordenadas (linha 31)
     if (prop.longitude) set(`D${31 + off}`, prop.longitude)
@@ -361,35 +382,39 @@ export async function generateAbancaReport(
   set('AC303', fmtDate(p.prev_valuation_date))
   set('D306',  v(p.perito_avaliador))
 
-  // IMAGEM DO MAPA — linha 403 (template actualizado)
+  // IMAGEM DO MAPA
   if (mapImageBlob) {
     const wsm = wb.getWorksheet('RELATÓRIO - PT')
     if (wsm) {
       try {
         const mapBuf = await mapImageBlob.arrayBuffer()
         const mapId  = wb.addImage({ buffer: mapBuf as ArrayBuffer, extension: 'png' })
+        const mapRow = isMulti ? 792 : 402  // B793 no multi, B403 no standard
         wsm.addImage(mapId, {
-          tl:  { col: 1,  row: 402 } as any,
-          br:  { col: 34, row: 420 } as any,
+          tl:  { col: 1,  row: mapRow } as any,
+          br:  { col: 34, row: mapRow + 18 } as any,
           editAs: 'oneCell',
         } as any)
       } catch { /* ignorar erro do mapa */ }
     }
   }
 
-  // FOTOS DO IMÓVEL — primeira foto na linha 347 (template actualizado)
+  // FOTOS DO IMÓVEL
   if (photos.length > 0) {
     const wsf = wb.getWorksheet('RELATÓRIO - PT')
     if (wsf) {
+      // Template standard: começa linha 347; template multi: começa linha 737
+      const photoStartRow = isMulti ? 736 : 346
+
       const PHOTO_SLOTS = [
-        { tl: { col: 1,  row: 346 }, br: { col: 16, row: 359 } }, // Foto 1 — B347:Q359
-        { tl: { col: 17, row: 346 }, br: { col: 35, row: 359 } }, // Foto 2 — R347:AI359
-        { tl: { col: 1,  row: 359 }, br: { col: 16, row: 372 } }, // Foto 3 — B360:Q372
-        { tl: { col: 17, row: 359 }, br: { col: 35, row: 372 } }, // Foto 4 — R360:AI372
-        { tl: { col: 1,  row: 372 }, br: { col: 16, row: 385 } }, // Foto 5 — B373:Q385
-        { tl: { col: 17, row: 372 }, br: { col: 35, row: 385 } }, // Foto 6 — R373:AI385
-        { tl: { col: 1,  row: 385 }, br: { col: 16, row: 398 } }, // Foto 7 — B386:Q398
-        { tl: { col: 17, row: 385 }, br: { col: 35, row: 398 } }, // Foto 8 — R386:AI398
+        { tl: { col: 1,  row: photoStartRow },      br: { col: 16, row: photoStartRow + 13 } },
+        { tl: { col: 17, row: photoStartRow },      br: { col: 35, row: photoStartRow + 13 } },
+        { tl: { col: 1,  row: photoStartRow + 13 }, br: { col: 16, row: photoStartRow + 26 } },
+        { tl: { col: 17, row: photoStartRow + 13 }, br: { col: 35, row: photoStartRow + 26 } },
+        { tl: { col: 1,  row: photoStartRow + 26 }, br: { col: 16, row: photoStartRow + 39 } },
+        { tl: { col: 17, row: photoStartRow + 26 }, br: { col: 35, row: photoStartRow + 39 } },
+        { tl: { col: 1,  row: photoStartRow + 39 }, br: { col: 16, row: photoStartRow + 52 } },
+        { tl: { col: 17, row: photoStartRow + 39 }, br: { col: 35, row: photoStartRow + 52 } },
       ]
 
       for (let i = 0; i < Math.min(photos.length, 8); i++) {
