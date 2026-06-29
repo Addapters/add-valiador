@@ -415,7 +415,6 @@ export async function generateAbancaReport(
   set('K303',  fmtDate(p.data_pedido_relatorio || p.data_pedido))
   set('O303',  fmtDate(p.data_visita || p.visit_date))
   set('V303',  fmtDate(p.data_conclusao || p.data_relatorio))
-  set('AC303', fmtDate(p.prev_valuation_date))
   set('D306',  v(p.perito_avaliador))
 
   // IMAGEM DO MAPA
