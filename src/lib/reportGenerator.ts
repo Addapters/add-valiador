@@ -275,6 +275,38 @@ export async function generateAbancaReport(
     // Coordenadas
     if (prop.longitude) set(`D${coordRow + off}`, prop.longitude)
     if (prop.latitude)  set(`G${coordRow + off}`, prop.latitude)
+
+    // Nos templates multi, preenche campos de descrição por linha
+    if (isMulti) {
+      const descRow   = isMulti ? MULTI_BASE_ROWS[3]  : 38  // Tipo/Subtipo/Uso
+      const estadoRow = isMulti ? MULTI_BASE_ROWS[4]  : 44  // Estado construção
+      const compRow   = isMulti ? MULTI_BASE_ROWS[5]  : 50  // Composição
+      const regRow    = isMulti ? MULTI_BASE_ROWS[6]  : 56  // Registo predial
+      const matricRow = isMulti ? MULTI_BASE_ROWS[7]  : 62  // Artigo matricial
+      const tipPredRow = isMulti ? MULTI_BASE_ROWS[8] : 68  // Tipo prédio
+      const areaRow   = isMulti ? MULTI_BASE_ROWS[12] : 105 // Áreas
+
+      set(`D${descRow + off}`,   tr(v(prop.property_type)))
+      set(`K${descRow + off}`,   tr(v(prop.property_subtype)))
+      set(`U${descRow + off}`,   tr(v(prop.use_type)))
+      set(`AD${descRow + off}`,  tr(v(prop.use_subtype)))
+
+      set(`D${estadoRow + off}`, tr(v(prop.estado_construcao, v(prop.property_state))))
+      set(`O${estadoRow + off}`, tr(v(prop.destino)))
+      set(`V${estadoRow + off}`, tr(v(prop.estado_conservacao)))
+      set(`AC${estadoRow + off}`,tr(v(prop.estado_ocupacao)))
+
+      set(`D${compRow + off}`,   tr(v(prop.composicao_imovel, v(prop.typology))))
+      set(`D${regRow + off}`,    v(prop.id_registo_predial))
+      set(`D${matricRow + off}`, v(prop.id_registo_matricial))
+      set(`G${matricRow + off}`, v(prop.fracao))
+      set(`D${tipPredRow + off}`,tr(v(prop.tipo_predio)))
+
+      const areaVal = prop.area_considerada || prop.area_m2 || prop.gross_area
+      set(`Q${areaRow + off}`,   fmtArea(areaVal))
+      set(`L${areaRow + off}`,   fmtArea(prop.land_area))
+      set(`T${areaRow + off}`,   fmtArea(prop.area_annex_m2))
+    }
   }
 
   // 1. IDENTIFICAÇÃO
@@ -287,50 +319,52 @@ export async function generateAbancaReport(
 
   // Id e IdRel — removido mapeamento automático (não preencher estas células)
 
-  // Preenche blocos por imóvel (1, 2 ou 3)
+  // Preenche blocos por imóvel (1, 2 ou 3 no standard; 1-18 no multi)
   allProps.forEach((prop, idx) => fillBlock(idx, prop))
 
-  // 3. DESCRIÇÃO DO IMÓVEL
-  set('D38',  tr(v(p.property_type)))
-  set('K38',  tr(v(p.property_subtype)))
-  set('U38',  tr(v(p.use_type)))
-  set('AD38', tr(v(p.use_subtype)))
-  set('D44',  tr(v(p.estado_construcao, v(p.property_state))))
-  set('O44',  tr(v(p.destino)))
-  set('V44',  tr(v(p.estado_conservacao)))
-  set('AC44', tr(v(p.estado_ocupacao)))
-  set('D50',  tr(v(p.composicao_imovel, v(p.typology))))
-  set('D56',  v(p.id_registo_predial))
-  set('D62',  v(p.id_registo_matricial))
-  set('G62',  v(p.fracao))
-  set('D68',  tr(v(p.tipo_predio)))
+  // 3. DESCRIÇÃO DO IMÓVEL — apenas no template standard (no multi colidem com linhas dos bens)
+  if (!isMulti) {
+    set('D38',  tr(v(p.property_type)))
+    set('K38',  tr(v(p.property_subtype)))
+    set('U38',  tr(v(p.use_type)))
+    set('AD38', tr(v(p.use_subtype)))
+    set('D44',  tr(v(p.estado_construcao, v(p.property_state))))
+    set('O44',  tr(v(p.destino)))
+    set('V44',  tr(v(p.estado_conservacao)))
+    set('AC44', tr(v(p.estado_ocupacao)))
+    set('D50',  tr(v(p.composicao_imovel, v(p.typology))))
+    set('D56',  v(p.id_registo_predial))
+    set('D62',  v(p.id_registo_matricial))
+    set('G62',  v(p.fracao))
+    set('D68',  tr(v(p.tipo_predio)))
 
-  // 4. ENQUADRAMENTO NO MERCADO LOCAL
-  set('J75', tr(v(p.caract_mercado)))
-  set('J78', tr(v(p.tipo_expectativa_mercado)))
-  set('J79', tr(v(p.ocupacao_laboral)))
-  set('J80', v(p.populacao_concelho))
-  set('J81', tr(v(p.evolucao_mercado)))
+    // 4. ENQUADRAMENTO NO MERCADO LOCAL
+    set('J75', tr(v(p.caract_mercado)))
+    set('J78', tr(v(p.tipo_expectativa_mercado)))
+    set('J79', tr(v(p.ocupacao_laboral)))
+    set('J80', v(p.populacao_concelho))
+    set('J81', tr(v(p.evolucao_mercado)))
 
-  // 5. CARACTERÍSTICAS DA CONSTRUÇÃO
-  if (p.nr_quartos)         set('D86', Number(p.nr_quartos))
-  if (p.nr_inst_sanitarias) set('G86', Number(p.nr_inst_sanitarias))
-  set('J86', v(p.nr_pisos, 1))
-  set('L86', tr(v(p.qualidade_construcao, 'Média')))
-  set('P86', tr(v(p.orientacao_solar, 'Não influi no valor')))
-  set('D92', v(p.nr_certificado_energ))
-  set('J92', v(p.classe_energetica))
-  set('N92', fmtDate(p.data_emissao_cert))
-  set('R92', fmtDate(p.data_validade_cert))
-  set('M98', v(p.year_built))
-  set('D98', v(p.ano_licenca_utilizacao))
+    // 5. CARACTERÍSTICAS DA CONSTRUÇÃO
+    if (p.nr_quartos)         set('D86', Number(p.nr_quartos))
+    if (p.nr_inst_sanitarias) set('G86', Number(p.nr_inst_sanitarias))
+    set('J86', v(p.nr_pisos, 1))
+    set('L86', tr(v(p.qualidade_construcao, 'Média')))
+    set('P86', tr(v(p.orientacao_solar, 'Não influi no valor')))
+    set('D92', v(p.nr_certificado_energ))
+    set('J92', v(p.classe_energetica))
+    set('N92', fmtDate(p.data_emissao_cert))
+    set('R92', fmtDate(p.data_validade_cert))
+    set('M98', v(p.year_built))
+    set('D98', v(p.ano_licenca_utilizacao))
 
-  // 6. ÁREAS
-  const areaVal = p.area_considerada || p.area_m2 || p.gross_area
-  set('D105', tr(v(p.composicao_imovel, v(p.typology))))
-  set('L105', fmtArea(p.land_area))
-  set('Q105', fmtArea(areaVal))
-  set('T105', fmtArea(p.area_annex_m2))
+    // 6. ÁREAS
+    const areaVal = p.area_considerada || p.area_m2 || p.gross_area
+    set('D105', tr(v(p.composicao_imovel, v(p.typology))))
+    set('L105', fmtArea(p.land_area))
+    set('Q105', fmtArea(areaVal))
+    set('T105', fmtArea(p.area_annex_m2))
+  }
 
   // COMPARÁVEIS — apenas na tab IV-IV (não na folha principal)
   const selectedComps = comps
