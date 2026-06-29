@@ -42,9 +42,17 @@ function toDisplay(val: any, type: string): string {
   if (!val && val !== 0) return ''
   if (type === 'number' || type === 'date') return String(val)
   const s = String(val)
-  // Aplica titleCase se estiver em uppercase (vem da datatape em espanhol)
+  // Aplica titleCase se estiver em uppercase (vem da datatape)
   if (s === s.toUpperCase() && s.length > 2 && /[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜ]/.test(s)) {
-    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+    // Palavra a palavra — preserva abreviaturas curtas (Dr., n.º, etc.)
+    const exceptions = new Set(['de','da','do','das','dos','e','a','o','as','os','em','na','no','nas','nos','ao','à','um','uma'])
+    return s.split(' ').map((word, i) => {
+      if (!word) return word
+      const lower = word.toLowerCase()
+      // Deixa minúsculas as palavras de ligação (excepto a primeira)
+      if (i > 0 && exceptions.has(lower)) return lower
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    }).join(' ')
   }
   return s
 }
