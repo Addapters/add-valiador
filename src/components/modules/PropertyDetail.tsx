@@ -338,35 +338,29 @@ export default function PropertyDetail() {
 
       if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada.')
 
-      // Captura do mapa — usa API de imagem estática com marcador
       let mapImageBlob: Blob | null = null
       if (property.latitude && property.longitude) {
         try {
           const lat = property.latitude
           const lon = property.longitude
-          // Usa a API do Geoapify que suporta CORS e marcadores
-          const marker = `lonlat:${lon},${lat};color:%231D9E75;size:medium`
-          const staticUrl = `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=800&height=400&center=lonlat:${lon},${lat}&zoom=16&marker=${encodeURIComponent(marker)}&apiKey=YOUR_KEY`
 
-          // Fallback: usa tiles do OSM compostos manualmente via canvas
-          // Cria um canvas com o marcador e fundo cinzento como placeholder
           const canvas = document.createElement('canvas')
           canvas.width = 800
           canvas.height = 400
           const ctx = canvas.getContext('2d')
           if (ctx) {
-            // Fundo
-            ctx.fillStyle = '#e8e8e8'
+            // Fundo tipo mapa (cinzento claro)
+            ctx.fillStyle = '#f2efe9'
             ctx.fillRect(0, 0, 800, 400)
-            // Texto de coordenadas
-            ctx.fillStyle = '#666'
-            ctx.font = '16px Arial'
-            ctx.textAlign = 'center'
-            ctx.fillText(`${lat.toFixed(6)}, ${lon.toFixed(6)}`, 400, 200)
+            // Grid subtil
+            ctx.strokeStyle = '#e0ddd6'
+            ctx.lineWidth = 1
+            for (let x = 0; x < 800; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,400); ctx.stroke() }
+            for (let y = 0; y < 400; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(800,y); ctx.stroke() }
             // Marcador no centro
             const cx = 400, cy = 200
-            ctx.shadowColor = 'rgba(0,0,0,0.4)'
-            ctx.shadowBlur = 8
+            ctx.shadowColor = 'rgba(0,0,0,0.35)'
+            ctx.shadowBlur = 10
             ctx.beginPath()
             ctx.arc(cx, cy, 18, 0, 2 * Math.PI)
             ctx.fillStyle = 'white'
@@ -378,16 +372,6 @@ export default function PropertyDetail() {
             ctx.fill()
           }
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
-
-          // Tenta o serviço estático — se funcionar substitui o placeholder
-          try {
-            const osmUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=800x400&markers=${lat},${lon},red-pushpin`
-            const res = await fetch(osmUrl, { mode: 'cors', cache: 'no-store' })
-            if (res.ok && res.headers.get('content-type')?.includes('image')) {
-              mapImageBlob = await res.blob()
-            }
-          } catch { /* usa o placeholder com marcador */ }
-
         } catch { /* continua sem mapa */ }
       }
 
