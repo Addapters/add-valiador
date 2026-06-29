@@ -249,11 +249,11 @@ export async function generateAbancaReport(
       set(`B${baseRow + off}`, id)
     }
 
-    // Linhas de dados — no standard e multi a 1ª tabela é morada (base[0]),
-    // 2ª é cód-postal (base[1]), 3ª é coordenadas (base[2])
-    const moradaRow   = baseRows[0]  // 19 (standard) ou 19 (multi)
-    const codPostalRow = baseRows[1] // 25 (standard) ou 40 (multi)
-    const coordRow    = baseRows[2]  // 31 (standard) ou 61 (multi)
+    // Standard: morada=19, cod-postal=25, coord=31
+    // Multi: morada=19, cod-postal=42, coord=65 (índices 0,1,2 das MULTI_BASE_ROWS)
+    const moradaRow    = isMulti ? MULTI_BASE_ROWS[0]  : 19
+    const codPostalRow = isMulti ? MULTI_BASE_ROWS[1]  : 25
+    const coordRow     = isMulti ? MULTI_BASE_ROWS[2]  : 31
 
     // Campos de morada
     set(`D${moradaRow + off}`,  tr(v(prop.tipo_via)))
