@@ -305,7 +305,25 @@ export default function PropertyDetail() {
     if (!property) return
     setGenerating(true)
     try {
-      const templateUrl = import.meta.env.VITE_REPORT_TEMPLATE_URL
+      // Vai buscar irmãos primeiro para decidir qual template usar
+      let siblings: any[] = []
+      if (property.external_ref) {
+        const { data: siblingsData } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('external_ref', property.external_ref)
+          .neq('id', property.id)
+          .order('id_bien')
+        siblings = siblingsData || []
+      }
+
+      const totalBens = 1 + siblings.length
+
+      // Selecciona template: multi para 4+ bens, standard para 1-3
+      const standardUrl = import.meta.env.VITE_REPORT_TEMPLATE_URL
+      const multiUrl    = import.meta.env.VITE_REPORT_TEMPLATE_MULTI_URL || standardUrl
+      const templateUrl = totalBens >= 4 ? multiUrl : standardUrl
+
       if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada.')
 
       // Captura do mapa com html2canvas
@@ -385,19 +403,11 @@ export default function PropertyDetail() {
         return { ...ph, url: data.publicUrl }
       }).filter((ph: any) => ph.url)
 
-      // Vai buscar imóveis com a mesma external_ref (irmãos) — max 2 extra
-      let siblings: any[] = []
-      if (property.external_ref) {
-        const { data: siblingsData } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('external_ref', property.external_ref)
-          .neq('id', property.id)
-          .limit(2)
-        siblings = siblingsData || []
-      }
+      // siblings já foi buscado acima para selecção do template
+      // Para 4+ bens usa todos; para 1-3 usa os primeiros 2
+      const siblingsToUse = totalBens >= 4 ? siblings : siblings.slice(0, 2)
 
-      await generateAbancaReport(property, photoUrls, comps, templateUrl, mapImageBlob, siblings)
+      await generateAbancaReport(property, photoUrls, comps, templateUrl, mapImageBlob, siblingsToUse)
       toast.success('Relatório gerado — verifica o teu computador e a tab 13. Certificação para o link online')
       qc.invalidateQueries({ queryKey: ['property', id] })
     } catch (e: any) { toast.error(e.message) }
