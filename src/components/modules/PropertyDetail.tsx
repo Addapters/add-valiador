@@ -343,34 +343,85 @@ export default function PropertyDetail() {
         try {
           const lat = property.latitude
           const lon = property.longitude
+          const zoom = 16
+
+          // Calcula tile OSM central
+          function latLonToTile(lat: number, lon: number, z: number) {
+            const n = Math.pow(2, z)
+            const x = Math.floor((lon + 180) / 360 * n)
+            const latRad = lat * Math.PI / 180
+            const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+            return { x, y, n }
+          }
+
+          const tile = latLonToTile(lat, lon, zoom)
+          const tileSize = 256
+          const canvasW = 800, canvasH = 400
+          const tilesX = Math.ceil(canvasW / tileSize) + 1
+          const tilesY = Math.ceil(canvasH / tileSize) + 1
 
           const canvas = document.createElement('canvas')
-          canvas.width = 800
-          canvas.height = 400
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            // Fundo tipo mapa (cinzento claro)
-            ctx.fillStyle = '#f2efe9'
-            ctx.fillRect(0, 0, 800, 400)
-            // Grid subtil
-            ctx.strokeStyle = '#e0ddd6'
-            ctx.lineWidth = 1
-            for (let x = 0; x < 800; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,400); ctx.stroke() }
-            for (let y = 0; y < 400; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(800,y); ctx.stroke() }
-            // Marcador no centro
-            const cx = 400, cy = 200
-            ctx.shadowColor = 'rgba(0,0,0,0.35)'
-            ctx.shadowBlur = 10
-            ctx.beginPath()
-            ctx.arc(cx, cy, 18, 0, 2 * Math.PI)
-            ctx.fillStyle = 'white'
-            ctx.fill()
-            ctx.shadowBlur = 0
-            ctx.beginPath()
-            ctx.arc(cx, cy, 13, 0, 2 * Math.PI)
-            ctx.fillStyle = '#1D9E75'
-            ctx.fill()
+          canvas.width = canvasW
+          canvas.height = canvasH
+          const ctx = canvas.getContext('2d')!
+
+          // Offset em píxeis do tile central relativamente ao canvas
+          const centerTilePixX = Math.floor(canvasW / 2)
+          const centerTilePixY = Math.floor(canvasH / 2)
+
+          // Posição fraccionária dentro do tile central
+          function tileOrigin(lat: number, lon: number, z: number) {
+            const n = Math.pow(2, z)
+            const x = (lon + 180) / 360 * n
+            const latRad = lat * Math.PI / 180
+            const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n
+            return { x, y }
           }
+          const origin = tileOrigin(lat, lon, zoom)
+          const fracX = origin.x - Math.floor(origin.x)
+          const fracY = origin.y - Math.floor(origin.y)
+
+          const startX = Math.floor(canvasW / 2) - Math.round(fracX * tileSize)
+          const startY = Math.floor(canvasH / 2) - Math.round(fracY * tileSize)
+
+          // Fundo enquanto carregam os tiles
+          ctx.fillStyle = '#f2efe9'
+          ctx.fillRect(0, 0, canvasW, canvasH)
+
+          // Carrega tiles em paralelo
+          const promises: Promise<void>[] = []
+          for (let dx = -Math.ceil(tilesX / 2); dx <= Math.ceil(tilesX / 2); dx++) {
+            for (let dy = -Math.ceil(tilesY / 2); dy <= Math.ceil(tilesY / 2); dy++) {
+              const tx = tile.x + dx
+              const ty = tile.y + dy
+              const px = startX + dx * tileSize
+              const py = startY + dy * tileSize
+              const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`
+              promises.push(
+                fetch(url, { cache: 'no-store' })
+                  .then(r => r.blob())
+                  .then(blob => new Promise<void>(resolve => {
+                    const img = new Image()
+                    img.onload = () => { ctx.drawImage(img, px, py, tileSize, tileSize); resolve() }
+                    img.onerror = () => resolve()
+                    img.src = URL.createObjectURL(blob)
+                  }))
+                  .catch(() => Promise.resolve())
+              )
+            }
+          }
+          await Promise.all(promises)
+
+          // Desenha marcador verde no centro
+          const cx = canvasW / 2, cy = canvasH / 2
+          ctx.shadowColor = 'rgba(0,0,0,0.4)'
+          ctx.shadowBlur = 8
+          ctx.beginPath(); ctx.arc(cx, cy, 16, 0, 2 * Math.PI)
+          ctx.fillStyle = 'white'; ctx.fill()
+          ctx.shadowBlur = 0
+          ctx.beginPath(); ctx.arc(cx, cy, 11, 0, 2 * Math.PI)
+          ctx.fillStyle = '#1D9E75'; ctx.fill()
+
           mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
         } catch { /* continua sem mapa */ }
       }
