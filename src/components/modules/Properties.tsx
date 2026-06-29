@@ -215,6 +215,7 @@ export default function Properties() {
           nuc_risco, data_pedido, tipo_via, escada, ampliacao, lugar,
           prev_valuation_date, prev_valuation_value, prev_valuation_method,
           prev_valuation_expert, prev_valuation_entity,
+          tem_fotos, tem_comparaveis, verificado,
           portfolios(id, name, clients(name))
         `)
         .order('portfolio_id').order('ref')
@@ -275,6 +276,15 @@ export default function Properties() {
     onError: (e: any) => toast.error(e.message)
   })
 
+  const updateField = useMutation({
+    mutationFn: async ({ id, field, value }: { id:string; field:string; value:any }) => {
+      const { error } = await supabase.from('properties').update({ [field]: value }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey:['properties-all'] }),
+    onError: (e: any) => toast.error(e.message)
+  })
+
   const bulkUpdate = useMutation({
     mutationFn: async ({ field, value }: { field:string; value:string }) => {
       const ids = [...selected]
@@ -321,8 +331,30 @@ export default function Properties() {
     const cls = isAbanca ? 'text-blue-700 whitespace-nowrap' : 'text-gray-600 whitespace-nowrap'
     switch(col) {
       case 'external_ref':    return <Link to={`/properties/${p.id}`} className="text-brand-600 hover:underline font-semibold whitespace-nowrap">{p.external_ref || p.ref || '—'}</Link>
-      case 'visit_status':     return <VisitBadge status={p.visit_status}/>
-      case 'billing_status':   return <span className="text-gray-600 whitespace-nowrap">{BILLING_LABELS[p.billing_status]||'—'}</span>
+      case 'visit_status':    return (
+        <select className="text-xs border-0 bg-transparent cursor-pointer" value={p.visit_status||''} onChange={e => updateField.mutate({ id:p.id, field:'visit_status', value:e.target.value })}>
+          <option value="">—</option>
+          {Object.entries(VISIT_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      )
+      case 'tem_fotos':       return (
+        <button onClick={() => updateField.mutate({ id:p.id, field:'tem_fotos', value:!p.tem_fotos })}
+          className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.tem_fotos ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+          {p.tem_fotos ? 'Sim' : 'Não'}
+        </button>
+      )
+      case 'tem_comparaveis': return (
+        <button onClick={() => updateField.mutate({ id:p.id, field:'tem_comparaveis', value:!p.tem_comparaveis })}
+          className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.tem_comparaveis ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-400'}`}>
+          {p.tem_comparaveis ? 'Sim' : 'Não'}
+        </button>
+      )
+      case 'verificado':      return (
+        <button onClick={() => updateField.mutate({ id:p.id, field:'verificado', value:!p.verificado })}
+          className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.verificado ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
+          {p.verificado ? 'Sim' : 'Não'}
+        </button>
+      )
       case 'fee_amount':       return <span className="font-medium text-gray-800 whitespace-nowrap">{p.fee_amount?formatCurrency(p.fee_amount):'—'}</span>
       case 'honorarios_addapters': return <span className="font-medium text-emerald-700 whitespace-nowrap">{p.fee_amount?formatCurrency(Math.round(p.fee_amount*0.6)):'—'}</span>
       case 'geo':              return p.latitude ? <span className="text-emerald-500">✓</span> : <span className="text-gray-300">—</span>
