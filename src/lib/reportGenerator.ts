@@ -22,7 +22,8 @@ function fmtArea(val: any): string {
 
 async function fetchBuf(url: string): Promise<ArrayBuffer | null> {
   try {
-    const r = await fetch(url)
+    const sep = url.includes('?') ? '&' : '?'
+    const r = await fetch(`${url}${sep}v=${Date.now()}`, { cache: 'no-store' })
     if (!r.ok) return null
     return r.arrayBuffer()
   } catch { return null }
