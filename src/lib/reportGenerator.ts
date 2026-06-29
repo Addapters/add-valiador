@@ -276,36 +276,32 @@ export async function generateAbancaReport(
     if (prop.longitude) set(`D${coordRow + off}`, prop.longitude)
     if (prop.latitude)  set(`G${coordRow + off}`, prop.latitude)
 
-    // Nos templates multi, preenche campos de descrição por linha
-    if (isMulti) {
-      const descRow   = isMulti ? MULTI_BASE_ROWS[3]  : 38  // Tipo/Subtipo/Uso
-      const estadoRow = isMulti ? MULTI_BASE_ROWS[4]  : 44  // Estado construção
-      const compRow   = isMulti ? MULTI_BASE_ROWS[5]  : 50  // Composição
-      const regRow    = isMulti ? MULTI_BASE_ROWS[6]  : 56  // Registo predial
-      const matricRow = isMulti ? MULTI_BASE_ROWS[7]  : 62  // Artigo matricial
-      const tipPredRow = isMulti ? MULTI_BASE_ROWS[8] : 68  // Tipo prédio
-      const areaRow   = isMulti ? MULTI_BASE_ROWS[12] : 105 // Áreas
-
+    // Campos de descrição por bem (apenas no multi, usando índices 3-8 das MULTI_BASE_ROWS)
+    if (isMulti && MULTI_BASE_ROWS.length > 8) {
+      const descRow = MULTI_BASE_ROWS[3] // Tipo/Subtipo/Uso — B89
       set(`D${descRow + off}`,   tr(v(prop.property_type)))
       set(`K${descRow + off}`,   tr(v(prop.property_subtype)))
       set(`U${descRow + off}`,   tr(v(prop.use_type)))
       set(`AD${descRow + off}`,  tr(v(prop.use_subtype)))
 
-      set(`D${estadoRow + off}`, tr(v(prop.estado_construcao, v(prop.property_state))))
-      set(`O${estadoRow + off}`, tr(v(prop.destino)))
-      set(`V${estadoRow + off}`, tr(v(prop.estado_conservacao)))
-      set(`AC${estadoRow + off}`,tr(v(prop.estado_ocupacao)))
+      const estadoRow = MULTI_BASE_ROWS[4] // Estado construção — B112
+      set(`D${estadoRow + off}`,  tr(v(prop.estado_construcao, v(prop.property_state))))
+      set(`O${estadoRow + off}`,  tr(v(prop.destino)))
+      set(`V${estadoRow + off}`,  tr(v(prop.estado_conservacao)))
+      set(`AC${estadoRow + off}`, tr(v(prop.estado_ocupacao)))
 
+      const compRow = MULTI_BASE_ROWS[5] // Composição — B135
       set(`D${compRow + off}`,   tr(v(prop.composicao_imovel, v(prop.typology))))
+
+      const regRow = MULTI_BASE_ROWS[6]  // Registo predial — B158
       set(`D${regRow + off}`,    v(prop.id_registo_predial))
+
+      const matricRow = MULTI_BASE_ROWS[7] // Artigo matricial — B181
       set(`D${matricRow + off}`, v(prop.id_registo_matricial))
       set(`G${matricRow + off}`, v(prop.fracao))
-      set(`D${tipPredRow + off}`,tr(v(prop.tipo_predio)))
 
-      const areaVal = prop.area_considerada || prop.area_m2 || prop.gross_area
-      set(`Q${areaRow + off}`,   fmtArea(areaVal))
-      set(`L${areaRow + off}`,   fmtArea(prop.land_area))
-      set(`T${areaRow + off}`,   fmtArea(prop.area_annex_m2))
+      const tipPredRow = MULTI_BASE_ROWS[8] // Tipo prédio — B204
+      set(`D${tipPredRow + off}`, tr(v(prop.tipo_predio)))
     }
   }
 
