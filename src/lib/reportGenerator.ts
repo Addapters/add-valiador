@@ -250,25 +250,31 @@ export async function generateAbancaReport(
       set(`B${baseRow + off}`, id)
     }
 
-    // Campos de morada (linha 19)
-    set(`D${19 + off}`,  tr(v(prop.tipo_via)))
-    set(`I${19 + off}`,  v(prop.street, v(prop.address)))
-    set(`AE${19 + off}`, v(prop.number))
-    set(`AG${19 + off}`, v(prop.floor_letter))
-    set(`AI${19 + off}`, v(prop.fracao))
-    set(`X${19 + off}`,  v(prop.block))
-    set(`Z${19 + off}`,  v(prop.escada))
-    set(`AB${19 + off}`, v(prop.portal))
+    // Linhas de dados — no standard e multi a 1ª tabela é morada (base[0]),
+    // 2ª é cód-postal (base[1]), 3ª é coordenadas (base[2])
+    const moradaRow   = baseRows[0]  // 19 (standard) ou 19 (multi)
+    const codPostalRow = baseRows[1] // 25 (standard) ou 40 (multi)
+    const coordRow    = baseRows[2]  // 31 (standard) ou 61 (multi)
 
-    // Código postal / localização (linha 25)
-    set(`D${25 + off}`,  v(prop.postal_code))
-    set(`I${25 + off}`,  titleCase(v(prop.district)))
-    set(`P${25 + off}`,  titleCase(v(prop.municipality)))
-    set(`W${25 + off}`,  titleCase(v(prop.parish)))
+    // Campos de morada
+    set(`D${moradaRow + off}`,  tr(v(prop.tipo_via)))
+    set(`I${moradaRow + off}`,  v(prop.street, v(prop.address)))
+    set(`AE${moradaRow + off}`, v(prop.number))
+    set(`AG${moradaRow + off}`, v(prop.floor_letter))
+    set(`AI${moradaRow + off}`, v(prop.fracao))
+    set(`X${moradaRow + off}`,  v(prop.block))
+    set(`Z${moradaRow + off}`,  v(prop.escada))
+    set(`AB${moradaRow + off}`, v(prop.portal))
 
-    // Coordenadas (linha 31)
-    if (prop.longitude) set(`D${31 + off}`, prop.longitude)
-    if (prop.latitude)  set(`G${31 + off}`, prop.latitude)
+    // Código postal / localização
+    set(`D${codPostalRow + off}`,  v(prop.postal_code))
+    set(`I${codPostalRow + off}`,  titleCase(v(prop.district)))
+    set(`P${codPostalRow + off}`,  titleCase(v(prop.municipality)))
+    set(`W${codPostalRow + off}`,  titleCase(v(prop.parish)))
+
+    // Coordenadas
+    if (prop.longitude) set(`D${coordRow + off}`, prop.longitude)
+    if (prop.latitude)  set(`G${coordRow + off}`, prop.latitude)
   }
 
   // 1. IDENTIFICAÇÃO
