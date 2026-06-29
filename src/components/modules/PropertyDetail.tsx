@@ -338,75 +338,20 @@ export default function PropertyDetail() {
 
       if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada.')
 
-      // Captura do mapa com html2canvas
+      // Captura do mapa — usa API de imagem estática (sem html2canvas)
       let mapImageBlob: Blob | null = null
-      if (mapRef.current && property.latitude && mapInst.current) {
+      if (property.latitude && property.longitude) {
         try {
-          // Mostra temporariamente o div do mapa para captura (pode estar hidden)
-          const mapContainer = mapRef.current.closest('[style*="display"]') as HTMLElement | null
-          const wasHidden = mapContainer?.style.display === 'none'
-          if (wasHidden && mapContainer) {
-            mapContainer.style.display = 'block'
-            await new Promise(r => setTimeout(r, 100))
+          const lat = property.latitude
+          const lon = property.longitude
+          // OpenStreetMap Static via staticmap.net — gratuito, sem API key
+          // Marcador verde incluído directamente no URL
+          const staticUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=800x400&markers=${lat},${lon},red-pushpin`
+          const res = await fetch(staticUrl)
+          if (res.ok) {
+            mapImageBlob = await res.blob()
           }
-
-          // Zoom 17 e aguarda tiles
-          mapInst.current.setZoom(17)
-          mapInst.current.invalidateSize()
-          await new Promise(r => setTimeout(r, 2500))
-
-          // Calcula posição do marcador ANTES de esconder controlos
-          let markerPoint: { x: number; y: number } | null = null
-          if (property.latitude && property.longitude) {
-            const pt = mapInst.current.latLngToContainerPoint(
-              window.L.latLng(property.latitude, property.longitude)
-            )
-            markerPoint = { x: Math.round(pt.x), y: Math.round(pt.y) }
-          }
-
-          // Esconde controlos
-          const controls = mapRef.current.querySelectorAll<HTMLElement>('.leaflet-control-container')
-          controls.forEach(el => { el.style.display = 'none' })
-
-          const html2canvas = (await import('html2canvas')).default
-          const canvas = await html2canvas(mapRef.current, {
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            scale: 1,
-            imageTimeout: 15000,
-            width: mapRef.current.offsetWidth || 600,
-            height: mapRef.current.offsetHeight || 300,
-          })
-
-          // Desenha marcador directamente no canvas
-          if (markerPoint) {
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-              const { x, y } = markerPoint
-              // Sombra
-              ctx.shadowColor = 'rgba(0,0,0,0.4)'
-              ctx.shadowBlur = 6
-              // Anel branco exterior
-              ctx.beginPath()
-              ctx.arc(x, y, 11, 0, 2 * Math.PI)
-              ctx.fillStyle = 'white'
-              ctx.fill()
-              // Ponto verde interior
-              ctx.shadowBlur = 0
-              ctx.beginPath()
-              ctx.arc(x, y, 8, 0, 2 * Math.PI)
-              ctx.fillStyle = '#16a34a'
-              ctx.fill()
-            }
-          }
-
-          mapImageBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
-
-          // Restaura
-          controls.forEach(el => { el.style.display = '' })
-          if (wasHidden && mapContainer) mapContainer.style.display = 'none'
-        } catch (e) { console.warn('Map capture failed:', e) }
+        } catch { /* continua sem mapa */ }
       }
 
       const { data: freshPhotos } = await supabase.from('property_photos').select('*').eq('property_id', property.id).order('slot').order('sort_order')
