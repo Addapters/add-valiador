@@ -190,16 +190,25 @@ export async function generateAbancaReport(
       const sheetFiles = Object.keys(zip.files).filter(f => /xl\/worksheets\/sheet\d+\.xml/.test(f))
       for (const sf of sheetFiles) {
         let xml: string = await zip.files[sf].async('string')
-        // Master shared formula: <f t="shared" ref="A1:A10" si="0">FORMULA</f> → <f>FORMULA</f>
-        xml = xml.replace(/<f\s[^>]*t="shared"[^>]*ref="[^"]*"[^>]*>([^<]*)<\/f>/g, '<f>$1</f>')
-        xml = xml.replace(/<f\s[^>]*ref="[^"]*"[^>]*t="shared"[^>]*>([^<]*)<\/f>/g, '<f>$1</f>')
-        // Clone shared formula (sem conteúdo) → remove
-        xml = xml.replace(/<f\s[^>]*t="shared"[^>]*\/>/g, '')
-        xml = xml.replace(/<f\s[^>]*si="\d+"[^>]*\/>/g, '')
+        // Remove TODAS as tags <f ...> que contenham t="shared" ou si="N"
+        // Substitui master (com conteúdo) por fórmula simples
+        xml = xml.replace(/<f([^>]*)>([^<]*)<\/f>/g, (match, attrs, formula) => {
+          if (attrs.includes('shared') || attrs.includes('si=')) {
+            return formula ? `<f>${formula}</f>` : ''
+          }
+          return match
+        })
+        // Remove tags self-closing com shared/si
+        xml = xml.replace(/<f[^>]*(t="shared"|si="\d+")[^>]*\/>/g, '')
+        // Remove atributo si= de qualquer tag <f> restante
+        xml = xml.replace(/<f([^>]*)\ssi="\d+"([^>]*)>/g, '<f$1$2>')
+        // Remove atributo t="shared" de qualquer tag <f> restante  
+        xml = xml.replace(/<f([^>]*)\st="shared"([^>]*)>/g, '<f$1$2>')
         zip.file(sf, xml)
       }
       return await zip.generateAsync({ type: 'arraybuffer' })
-    } catch {
+    } catch (e) {
+      console.warn('cleanSharedFormulas failed:', e)
       return buf
     }
   }
