@@ -1377,6 +1377,8 @@ function CompForm({ propertyId, onAdded }: { propertyId: string; onAdded: () => 
     if (error) { toast.error(error.message); return }
     setForm({ portal:'', listing_ref:'', url:'', address:'', area_m2:'', price:'', notes:'', uso:'', tipologia:'', ano_estado:'' })
     onAdded(); toast.success('Comparável adicionado')
+    // Actualiza automaticamente tem_comparaveis
+    await supabase.from('properties').update({ tem_comparaveis: true }).eq('id', propertyId)
   }
   return (
     <div className="card">
