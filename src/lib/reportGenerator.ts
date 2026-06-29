@@ -29,12 +29,18 @@ async function fetchBuf(url: string): Promise<ArrayBuffer | null> {
   } catch { return null }
 }
 
-// Primeira letra maiúscula, resto minúsculas
+// Primeira letra de cada palavra maiúscula (para moradas e nomes)
 function titleCase(val: any): string {
   if (!val) return ''
   const s = String(val).trim()
   if (!s) return ''
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  const exceptions = new Set(['de','da','do','das','dos','e','a','o','as','os','em','na','no','nas','nos','ao','à','um','uma'])
+  return s.split(' ').map((word, i) => {
+    if (!word) return word
+    const lower = word.toLowerCase()
+    if (i > 0 && exceptions.has(lower)) return lower
+    return lower.charAt(0).toUpperCase() + lower.slice(1)
+  }).join(' ')
 }
 
 // Traduz termos em espanhol para português europeu
