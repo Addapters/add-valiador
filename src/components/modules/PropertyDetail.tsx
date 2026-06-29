@@ -215,13 +215,25 @@ export default function PropertyDetail() {
 
   // Carrega Leaflet sempre (necessário para captura do mapa no relatório)
   useLeaflet(true, () => setMapReady(true))
+  const markerRef = useRef<any>(null)
+
   useEffect(() => {
     if (!mapReady || !mapRef.current || !property) return
+
     if (mapInst.current) {
-      // Já inicializado — quando volta à tab 2, faz invalidateSize
       if (tab === 'sec2') setTimeout(() => mapInst.current?.invalidateSize(), 100)
+      // Actualiza marcador se coordenadas mudaram
+      if (property.latitude && mapInst.current) {
+        if (markerRef.current) markerRef.current.remove()
+        markerRef.current = window.L.circleMarker(
+          [property.latitude, property.longitude],
+          { radius: 8, fillColor: '#1D9E75', color: 'white', weight: 2, opacity: 1, fillOpacity: 1 }
+        ).addTo(mapInst.current)
+        mapInst.current.setView([property.latitude, property.longitude], 16)
+      }
       return
     }
+
     setTimeout(() => {
       const L = window.L
       const lat = property.latitude||39.5, lon = property.longitude||-8.0
@@ -231,12 +243,12 @@ export default function PropertyDetail() {
       satellite.addTo(mapInst.current)
       L.control.layers({'Satélite':satellite,'Mapa':street},{},{position:'topright'}).addTo(mapInst.current)
       if (property.latitude) {
-        L.circleMarker([property.latitude, property.longitude], {
+        markerRef.current = L.circleMarker([property.latitude, property.longitude], {
           radius: 8, fillColor: '#1D9E75', color: 'white', weight: 2, opacity: 1, fillOpacity: 1,
         }).addTo(mapInst.current)
       }
     }, 150)
-  }, [mapReady, property?.id, tab])
+  }, [mapReady, property?.id, property?.latitude, property?.longitude, tab])
 
   const onDrop = useCallback(async (files: globalThis.File[]) => {
     if (!property) return
