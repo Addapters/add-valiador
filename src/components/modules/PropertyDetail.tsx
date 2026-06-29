@@ -290,6 +290,12 @@ export default function PropertyDetail() {
       } catch (e: any) { toast.error(e.message) }
     }
     qc.invalidateQueries({ queryKey: ['property', id] })
+    // Actualiza automaticamente: visita como feita e fotos como Sim
+    await supabase.from('properties').update({
+      tem_fotos: true,
+      visit_status: property.visit_status === 'pending' ? 'done' : property.visit_status,
+    }).eq('id', property.id)
+    qc.invalidateQueries({ queryKey: ['dashboard-stats'] })
     setUploading(false); toast.success('Fotos guardadas')
   }, [property, id, qc])
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxSize: 5_000_000 })

@@ -370,12 +370,11 @@ export default function Dashboard() {
                     <th>Tipo</th>
                     {role === 'admin' && <th>Perito</th>}
                     <th>Visita</th>
-                    <th>Faturação</th>
-                    <th>Honorário</th>
-                    <th>Hon. Addapters</th>
                     <th className="text-center">Fotos</th>
                     <th className="text-center">Comparáveis</th>
                     <th className="text-center">Verificado</th>
+                    <th>Honorário</th>
+                    <th>Hon. Addapters</th>
                     <th>Actualizado</th>
                   </tr>
                 </thead>
@@ -416,19 +415,6 @@ export default function Dashboard() {
                         />
                       </td>
 
-                      {/* Faturação — inline select */}
-                      <td>
-                        <InlineSelect
-                          value={p.billing_status}
-                          options={BILLING_LABELS}
-                          renderValue={v => <BillingBadge status={v} />}
-                          onChange={val => updateField.mutate({ id:p.id, field:'billing_status', value:val })}
-                        />
-                      </td>
-
-                      <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
-                      <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
-
                       <td className="text-center">
                         <BoolBadge value={!!p.tem_fotos} trueLabel="Sim" falseLabel="Não"
                           color="bg-blue-100 text-blue-600 hover:bg-blue-200"
@@ -444,6 +430,9 @@ export default function Dashboard() {
                           color="bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
                           onClick={() => updateField.mutate({ id:p.id, field:'verificado', value:!p.verificado })}/>
                       </td>
+
+                      <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
+                      <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
 
                       <td className="text-gray-400 whitespace-nowrap">{formatDate(p.updated_at)}</td>
                     </tr>
