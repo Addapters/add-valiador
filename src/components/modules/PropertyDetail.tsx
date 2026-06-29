@@ -38,6 +38,16 @@ function useLeaflet(active: boolean, cb: () => void) {
 }
 
 // ── Auto-save field component ──────────────────────────────────────────────
+function toDisplay(val: any, type: string): string {
+  if (!val && val !== 0) return ''
+  if (type === 'number' || type === 'date') return String(val)
+  const s = String(val)
+  // Aplica titleCase se estiver em uppercase (vem da datatape em espanhol)
+  if (s === s.toUpperCase() && s.length > 2 && /[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜ]/.test(s)) {
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  }
+  return s
+}
 function F({ label, value, field, type='text', onSave, opts, span, textarea, half }: {
   label:string; value:any; field:string; type?:string
   onSave:(p:any)=>void; opts?:string[]; span?:boolean; textarea?:boolean; half?:boolean
@@ -92,8 +102,8 @@ function F({ label, value, field, type='text', onSave, opts, span, textarea, hal
         </div>
       </div>
       {textarea
-        ? <textarea className="input text-sm w-full min-h-[80px]" value={val} onChange={e => handleChange(e.target.value)}/>
-        : <input type={type} className="input text-sm w-full" value={val} onChange={e => handleChange(e.target.value)}
+        ? <textarea className="input text-sm w-full min-h-[80px]" value={toDisplay(val, type)} onChange={e => handleChange(e.target.value)}/>
+        : <input type={type} className="input text-sm w-full" value={toDisplay(val, type)} onChange={e => handleChange(e.target.value)}
             onBlur={saveNow}/>
       }
     </div>
