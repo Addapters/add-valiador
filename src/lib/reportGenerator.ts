@@ -577,8 +577,36 @@ export async function generateAbancaReport(
     })
   const compsToUse = selectedComps.length > 0 ? selectedComps : comps
 
-  // TAB IV-IV — 5 comparáveis seleccionados
-  const IV_COLS = ['H', 'L', 'P', 'T', 'X']
+  // TAB IV-IV — 5 comparáveis seleccionados + homogeneização
+  const IV_COLS  = ['H', 'L', 'P', 'T', 'X']   // colunas de cada amostra (label/valor)
+  const IV_PCT_COLS = ['J', 'N', 'R', 'V', 'Z'] // colunas da % calculada por amostra (ao lado de cada IV_COLS)
+
+  // Percentagens confirmadas a partir da tabela de referência do próprio template
+  // (folha IV-IV, $AE$45:$AH$51 e $AE$54:$AH$59) — não inventar valores novos sem voltar a confirmar.
+  const HOMOG_PCT_GENERIC: Record<string, number> = {
+    'MUITO INFERIOR': 0.15, 'INFERIOR': 0.10, 'LIGEIRAMENTE INFERIOR': 0.05,
+    'SEMELHANTE': 0, 'LIGEIRAMENTE SUPERIOR': -0.05, 'SUPERIOR': -0.10, 'MUITO SUPERIOR': -0.15,
+  }
+  const HOMOG_PCT_TX: Record<string, number> = {
+    'ESPECULATIVO': -0.20, 'FÁCILMENTE NEGOCIÁVEL': -0.15, 'LIGEIRAMENTE NEGOCIÁVEL': -0.10,
+    'ALINHADO COM MERCADO': -0.05, 'SEM MARGEM NEGOCIAÇÃO': 0,
+  }
+  function pctGeneric(label: any): number | undefined {
+    return HOMOG_PCT_GENERIC[String(label ?? 'Semelhante').toUpperCase().trim()]
+  }
+  function pctTxDesconto(label: any): number | undefined {
+    return HOMOG_PCT_TX[String(label ?? 'Alinhado com Mercado').toUpperCase().trim()]
+  }
+  // Ajuste de área — mesma fórmula do template (linha 25 do IV-IV), substituída por valor estático
+  // já que as fórmulas são removidas do ficheiro final (ver cleanSharedFormulas)
+  function areaAdjustment(subjectAreaM2: any, compAreaM2: any): number | null {
+    const sa = parseFloat(subjectAreaM2), ca = parseFloat(compAreaM2)
+    if (!sa || !ca || isNaN(sa) || isNaN(ca)) return null
+    const diffRatio = (sa - ca) / sa
+    const exp = diffRatio < 0.3 ? 1 / 25 : 1 / 50
+    return Math.pow(ca / sa, exp) - 1
+  }
+
   const wsIV = wb.getWorksheet('IV - IV')
   if (wsIV) {
     function setIV(ref: string, val: any) {
@@ -586,8 +614,12 @@ export async function generateAbancaReport(
       wsIV.getCell(ref).value = val
     }
 
+    // E13 — Área Privativa/Locável do imóvel em avaliação (ABP), usada como base da homogeneização de área
+    setIV('E13', fmtArea(p.gross_area))
+
     compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
       const col      = IV_COLS[idx]
+      const pctCol   = IV_PCT_COLS[idx]
       const tipologia = c.tipologia || ''
       const uso       = c.uso       || ''
       const anoEstado = c.ano_estado || ''
@@ -603,6 +635,28 @@ export async function generateAbancaReport(
       if (price > 0) setIV(`${col}14`, price)    // Asking Price
       setIV(`${col}22`, descricao)               // Descrição
       setIV(`${col}34`, v(c.url))                // Fonte
+
+      // HOMOGENEIZAÇÃO (linhas 24-30) — label escolhido na tab Comparáveis + % correspondente
+      setIV(`${col}24`, v(c.homog_localizacao, 'Semelhante'))
+      setIV(`${pctCol}24`, pctGeneric(c.homog_localizacao))
+
+      const areaAdj = areaAdjustment(p.gross_area, c.area_m2)
+      if (areaAdj !== null) setIV(`${pctCol}25`, areaAdj)   // Área — sem label, só % (auto)
+
+      setIV(`${col}26`, v(c.homog_acabamentos, 'Semelhante'))
+      setIV(`${pctCol}26`, pctGeneric(c.homog_acabamentos))
+
+      setIV(`${col}27`, v(c.homog_conservacao, 'Semelhante'))
+      setIV(`${pctCol}27`, pctGeneric(c.homog_conservacao))
+
+      setIV(`${col}28`, v(c.homog_caract_gerais, 'Semelhante'))
+      setIV(`${pctCol}28`, pctGeneric(c.homog_caract_gerais))
+
+      setIV(`${col}29`, v(c.homog_classe_energetica, 'Semelhante'))
+      setIV(`${pctCol}29`, pctGeneric(c.homog_classe_energetica))
+
+      setIV(`${col}30`, v(c.homog_tx_desconto, 'Alinhado com Mercado'))
+      setIV(`${pctCol}30`, pctTxDesconto(c.homog_tx_desconto))
     })
   }
 
