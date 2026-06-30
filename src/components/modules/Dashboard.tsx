@@ -3,6 +3,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, KpiCard, VisitBadge, BillingBadge } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/utils'
+
+// Converte texto em uppercase (datatape espanhol) para titleCase
+function toDisplayDash(val: any): string {
+  if (!val) return ''
+  const s = String(val)
+  if (s === s.toUpperCase() && s.length > 2 && /[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜ]/.test(s)) {
+    const exceptions = new Set(['de','da','do','das','dos','e','a','o','as','os','em','na','no','nas','nos','ao','à','um','uma'])
+    return s.split(' ').map((word, i) => {
+      if (!word) return word
+      const lower = word.toLowerCase()
+      if (i > 0 && exceptions.has(lower)) return lower
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    }).join(' ')
+  }
+  return s
+}
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
 import { CheckSquare, Square, Pencil, Check, X, Trash2 } from 'lucide-react'
@@ -395,8 +411,8 @@ export default function Dashboard() {
                       </td>
                       <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>
 
-                      <td className="text-gray-600 max-w-[160px] truncate">{p.municipality || p.address || '—'}</td>
-                      <td className="text-gray-600 whitespace-nowrap">{[p.property_type, p.typology].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="text-gray-600 max-w-[160px] truncate">{toDisplayDash(p.municipality || p.address) || '—'}</td>
+                      <td className="text-gray-600 whitespace-nowrap">{toDisplayDash([p.property_type, p.typology].filter(Boolean).join(' ')) || '—'}</td>
 
                       {role === 'admin' && (
                         <td>

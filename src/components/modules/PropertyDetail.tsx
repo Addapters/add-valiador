@@ -90,15 +90,21 @@ function F({ label, value, field, type='text', onSave, opts, span, textarea, hal
 
   const cls = `col-span-${span ? 2 : half ? 1 : 1}`
 
-  if (opts) return (
-    <div className={cls}>
-      <label className="label">{label}</label>
-      <select className="input text-sm w-full" value={value||''} onChange={e => { onSave({[field]:e.target.value||null}) }}>
-        <option value="">—</option>
-        {opts.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  )
+  if (opts) {
+    // Se o valor actual não está na lista (ex: vem da datatape em espanhol), adiciona-o traduzido
+    const currentInList = value && opts.includes(value)
+    const displayOpts = currentInList || !value ? opts : [toDisplay(value, 'text'), ...opts]
+    return (
+      <div className={cls}>
+        <label className="label">{label}</label>
+        <select className="input text-sm w-full" value={currentInList ? value : toDisplay(value, 'text')}
+          onChange={e => { onSave({[field]: e.target.value||null}) }}>
+          <option value="">—</option>
+          {displayOpts.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+    )
+  }
 
   return (
     <div className={cls}>

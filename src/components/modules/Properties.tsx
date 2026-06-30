@@ -14,6 +14,22 @@ import {
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
 const BILLING_LABELS: Record<string,string> = { no_po:'Sem PO', awaiting_po:'A aguardar PO', po_received:'PO recebida', invoice_pending:'Fat. por emitir', invoice_issued:'Fat. emitida', paid:'Pago' }
 
+// Converte texto em uppercase (vindo da datatape em espanhol) para titleCase
+function toDisplayProps(val: any): string {
+  if (!val) return ''
+  const s = String(val)
+  if (s === s.toUpperCase() && s.length > 2 && /[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜ]/.test(s)) {
+    const exceptions = new Set(['de','da','do','das','dos','e','a','o','as','os','em','na','no','nas','nos','ao','à','um','uma'])
+    return s.split(' ').map((word, i) => {
+      if (!word) return word
+      const lower = word.toLowerCase()
+      if (i > 0 && exceptions.has(lower)) return lower
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    }).join(' ')
+  }
+  return s
+}
+
 function MultiSelect({ label, options, selected, onChange }: { label:string; options:string[]; selected:string[]; onChange:(v:string[])=>void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -363,7 +379,7 @@ export default function Properties() {
       case 'area_garage_m2':   return <span className={cls}>{p.area_garage_m2?`${p.area_garage_m2} m²`:'—'}</span>
       case 'area_annex_m2':    return <span className={cls}>{p.area_annex_m2?`${p.area_annex_m2} m²`:'—'}</span>
       case 'prev_valuation_value': return <span className={cls}>{p.prev_valuation_value?`€ ${p.prev_valuation_value}`:'—'}</span>
-      default:                 return <span className={cls}>{(p as any)[col]||'—'}</span>
+      default:                 return <span className={cls}>{toDisplayProps((p as any)[col])||'—'}</span>
     }
   }
 
