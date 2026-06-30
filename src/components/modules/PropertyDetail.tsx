@@ -1134,6 +1134,7 @@ export default function PropertyDetail() {
             propertyId={property.id}
             comps={comps}
             onRefresh={() => qc.invalidateQueries({ queryKey: ['property', id] })}
+            subjectAreaM2={property.gross_area}
           />
         )}
 
@@ -1279,8 +1280,41 @@ function EditCell({ value, type='text', onSave, className='' }: {
 }
 
 // ── Comparáveis com Chauvenet e selecção ──────────────────────────────────
-function CompsSection({ propertyId, comps, onRefresh }: {
-  propertyId: string; comps: any[]; onRefresh: () => void
+// ── Homogeneização — opções e percentagens (extraídas do template IV-IV) ─────
+const HOMOG_OPTS_GENERIC = ['Muito inferior','Inferior','Ligeiramente inferior','Semelhante','Ligeiramente superior','Superior','Muito superior']
+const HOMOG_PCT_GENERIC: Record<string, number> = {
+  'MUITO INFERIOR': 0.15, 'INFERIOR': 0.10, 'LIGEIRAMENTE INFERIOR': 0.05,
+  'SEMELHANTE': 0, 'LIGEIRAMENTE SUPERIOR': -0.05, 'SUPERIOR': -0.10, 'MUITO SUPERIOR': -0.15,
+}
+const HOMOG_OPTS_TX = ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação']
+const HOMOG_PCT_TX: Record<string, number> = {
+  'ESPECULATIVO': -0.20, 'FÁCILMENTE NEGOCIÁVEL': -0.15, 'LIGEIRAMENTE NEGOCIÁVEL': -0.10,
+  'ALINHADO COM MERCADO': -0.05, 'SEM MARGEM NEGOCIAÇÃO': 0,
+}
+const HOMOG_CRITERIA: { key: string; label: string; tx?: boolean }[] = [
+  { key: 'homog_localizacao',       label: 'Localização' },
+  { key: 'homog_acabamentos',       label: 'Acab. e Equipamentos' },
+  { key: 'homog_conservacao',       label: 'Conservação' },
+  { key: 'homog_caract_gerais',     label: 'Caract. Gerais' },
+  { key: 'homog_classe_energetica', label: 'Classe Energética' },
+  { key: 'homog_tx_desconto',       label: 'Tx Desconto | Revisão', tx: true },
+]
+
+function fmtPct(p: number | null): string {
+  if (p === null || p === undefined || isNaN(p)) return '—'
+  return (p * 100).toFixed(1).replace('.', ',') + '%'
+}
+
+function areaAdjustment(subjectAreaM2: any, compAreaM2: any): number | null {
+  const sa = parseFloat(subjectAreaM2), ca = parseFloat(compAreaM2)
+  if (!sa || !ca || isNaN(sa) || isNaN(ca)) return null
+  const diffRatio = (sa - ca) / sa
+  const exp = diffRatio < 0.3 ? 1 / 25 : 1 / 50
+  return Math.pow(ca / sa, exp) - 1
+}
+
+function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
+  propertyId: string; comps: any[]; onRefresh: () => void; subjectAreaM2?: any
 }) {
   const [applying, setApplying] = useState(false)
 
@@ -1511,6 +1545,71 @@ function CompsSection({ propertyId, comps, onRefresh }: {
           {selected.some((c:any) => c.chauvenet_rejected) && (
             <p className="text-xs text-red-500">⚠️ Um ou mais comparáveis seleccionados foram identificados como outliers pelo Critério de Chauvenet.</p>
           )}
+        </div>
+      )}
+
+      {/* 5 ── Homogeneização dos comparáveis seleccionados */}
+      {selected.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Homogeneização (em relação ao imóvel em avaliação)
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="table-base text-xs">
+              <thead>
+                <tr>
+                  <th></th>
+                  {selected.map((c: any, i: number) => (
+                    <th key={c.id} colSpan={2} className="text-center">Amostra {i + 1}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Área — calculada automaticamente, não editável */}
+                <tr className="bg-gray-50">
+                  <td className="font-medium text-gray-500 whitespace-nowrap">Área</td>
+                  {selected.map((c: any) => {
+                    const adj = areaAdjustment(subjectAreaM2, c.area_m2)
+                    return (
+                      <td key={c.id} colSpan={2} className="text-gray-400 italic">
+                        {fmtPct(adj)} <span className="text-[10px]">(auto)</span>
+                      </td>
+                    )
+                  })}
+                </tr>
+                {HOMOG_CRITERIA.map(({ key, label, tx }) => {
+                  const opts = tx ? HOMOG_OPTS_TX : HOMOG_OPTS_GENERIC
+                  const pctMap = tx ? HOMOG_PCT_TX : HOMOG_PCT_GENERIC
+                  return (
+                    <tr key={key}>
+                      <td className="font-medium text-gray-500 whitespace-nowrap">{label}</td>
+                      {selected.map((c: any) => {
+                        const val = c[key] || (tx ? 'Alinhado com Mercado' : 'Semelhante')
+                        const pct = pctMap[String(val).toUpperCase().trim()]
+                        return (
+                          <td key={c.id} colSpan={2}>
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                className="input text-xs py-1"
+                                value={val}
+                                onChange={e => updateComp(c.id, { [key]: e.target.value })}
+                              >
+                                {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                              <span className="text-gray-400 whitespace-nowrap">{fmtPct(pct)}</span>
+                            </div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-400 italic">
+            Estes ajustes são escritos no relatório (folha IV-IV) junto com o respectivo comparável.
+          </p>
         </div>
       )}
 
