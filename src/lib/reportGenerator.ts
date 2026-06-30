@@ -47,6 +47,17 @@ function titleCase(val: any): string {
 function traduzTipo(val: any): string {
   if (!val) return ''
   const map: Record<string, string> = {
+    'DESCONOCIDO':                 'Desconhecido',
+    'NO DISPONIBLE':               'Não disponível',
+    'NO APLICA':                   'Não aplicável',
+    'SIN DATOS':                   'Sem dados',
+    'NO ESPECIFICADO':             'Não especificado',
+    'OTRO':                        'Outro',
+    'OTROS':                       'Outros',
+    'NINGUNO':                     'Nenhum',
+    'NINGUNA':                     'Nenhuma',
+    'SI':                          'Sim',
+    'SÍ':                          'Sim',
     // Tipos de imóvel
     'VIVIENDA UNIFAMILIAR':        'Moradia unifamiliar',
     'VIVIENDA (PISO)':             'Apartamento',
@@ -70,13 +81,18 @@ function traduzTipo(val: any): string {
     'FINCA RUSTICA':               'Propriedade rústica',
     'FINCA RÚSTICA':               'Propriedade rústica',
     'EDIFICIO':                    'Edifício',
+    'EDIFICIO COMPLETO':           'Edifício completo',
     'CHALET':                      'Moradia',
     'CHALET ADOSADO':              'Moradia em banda',
     'CHALET PAREADO':              'Moradia geminada',
+    'CHALET INDIVIDUAL':           'Moradia isolada',
     'DUPLEX':                      'Duplex',
     'ATICO':                       'Cobertura',
     'ÁTICO':                       'Cobertura',
     'ESTUDIO':                     'Estúdio',
+    'APARTAMENTO':                 'Apartamento',
+    'BAJO':                        'Rés-do-chão',
+    'BAJO COMERCIAL':              'Rés-do-chão comercial',
     // Finalidades
     'ADJUDICADO CON VISITA INTERIOR':    'Adjudicado com visita interior',
     'ADJUDICADOS CON VISTORIA INTERIOR': 'Adjudicado com visita interior',
@@ -110,6 +126,9 @@ function traduzTipo(val: any): string {
     'LIBRE':                       'Livre',
     'ARRENDADO':                   'Arrendado',
     'OCUPADO POR TERCEROS':        'Ocupado por terceiros',
+    'VACIO':                       'Vazio',
+    'VACÍO':                       'Vazio',
+    'ALQUILADO':                   'Arrendado',
     // Uso
     'RESIDENCIAL':                 'Residencial',
     'COMERCIAL':                   'Comercial',
@@ -126,6 +145,11 @@ function traduzTipo(val: any): string {
     'ESTABLE':                     'Estável',
     'EN ALZA':                     'Em alta',
     'EN BAJA':                     'Em baixa',
+    'ALTA':                        'Alta',
+    'MEDIA':                       'Média',
+    'BAJA':                        'Baixa',
+    'MUY ALTA':                    'Muito alta',
+    'MUY BAJA':                    'Muito baixa',
     'TENDENCIALMENTE POSITIVA':    'Tendencialmente positiva',
     'TENDENCIALMENTE NEGATIVA':    'Tendencialmente negativa',
     // Tipo via
