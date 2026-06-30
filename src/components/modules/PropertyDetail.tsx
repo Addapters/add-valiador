@@ -1343,7 +1343,11 @@ function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
   }
 
   async function updateComp(compId: string, patch: any) {
-    await supabase.from('market_comps').update(patch).eq('id', compId)
+    const { error } = await supabase.from('market_comps').update(patch).eq('id', compId)
+    if (error) {
+      toast.error(`Erro ao guardar: ${error.message}`)
+      return
+    }
     onRefresh()
   }
 
