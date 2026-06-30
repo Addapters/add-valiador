@@ -10,6 +10,7 @@ import PropertyDetail from '@/components/modules/PropertyDetail'
 import PropertyMap    from '@/components/modules/PropertyMap'
 import Billing        from '@/components/modules/Billing'
 import MarketSearch   from '@/components/modules/MarketSearch'
+import PropertyCreate from '@/components/modules/PropertyCreate'
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth()
@@ -59,7 +60,8 @@ function AppRoutes() {
         <Route path="dashboard"      element={<Dashboard />} />
         <Route path="clients"        element={<Clients />} />
         <Route path="portfolios"     element={<Portfolios />} />
-        <Route path="properties"     element={<Properties />} />
+        <Route path="properties"      element={<Properties />} />
+        <Route path="properties/new" element={<PropertyCreate />} />
         <Route path="properties/:id" element={<PropertyDetail />} />
         <Route path="map"            element={<PropertyMap />} />
         <Route path="billing"        element={<Billing />} />

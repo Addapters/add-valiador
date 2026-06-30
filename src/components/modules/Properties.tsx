@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { PageHeader, VisitBadge, EmptyState } from '@/components/ui'
 import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/lib/utils'
-import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pencil, Check, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pencil, Check, X, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   getSavedFilters as _getSavedFilters, saveFilters as _saveFilters, clearFilters as _clearFilters, type PropertyFilters,
@@ -388,7 +388,10 @@ export default function Properties() {
   return (
     <div>
       <PageHeader title="Imóveis" subtitle={`${filtered.length} de ${rows.length} registos`}
-        actions={<ColumnPicker visible={visibleCols} onChange={setVisibleCols}/>}
+        actions={<>
+          <Link to="/properties/new" className="btn btn-primary flex items-center gap-1.5 text-sm"><Plus size={14}/>Novo imóvel</Link>
+          <ColumnPicker visible={visibleCols} onChange={setVisibleCols}/>
+        </>}
       />
 
       <div className="bg-white border-b border-gray-100 px-6 py-3 flex flex-wrap gap-2 items-center">
