@@ -936,7 +936,7 @@ export default function PropertyDetail() {
               { label: 'Certificado Energético',             field: 'doc_cert_energetico' },
               { label: 'Outro',                              field: 'doc_outro' },
             ].map(({ label, field }) => {
-              return <F key={field} label={label} field={field} value={(property as any)[field]}
+              return <F key={field} label={label} field={field} value={(property as any)[field] ?? 'Não entregue'}
                 opts={['Entregue','Não entregue','N/A']} onSave={save}/>
             })}
           </Section>
