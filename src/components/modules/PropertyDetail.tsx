@@ -1313,6 +1313,26 @@ function areaAdjustment(subjectAreaM2: any, compAreaM2: any): number | null {
   return Math.pow(ca / sa, exp) - 1
 }
 
+function median(values: number[]): number {
+  const s = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(s.length / 2)
+  return s.length % 2 !== 0 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+}
+function stdevP(values: number[]): number {
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length
+  return Math.sqrt(variance)
+}
+// Valores críticos do Critério de Chauvenet por N (o template do relatório só tem 5 e 6 tabelados;
+// os restantes são a tabela estatística padrão, usada quando há menos de 5 comparáveis seleccionados)
+const CHAUVENET_CRITICAL: Record<number, number> = {
+  2: 1.15, 3: 1.38, 4: 1.54, 5: 1.65, 6: 1.73, 7: 1.80, 8: 1.86,
+}
+function fmtEpm2(val: number | null): string {
+  if (val === null || val === undefined || isNaN(val)) return '—'
+  return Math.round(val).toLocaleString('pt-PT') + ' €/m²'
+}
+
 function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
   propertyId: string; comps: any[]; onRefresh: () => void; subjectAreaM2?: any
 }) {
@@ -1334,6 +1354,32 @@ function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
   const avgSelected   = selected.length
     ? selected.reduce((s: number, c: any) => s + (c.epm2 || 0), 0) / selected.filter((c:any) => c.epm2).length
     : null
+
+  // ── Homogeneização: índice de venda homogeneizado + análise estatística + Chauvenet ──
+  // Mesma fórmula confirmada nos relatórios fechados reais (folha IV-IV do template).
+  const homogResults = selected.map((c: any) => {
+    const price = parseFloat(c.price || 0)
+    const area  = parseFloat(c.area_m2 || 0)
+    const baseIndex = (price > 0 && area > 0) ? price / area : null
+    if (baseIndex === null) return { id: c.id, homogIndex: null as number | null }
+    const pctLoc   = HOMOG_PCT_GENERIC[String(c.homog_localizacao || 'Semelhante').toUpperCase().trim()] ?? 0
+    const pctArea  = areaAdjustment(subjectAreaM2, c.area_m2) ?? 0
+    const pctAcab  = HOMOG_PCT_GENERIC[String(c.homog_acabamentos || 'Semelhante').toUpperCase().trim()] ?? 0
+    const pctConsv = HOMOG_PCT_GENERIC[String(c.homog_conservacao || 'Semelhante').toUpperCase().trim()] ?? 0
+    const pctCarac = HOMOG_PCT_GENERIC[String(c.homog_caract_gerais || 'Semelhante').toUpperCase().trim()] ?? 0
+    const pctClass = HOMOG_PCT_GENERIC[String(c.homog_classe_energetica || 'Semelhante').toUpperCase().trim()] ?? 0
+    const pctTx    = HOMOG_PCT_TX[String(c.homog_tx_desconto || 'Alinhado com Mercado').toUpperCase().trim()] ?? 0
+    const sumAdj   = pctLoc + pctArea + pctAcab + pctConsv + pctCarac + pctClass + pctTx
+    return { id: c.id, homogIndex: baseIndex * (1 + sumAdj) }
+  })
+  const validHomog = homogResults.filter(r => r.homogIndex !== null).map(r => r.homogIndex as number)
+  const homogN      = validHomog.length
+  const homogMin     = homogN ? Math.min(...validHomog) : null
+  const homogMax     = homogN ? Math.max(...validHomog) : null
+  const homogAvg      = homogN ? validHomog.reduce((a, b) => a + b, 0) / homogN : null
+  const homogMedian  = homogN ? median(validHomog) : null
+  const homogStdev    = homogN ? stdevP(validHomog) : null
+  const chauvenetR  = homogN ? CHAUVENET_CRITICAL[homogN] : undefined
 
   function fmtPrice(val: any): string {
     if (!val) return '—'
@@ -1608,11 +1654,65 @@ function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
                     </tr>
                   )
                 })}
+                {/* Oferta Homogeneizada — índice final por amostra (€/m²) */}
+                <tr className="bg-brand-50 font-semibold">
+                  <td className="text-brand-700 whitespace-nowrap">Oferta Homogeneizada</td>
+                  {selected.map((c: any) => {
+                    const r = homogResults.find(h => h.id === c.id)
+                    return (
+                      <td key={c.id} colSpan={2} className="text-brand-700">
+                        {fmtEpm2(r?.homogIndex ?? null)}
+                      </td>
+                    )
+                  })}
+                </tr>
               </tbody>
             </table>
           </div>
+
+          {/* Análise Estatística */}
+          {homogN >= 2 && (
+            <div className="rounded-lg border border-gray-100 overflow-hidden">
+              <div className="grid grid-cols-5 bg-gray-50 text-xs px-3 py-2">
+                <div className="font-semibold text-gray-600 col-span-5 mb-1">
+                  Análise Estatística — Oferta Homogeneizada
+                </div>
+                <div>Mínimo: <span className="font-medium">{fmtEpm2(homogMin)}</span></div>
+                <div>Máximo: <span className="font-medium">{fmtEpm2(homogMax)}</span></div>
+                <div>Média: <span className="font-medium">{fmtEpm2(homogAvg)}</span></div>
+                <div>Mediana: <span className="font-medium">{fmtEpm2(homogMedian)}</span></div>
+                <div>DesvPad: <span className="font-medium">{fmtEpm2(homogStdev)}</span></div>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] gap-3 px-3 py-2 text-xs border-t border-gray-100">
+                <div className="text-gray-500">
+                  Saneamento<br/>(Critério de Chauvenet)<br/>
+                  N = {homogN}{chauvenetR !== undefined && <><br/>r = {chauvenetR.toFixed(2).replace('.',',')}</>}
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {selected.map((c: any) => {
+                    const r = homogResults.find(h => h.id === c.id)
+                    const idx = r?.homogIndex ?? null
+                    if (idx === null || homogAvg === null || homogStdev === null) {
+                      return <div key={c.id} className="text-gray-400">—</div>
+                    }
+                    const ratio = homogStdev > 0 ? Math.abs(idx - homogAvg) / homogStdev : 0
+                    const validated = chauvenetR !== undefined ? ratio < chauvenetR : null
+                    return (
+                      <div key={c.id} className={validated === false ? 'text-red-600' : 'text-gray-700'}>
+                        <div>{ratio.toFixed(5).replace('.',',')}</div>
+                        <div className="text-[10px] font-medium">
+                          {validated === null ? '—' : validated ? 'AMOSTRA VALIDADA' : 'AMOSTRA REJEITADA'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-gray-400 italic">
-            Estes ajustes são escritos no relatório (folha IV-IV) junto com o respectivo comparável.
+            Estes ajustes e a Oferta Homogeneizada são escritos no relatório (folha IV-IV) junto com o respectivo comparável.
           </p>
         </div>
       )}
