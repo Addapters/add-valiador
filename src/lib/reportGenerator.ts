@@ -206,7 +206,8 @@ export async function generateAbancaReport(
 
   const wb = new ExcelJS.Workbook()
 
-  // Pré-processa para remover shared formulas que o ExcelJS não suporta
+  // Pré-processa para remover TODAS as fórmulas (incluindo shared) que o ExcelJS não suporta bem
+  // Não precisamos de fórmulas calculadas no resultado final, apenas valores estáticos
   async function cleanSharedFormulas(buf: ArrayBuffer): Promise<ArrayBuffer> {
     try {
       const JSZip = (await import('jszip')).default
@@ -214,25 +215,14 @@ export async function generateAbancaReport(
       const sheetFiles = Object.keys(zip.files).filter(f => /xl\/worksheets\/sheet\d+\.xml/.test(f))
       for (const sf of sheetFiles) {
         let xml: string = await zip.files[sf].async('string')
-        // Remove TODAS as tags <f ...> que contenham t="shared" ou si="N"
-        // Substitui master (com conteúdo) por fórmula simples
-        xml = xml.replace(/<f([^>]*)>([^<]*)<\/f>/g, (match, attrs, formula) => {
-          if (attrs.includes('shared') || attrs.includes('si=')) {
-            return formula ? `<f>${formula}</f>` : ''
-          }
-          return match
-        })
-        // Remove tags self-closing com shared/si
-        xml = xml.replace(/<f[^>]*(t="shared"|si="\d+")[^>]*\/>/g, '')
-        // Remove atributo si= de qualquer tag <f> restante
-        xml = xml.replace(/<f([^>]*)\ssi="\d+"([^>]*)>/g, '<f$1$2>')
-        // Remove atributo t="shared" de qualquer tag <f> restante  
-        xml = xml.replace(/<f([^>]*)\st="shared"([^>]*)>/g, '<f$1$2>')
+        // Remove COMPLETAMENTE qualquer tag <f>...</f> ou <f ... /> — sem fórmulas, só valores
+        xml = xml.replace(/<f[^>]*>[\s\S]*?<\/f>/g, '')
+        xml = xml.replace(/<f[^>]*\/>/g, '')
         zip.file(sf, xml)
       }
       return await zip.generateAsync({ type: 'arraybuffer' })
     } catch (e) {
-      console.warn('cleanSharedFormulas failed:', e)
+      console.warn('cleanSharedFormulas failed, using original buffer:', e)
       return buf
     }
   }
