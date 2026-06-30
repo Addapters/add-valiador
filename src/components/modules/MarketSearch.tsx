@@ -45,9 +45,9 @@ export default function MarketSearch() {
 
   const filteredProperties = properties.filter((p: any) => {
     if (!search) return true
-    const s = search.toLowerCase()
+    const s = search.toLowerCase().trim()
     return [p.external_ref, p.id_bien, p.address, p.municipality]
-      .some((v: any) => v?.toLowerCase().includes(s))
+      .some((v: any) => v !== null && v !== undefined && String(v).toLowerCase().includes(s))
   })
 
   const { data: comps = [] } = useQuery({
@@ -150,6 +150,9 @@ export default function MarketSearch() {
                 </option>
               ))}
             </select>
+            {search && filteredProperties.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">Nenhum imóvel encontrado para "{search}".</p>
+            )}
             {selectedProp && (
               <div className="mt-2 flex items-center gap-2 text-xs">
                 {selectedProp.comps_count > 0 ? (
