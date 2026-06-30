@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/ui'
-import { ExternalLink, Info, Plus, Trash2, Link as LinkIcon } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { ExternalLink, Info, Plus, Trash2, Link as LinkIcon, CheckCircle, Circle } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 const PORTALS = [
@@ -17,18 +17,37 @@ const PORTALS = [
 
 export default function MarketSearch() {
   const qc = useQueryClient()
+  const [search, setSearch] = useState('')
   const [selectedProperty, setSelectedProperty] = useState('')
   const [form, setForm] = useState({
     portal: 'Idealista', listing_ref: '', url: '',
     typology: '', area_m2: '', price: '', notes: ''
   })
 
+  // Lista de imóveis com contagem de comparáveis já existentes
   const { data: properties = [] } = useQuery({
-    queryKey: ['properties-simple'],
+    queryKey: ['properties-simple-with-comps'],
     queryFn: async () => {
-      const { data } = await supabase.from('properties').select('id, ref, address, municipality, property_type').order('ref')
-      return (data||[]) as any[]
+      const { data: props } = await supabase
+        .from('properties')
+        .select('id, external_ref, id_bien, address, municipality, property_type')
+        .order('external_ref')
+      const { data: compsCount } = await supabase
+        .from('market_comps')
+        .select('property_id')
+      const countMap: Record<string, number> = {}
+      ;(compsCount || []).forEach((c: any) => {
+        countMap[c.property_id] = (countMap[c.property_id] || 0) + 1
+      })
+      return (props || []).map((p: any) => ({ ...p, comps_count: countMap[p.id] || 0 }))
     }
+  })
+
+  const filteredProperties = properties.filter((p: any) => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return [p.external_ref, p.id_bien, p.address, p.municipality]
+      .some((v: any) => v?.toLowerCase().includes(s))
   })
 
   const { data: comps = [] } = useQuery({
@@ -54,9 +73,12 @@ export default function MarketSearch() {
         notes:        form.notes       || null,
       })
       if (error) throw error
+      // Marca o imóvel como tendo comparáveis
+      await supabase.from('properties').update({ tem_comparaveis: true }).eq('id', selectedProperty)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['all-comps', selectedProperty] })
+      qc.invalidateQueries({ queryKey: ['properties-simple-with-comps'] })
       toast.success('Comparável adicionado')
       setForm({ portal:'Idealista', listing_ref:'', url:'', typology:'', area_m2:'', price:'', notes:'' })
     },
@@ -68,13 +90,18 @@ export default function MarketSearch() {
       const { error } = await supabase.from('market_comps').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['all-comps', selectedProperty] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-comps', selectedProperty] })
+      qc.invalidateQueries({ queryKey: ['properties-simple-with-comps'] })
+    }
   })
 
   const medianPricePerM2 = (() => {
-    const vals = comps.map((c: any) => c.price_per_m2).filter(Boolean)
+    const vals = comps
+      .map((c: any) => c.price && c.area_m2 ? parseFloat(c.price) / parseFloat(c.area_m2) : null)
+      .filter((v: any): v is number => v !== null)
     if (!vals.length) return null
-    const s = [...vals].sort((a: number, b: number) => a - b)
+    const s = [...vals].sort((a, b) => a - b)
     const m = Math.floor(s.length / 2)
     return s.length % 2 !== 0 ? Math.round(s[m]) : Math.round((s[m-1] + s[m]) / 2)
   })()
@@ -109,12 +136,29 @@ export default function MarketSearch() {
 
           <div>
             <label className="label">Imóvel em avaliação *</label>
+            <input
+              className="input max-w-md mb-2"
+              placeholder="Pesquisar por referência ou ID do bem…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
             <select className="input max-w-md" value={selectedProperty} onChange={e => setSelectedProperty(e.target.value)}>
               <option value="">Seleccionar imóvel…</option>
-              {properties.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.ref} — {p.property_type||''} {p.municipality||p.address||''}</option>
+              {filteredProperties.map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.external_ref || '—'} {p.id_bien ? `· ID ${p.id_bien}` : ''} {p.comps_count > 0 ? `· ${p.comps_count} comparáveis já carregados` : '· sem comparáveis'}
+                </option>
               ))}
             </select>
+            {selectedProp && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                {selectedProp.comps_count > 0 ? (
+                  <span className="flex items-center gap-1 text-emerald-600"><CheckCircle size={13}/> {selectedProp.comps_count} comparáveis já carregados para este imóvel</span>
+                ) : (
+                  <span className="flex items-center gap-1 text-gray-400"><Circle size={13}/> Ainda sem comparáveis — adiciona o primeiro abaixo</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -144,9 +188,6 @@ export default function MarketSearch() {
               <label className="label">Preço (€)</label>
               <input type="number" className="input" value={form.price} onChange={e => setForm(f => ({...f, price:e.target.value}))}/>
             </div>
-            <div>
-              <label className="label">Data anúncio</label>
-            </div>
             <div className="md:col-span-3">
               <label className="label">Notas</label>
               <input className="input" placeholder="Observações, estado de conservação…" value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))}/>
@@ -164,7 +205,7 @@ export default function MarketSearch() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-gray-700">
-                Comparáveis — {selectedProp?.ref} {selectedProp?.municipality ? `· ${selectedProp.municipality}` : ''}
+                Comparáveis — {selectedProp?.external_ref} {selectedProp?.id_bien ? `· ID ${selectedProp.id_bien}` : ''} {selectedProp?.municipality ? `· ${selectedProp.municipality}` : ''}
               </h2>
               {medianPricePerM2 && (
                 <span className="text-sm text-gray-600">Mediana: <strong className="text-brand-600">€ {medianPricePerM2}/m²</strong></span>
@@ -178,34 +219,37 @@ export default function MarketSearch() {
                   <thead>
                     <tr>
                       <th>Portal</th><th>Ref.</th><th>Link</th><th>Tipologia</th>
-                      <th>Área</th><th>Preço</th><th>€/m²</th><th>Data</th><th>Notas</th><th></th>
+                      <th>Área</th><th>Preço</th><th>€/m²</th><th>Notas</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {comps.map((c: any) => (
-                      <tr key={c.id}>
-                        <td className="font-medium">{c.portal}</td>
-                        <td className="text-gray-500 text-xs">{c.listing_ref || '—'}</td>
-                        <td>
-                          {c.url ? (
-                            <a href={c.url} target="_blank" rel="noopener noreferrer"
-                              className="text-brand-600 hover:underline flex items-center gap-1 text-xs">
-                              <ExternalLink size={11}/> Abrir
-                            </a>
-                          ) : '—'}
-                        </td>
-                        <td>{c.typology || '—'}</td>
-                        <td>{c.area_m2 ? `${c.area_m2} m²` : '—'}</td>
-                        <td>{c.price ? formatCurrency(c.price) : '—'}</td>
-                        <td className="font-medium text-brand-600">{c.price_per_m2 ? `€ ${c.price_per_m2}` : '—'}</td>
-                        <td className="text-gray-500 text-xs max-w-[140px] truncate">{c.notes || '—'}</td>
-                        <td>
-                          <button className="text-red-400 hover:text-red-600" onClick={() => delComp.mutate(c.id)}>
-                            <Trash2 size={13}/>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {comps.map((c: any) => {
+                      const epm2 = c.price && c.area_m2 ? Math.round(parseFloat(c.price) / parseFloat(c.area_m2)) : null
+                      return (
+                        <tr key={c.id}>
+                          <td className="font-medium">{c.portal}</td>
+                          <td className="text-gray-500 text-xs">{c.listing_ref || '—'}</td>
+                          <td>
+                            {c.url ? (
+                              <a href={c.url} target="_blank" rel="noopener noreferrer"
+                                className="text-brand-600 hover:underline flex items-center gap-1 text-xs">
+                                <ExternalLink size={11}/> Abrir
+                              </a>
+                            ) : '—'}
+                          </td>
+                          <td>{c.typology || '—'}</td>
+                          <td>{c.area_m2 ? `${c.area_m2} m²` : '—'}</td>
+                          <td>{c.price ? formatCurrency(c.price) : '—'}</td>
+                          <td className="font-medium text-brand-600">{epm2 ? `€ ${epm2}` : '—'}</td>
+                          <td className="text-gray-500 text-xs max-w-[140px] truncate">{c.notes || '—'}</td>
+                          <td>
+                            <button className="text-red-400 hover:text-red-600" onClick={() => delComp.mutate(c.id)}>
+                              <Trash2 size={13}/>
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
