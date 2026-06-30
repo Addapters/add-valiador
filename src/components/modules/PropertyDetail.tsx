@@ -920,9 +920,23 @@ export default function PropertyDetail() {
         {/* SEC 8 ── Documentos Entregues */}
         {tab==='sec8' && (<>
           <Section title="Documentos para Avaliação">
-            {['Caderneta Predial','Certidão da CRP','Contrato de Arrendamento','Alvará de Loteamento','Planta de Loteamento','Licença de Construção/Obras','Licença de Utilização','Orçamento de obras','Memória Descritiva','Ficha Técnica Habitação','Projeto Aprovado','Projeto Não Aprovado','Certificado Energético','Outro'].map(doc => {
-              const field = 'doc_' + doc.toLowerCase().replace(/[^a-z0-9]/g,'_')
-              return <F key={field} label={doc} field={field} value={(property as any)[field]}
+            {[
+              { label: 'Caderneta Predial',                 field: 'doc_caderneta' },
+              { label: 'Certidão da CRP',                   field: 'doc_certidao' },
+              { label: 'Contrato de Arrendamento',           field: 'doc_contrato_arrend' },
+              { label: 'Alvará de Loteamento',               field: 'doc_alvara' },
+              { label: 'Planta de Loteamento',               field: 'doc_planta' },
+              { label: 'Licença de Construção/Obras',        field: 'doc_licenca_constr' },
+              { label: 'Licença de Utilização',              field: 'doc_licenca_util' },
+              { label: 'Orçamento de obras',                 field: 'doc_orcamento_obras' },
+              { label: 'Memória Descritiva',                 field: 'doc_memoria_descritiva' },
+              { label: 'Ficha Técnica Habitação',             field: 'doc_ficha_tecnica' },
+              { label: 'Projeto Aprovado',                   field: 'doc_projeto_aprovado' },
+              { label: 'Projeto Não Aprovado',                field: 'doc_projeto_nao_aprovado' },
+              { label: 'Certificado Energético',             field: 'doc_cert_energetico' },
+              { label: 'Outro',                              field: 'doc_outro' },
+            ].map(({ label, field }) => {
+              return <F key={field} label={label} field={field} value={(property as any)[field]}
                 opts={['Entregue','Não entregue','N/A']} onSave={save}/>
             })}
           </Section>
