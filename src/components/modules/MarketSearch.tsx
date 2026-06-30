@@ -136,22 +136,40 @@ export default function MarketSearch() {
 
           <div>
             <label className="label">Imóvel em avaliação *</label>
-            <input
-              className="input max-w-md mb-2"
-              placeholder="Pesquisar por referência ou ID do bem…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <select className="input max-w-md" value={selectedProperty} onChange={e => setSelectedProperty(e.target.value)}>
-              <option value="">Seleccionar imóvel…</option>
-              {filteredProperties.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.external_ref || '—'} {p.id_bien ? `· ID ${p.id_bien}` : ''} {p.comps_count > 0 ? `· ${p.comps_count} comparáveis já carregados` : '· sem comparáveis'}
-                </option>
-              ))}
-            </select>
-            {search && filteredProperties.length === 0 && (
-              <p className="text-xs text-amber-600 mt-1">Nenhum imóvel encontrado para "{search}".</p>
+            <div className="relative max-w-md">
+              <input
+                className="input w-full"
+                placeholder="Pesquisar por referência ou ID do bem…"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setSelectedProperty('') }}
+              />
+              {search && !selectedProperty && (
+                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                  {filteredProperties.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-amber-600">Nenhum imóvel encontrado para "{search}".</p>
+                  ) : (
+                    filteredProperties.slice(0, 30).map((p: any) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                        onClick={() => { setSelectedProperty(p.id); setSearch(`${p.external_ref || ''} ${p.id_bien ? '· ID ' + p.id_bien : ''}`.trim()) }}
+                      >
+                        <span className="font-medium">{p.external_ref || '—'}</span>
+                        {p.id_bien && <span className="text-gray-400"> · ID {p.id_bien}</span>}
+                        <span className={`ml-2 text-xs ${p.comps_count > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                          {p.comps_count > 0 ? `· ${p.comps_count} comparáveis` : '· sem comparáveis'}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedProperty && (
+              <button className="text-xs text-gray-400 hover:text-gray-600 mt-1" onClick={() => { setSelectedProperty(''); setSearch('') }}>
+                ✕ Limpar selecção
+              </button>
             )}
             {selectedProp && (
               <div className="mt-2 flex items-center gap-2 text-xs">
