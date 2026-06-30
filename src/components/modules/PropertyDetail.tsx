@@ -37,12 +37,100 @@ function useLeaflet(active: boolean, cb: () => void) {
   }, [active])
 }
 
+// Dicionário de tradução espanhol → português europeu
+const ES_PT_MAP: Record<string, string> = {
+  'VIVIENDA UNIFAMILIAR':        'Moradia unifamiliar',
+  'VIVIENDA (PISO)':             'Apartamento',
+  'VIVIENDA':                    'Habitação',
+  'PISO':                        'Apartamento',
+  'CASA':                        'Moradia',
+  'GARAJE':                      'Garagem',
+  'PLAZA DE GARAJE':             'Garagem',
+  'TRASTERO':                    'Arrumos',
+  'LOCAL':                       'Loja',
+  'LOCAL COMERCIAL':             'Loja comercial',
+  'LOCAL DE NEGOCIO':            'Loja comercial',
+  'OFICINA':                     'Escritório',
+  'NAVE':                        'Nave industrial',
+  'NAVE INDUSTRIAL':             'Nave industrial',
+  'TERRENO':                     'Terreno',
+  'TERRENO FINCA RUSTICA':       'Terreno rústico',
+  'TERRENO FINCA URBANA':        'Terreno urbano',
+  'SOLAR':                       'Terreno urbano',
+  'FINCA RUSTICA':               'Propriedade rústica',
+  'EDIFICIO':                    'Edifício',
+  'CHALET':                      'Moradia',
+  'CHALET ADOSADO':              'Moradia em banda',
+  'CHALET PAREADO':              'Moradia geminada',
+  'DUPLEX':                      'Duplex',
+  'ATICO':                       'Cobertura',
+  'ESTUDIO':                     'Estúdio',
+  'LIBRE':                       'Livre',
+  'OCUPADO':                     'Ocupado',
+  'OCUPADO POR EL PROPIETARIO':  'Ocupado pelo proprietário',
+  'ARRENDADO':                   'Arrendado',
+  'OCUPADO POR TERCEROS':        'Ocupado por terceiros',
+  'RESIDENCIAL':                 'Residencial',
+  'COMERCIAL':                   'Comercial',
+  'INDUSTRIAL':                  'Industrial',
+  'SERVICIOS':                   'Serviços',
+  'MIXTO':                       'Misto',
+  'RUSTICO':                     'Rústico',
+  '1ª RESIDENCIA':               '1ª residência',
+  '2ª RESIDENCIA':               '2ª residência',
+  'ARRENDAMIENTO':               'Arrendamento',
+  'PREDIO URBANO':               'Prédio urbano',
+  'PREDIO RUSTICO':              'Prédio rústico',
+  'PREDIO MIXTO':                'Prédio misto',
+  'NUEVA CONSTRUCCION':          'Construção nova',
+  'SEGUNDA MANO':                'Usado',
+  'EN PROYECTO':                 'Em projecto',
+  'EN PROYETO':                  'Em projecto',
+  'EN CONSTRUCCION':             'Em construção',
+  'EN REHABILITACION':           'Em reabilitação',
+  'REHABILITADO':                'Reabilitado',
+  'TERMINADO':                   'Terminado',
+  'HIPOTESIS TERMINADO':         'Hipótese terminado',
+  'MUY BUENO':                   'Muito bom',
+  'BUENO':                       'Bom',
+  'NORMAL':                      'Normal',
+  'DEFICIENTE':                  'Deficiente',
+  'MUY DEFICIENTE':              'Muito deficiente',
+  'RUINOSO':                     'Ruinoso',
+  'POSITIVA':                    'Positiva',
+  'MUY POSITIVA':                'Muito positiva',
+  'NEGATIVA':                    'Negativa',
+  'MUY NEGATIVA':                'Muito negativa',
+  'ESTABLE':                     'Estável',
+  'EN ALZA':                     'Em alta',
+  'EN BAJA':                     'Em baixa',
+  'TENDENCIALMENTE POSITIVA':    'Tendencialmente positiva',
+  'TENDENCIALMENTE NEGATIVA':    'Tendencialmente negativa',
+  'CALLE':                       'Rua',
+  'AVENIDA':                     'Avenida',
+  'PLAZA':                       'Praça',
+  'PASEO':                       'Passeio',
+  'CARRETERA':                   'Estrada',
+  'CAMINO':                      'Caminho',
+  'TRAVESIA':                    'Travessa',
+  'TASACION':                    'Avaliação',
+  'RETASACION':                  'Reavaliação',
+  'VISTORIA':                    'Vistoria',
+  'PORTABILIDAD':                'Portabilidade',
+}
+
+function translateES(s: string): string {
+  return ES_PT_MAP[s.toUpperCase().trim()] || s
+}
+
 // ── Auto-save field component ──────────────────────────────────────────────
 function toDisplay(val: any, type: string): string {
   if (!val && val !== 0) return ''
   if (type === 'number' || type === 'date') return String(val)
-  const s = String(val)
-  // Aplica titleCase se estiver em uppercase (vem da datatape)
+  let s = String(val)
+  // Traduz termos espanhóis conhecidos primeiro
+  s = translateES(s)
+  // Aplica titleCase se ainda estiver em uppercase (vem da datatape)
   if (s === s.toUpperCase() && s.length > 2 && /[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜ]/.test(s)) {
     // Palavra a palavra — preserva abreviaturas curtas (Dr., n.º, etc.)
     const exceptions = new Set(['de','da','do','das','dos','e','a','o','as','os','em','na','no','nas','nos','ao','à','um','uma'])
