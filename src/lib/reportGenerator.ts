@@ -577,12 +577,12 @@ export async function generateAbancaReport(
     })
   const compsToUse = selectedComps.length > 0 ? selectedComps : comps
 
-  // TAB IV-IV — 5 comparáveis seleccionados + homogeneização
+  // TAB IV-IV — 5 comparáveis seleccionados + homogeneização + análise estatística + Chauvenet
   const IV_COLS  = ['H', 'L', 'P', 'T', 'X']   // colunas de cada amostra (label/valor)
   const IV_PCT_COLS = ['J', 'N', 'R', 'V', 'Z'] // colunas da % calculada por amostra (ao lado de cada IV_COLS)
 
   // Percentagens confirmadas a partir da tabela de referência do próprio template
-  // (folha IV-IV, $AE$45:$AH$51 e $AE$54:$AH$59) — não inventar valores novos sem voltar a confirmar.
+  // (folha IV-IV, $AE$45:$AH$51 e $AE$54:$AH$59 — confirmado igual em 4 relatórios fechados reais)
   const HOMOG_PCT_GENERIC: Record<string, number> = {
     'MUITO INFERIOR': 0.15, 'INFERIOR': 0.10, 'LIGEIRAMENTE INFERIOR': 0.05,
     'SEMELHANTE': 0, 'LIGEIRAMENTE SUPERIOR': -0.05, 'SUPERIOR': -0.10, 'MUITO SUPERIOR': -0.15,
@@ -590,6 +590,11 @@ export async function generateAbancaReport(
   const HOMOG_PCT_TX: Record<string, number> = {
     'ESPECULATIVO': -0.20, 'FÁCILMENTE NEGOCIÁVEL': -0.15, 'LIGEIRAMENTE NEGOCIÁVEL': -0.10,
     'ALINHADO COM MERCADO': -0.05, 'SEM MARGEM NEGOCIAÇÃO': 0,
+  }
+  // Valores críticos do Critério de Chauvenet por N — o template só tem 5 e 6 (linhas AE61:AH62),
+  // os restantes são a tabela estatística padrão de Chauvenet (usada quando há menos de 5 comparáveis)
+  const CHAUVENET_CRITICAL: Record<number, number> = {
+    2: 1.15, 3: 1.38, 4: 1.54, 5: 1.65, 6: 1.73, 7: 1.80, 8: 1.86,
   }
   function pctGeneric(label: any): number | undefined {
     return HOMOG_PCT_GENERIC[String(label ?? 'Semelhante').toUpperCase().trim()]
@@ -606,6 +611,16 @@ export async function generateAbancaReport(
     const exp = diffRatio < 0.3 ? 1 / 25 : 1 / 50
     return Math.pow(ca / sa, exp) - 1
   }
+  function median(values: number[]): number {
+    const s = [...values].sort((a, b) => a - b)
+    const mid = Math.floor(s.length / 2)
+    return s.length % 2 !== 0 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+  }
+  function stdevP(values: number[]): number {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length
+    const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length
+    return Math.sqrt(variance)
+  }
 
   const wsIV = wb.getWorksheet('IV - IV')
   if (wsIV) {
@@ -615,7 +630,11 @@ export async function generateAbancaReport(
     }
 
     // E13 — Área Privativa/Locável do imóvel em avaliação (ABP), usada como base da homogeneização de área
-    setIV('E13', fmtArea(p.gross_area))
+    const subjectArea = parseFloat(p.gross_area)
+    if (subjectArea > 0) setIV('E13', subjectArea)
+
+    // Guarda o índice homogeneizado (linha 31) de cada amostra para a análise estatística seguinte
+    const homogIndices: { col: string; pctCol: string; value: number }[] = []
 
     compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
       const col      = IV_COLS[idx]
@@ -631,33 +650,73 @@ export async function generateAbancaReport(
       setIV(`${col}10`, uso)                     // Uso
       setIV(`${col}11`, tipologia)               // Tipologia
       setIV(`${col}12`, anoEstado)               // Ano/Estado
-      setIV(`${col}13`, fmtArea(c.area_m2))     // Área
+      if (area > 0) setIV(`${col}13`, area)      // Área — valor numérico (não texto), usado nos cálculos
       if (price > 0) setIV(`${col}14`, price)    // Asking Price
+
+      // Índice base (Asking Index, Uso Principal) — sem áreas acessórias (Outros I/II, Logradouro),
+      // que esta plataforma não recolhe; equivale a H15/H21 do template quando essas parcelas são 0
+      const baseIndex = (price > 0 && area > 0) ? price / area : null
+      if (baseIndex !== null) setIV(`${col}15`, baseIndex)
+      if (baseIndex !== null) setIV(`${col}21`, baseIndex)
+
       setIV(`${col}22`, descricao)               // Descrição
       setIV(`${col}34`, v(c.url))                // Fonte
 
       // HOMOGENEIZAÇÃO (linhas 24-30) — label escolhido na tab Comparáveis + % correspondente
-      setIV(`${col}24`, v(c.homog_localizacao, 'Semelhante'))
-      setIV(`${pctCol}24`, pctGeneric(c.homog_localizacao))
+      const pctLoc   = pctGeneric(c.homog_localizacao)
+      const pctArea  = areaAdjustment(p.gross_area, c.area_m2)
+      const pctAcab  = pctGeneric(c.homog_acabamentos)
+      const pctConsv = pctGeneric(c.homog_conservacao)
+      const pctCarac = pctGeneric(c.homog_caract_gerais)
+      const pctClass = pctGeneric(c.homog_classe_energetica)
+      const pctTx    = pctTxDesconto(c.homog_tx_desconto)
 
-      const areaAdj = areaAdjustment(p.gross_area, c.area_m2)
-      if (areaAdj !== null) setIV(`${pctCol}25`, areaAdj)   // Área — sem label, só % (auto)
+      setIV(`${col}24`, v(c.homog_localizacao, 'Semelhante'));        setIV(`${pctCol}24`, pctLoc)
+      if (pctArea !== null) setIV(`${pctCol}25`, pctArea)             // Área — sem label, só % (auto)
+      setIV(`${col}26`, v(c.homog_acabamentos, 'Semelhante'));        setIV(`${pctCol}26`, pctAcab)
+      setIV(`${col}27`, v(c.homog_conservacao, 'Semelhante'));        setIV(`${pctCol}27`, pctConsv)
+      setIV(`${col}28`, v(c.homog_caract_gerais, 'Semelhante'));      setIV(`${pctCol}28`, pctCarac)
+      setIV(`${col}29`, v(c.homog_classe_energetica, 'Semelhante')); setIV(`${pctCol}29`, pctClass)
+      setIV(`${col}30`, v(c.homog_tx_desconto, 'Alinhado com Mercado')); setIV(`${pctCol}30`, pctTx)
 
-      setIV(`${col}26`, v(c.homog_acabamentos, 'Semelhante'))
-      setIV(`${pctCol}26`, pctGeneric(c.homog_acabamentos))
-
-      setIV(`${col}27`, v(c.homog_conservacao, 'Semelhante'))
-      setIV(`${pctCol}27`, pctGeneric(c.homog_conservacao))
-
-      setIV(`${col}28`, v(c.homog_caract_gerais, 'Semelhante'))
-      setIV(`${pctCol}28`, pctGeneric(c.homog_caract_gerais))
-
-      setIV(`${col}29`, v(c.homog_classe_energetica, 'Semelhante'))
-      setIV(`${pctCol}29`, pctGeneric(c.homog_classe_energetica))
-
-      setIV(`${col}30`, v(c.homog_tx_desconto, 'Alinhado com Mercado'))
-      setIV(`${pctCol}30`, pctTxDesconto(c.homog_tx_desconto))
+      // ÍNDICE DE VENDA HOMOGENEIZADO (linha 31) = índice base × (1 + soma dos 7 ajustes)
+      if (baseIndex !== null) {
+        const adjustments = [pctLoc, pctArea, pctAcab, pctConsv, pctCarac, pctClass, pctTx]
+        const sumAdj = adjustments.reduce((s: number, a) => s + (a ?? 0), 0)
+        const homogIndex = baseIndex * (1 + sumAdj)
+        setIV(`${col}31`, homogIndex)
+        homogIndices.push({ col, pctCol, value: homogIndex })
+      }
     })
+
+    // ANÁLISE ESTATÍSTICA — OFERTA HOMOGENEIZADA (linha 38) + SANEAMENTO / Critério de Chauvenet (linhas 41-42)
+    if (homogIndices.length >= 2) {
+      const values  = homogIndices.map(h => h.value)
+      const n       = values.length
+      const minV    = Math.min(...values)
+      const maxV    = Math.max(...values)
+      const avg     = values.reduce((a, b) => a + b, 0) / n
+      const med     = median(values)
+      const sd      = stdevP(values)
+
+      setIV('H38', minV)
+      setIV('L38', maxV)
+      setIV('P38', avg)
+      setIV('T38', med)
+      setIV('X38', sd)
+
+      setIV('F41', n)
+      const critical = CHAUVENET_CRITICAL[n]
+      if (critical !== undefined) setIV('F42', critical)
+
+      homogIndices.forEach(({ col, value }) => {
+        const ratio = sd > 0 ? Math.abs(value - avg) / sd : 0
+        setIV(`${col}41`, ratio)
+        if (critical !== undefined) {
+          setIV(`${col}42`, ratio < critical ? 'AMOSTRA VALIDADA' : 'AMOSTRA REJEITADA')
+        }
+      })
+    }
   }
 
   // 14. CONDICIONALISMOS E ADVERTÊNCIAS (linhas diferentes no template Terreno — não mapeado ainda)
