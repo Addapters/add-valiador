@@ -96,15 +96,20 @@ export default function MarketSearch() {
     }
   })
 
-  const medianPricePerM2 = (() => {
+  const avgPricePerM2 = (() => {
     const vals = comps
       .map((c: any) => c.price && c.area_m2 ? parseFloat(c.price) / parseFloat(c.area_m2) : null)
       .filter((v: any): v is number => v !== null)
     if (!vals.length) return null
-    const s = [...vals].sort((a, b) => a - b)
-    const m = Math.floor(s.length / 2)
-    return s.length % 2 !== 0 ? Math.round(s[m]) : Math.round((s[m-1] + s[m]) / 2)
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
   })()
+
+  // Extrai a tipologia (T1, T2, T3...) da descrição/notas se o campo typology estiver vazio
+  function extractTypology(c: any): string {
+    if (c.typology) return c.typology
+    const match = (c.notes || '').match(/T\d+/i)
+    return match ? match[0].toUpperCase() : '—'
+  }
 
   const selectedProp = properties.find((p: any) => p.id === selectedProperty)
 
@@ -189,10 +194,6 @@ export default function MarketSearch() {
                 {['Idealista','Imovirtual','Casa Sapo','ERA','Remax','Outro'].map(v => <option key={v}>{v}</option>)}
               </select>
             </div>
-            <div>
-              <label className="label">Ref. anúncio</label>
-              <input className="input" placeholder="ex: 12345678" value={form.listing_ref} onChange={e => setForm(f => ({...f, listing_ref:e.target.value}))}/>
-            </div>
             <div className="md:col-span-2">
               <label className="label flex items-center gap-1"><LinkIcon size={11}/> Link do anúncio</label>
               <input className="input" placeholder="https://www.idealista.pt/imovel/…" value={form.url} onChange={e => setForm(f => ({...f, url:e.target.value}))}/>
@@ -228,8 +229,8 @@ export default function MarketSearch() {
               <h2 className="text-sm font-semibold text-gray-700">
                 Comparáveis — {selectedProp?.external_ref} {selectedProp?.id_bien ? `· ID ${selectedProp.id_bien}` : ''} {selectedProp?.municipality ? `· ${selectedProp.municipality}` : ''}
               </h2>
-              {medianPricePerM2 && (
-                <span className="text-sm text-gray-600">Mediana: <strong className="text-brand-600">€ {medianPricePerM2}/m²</strong></span>
+              {avgPricePerM2 && (
+                <span className="text-sm text-gray-600">Média: <strong className="text-brand-600">€ {avgPricePerM2}/m²</strong></span>
               )}
             </div>
             {comps.length === 0 ? (
@@ -239,7 +240,7 @@ export default function MarketSearch() {
                 <table className="table-base">
                   <thead>
                     <tr>
-                      <th>Portal</th><th>Ref.</th><th>Link</th><th>Tipologia</th>
+                      <th>Portal</th><th>Link</th><th>Tipologia</th>
                       <th>Área</th><th>Preço</th><th>€/m²</th><th>Notas</th><th></th>
                     </tr>
                   </thead>
@@ -249,7 +250,6 @@ export default function MarketSearch() {
                       return (
                         <tr key={c.id}>
                           <td className="font-medium">{c.portal}</td>
-                          <td className="text-gray-500 text-xs">{c.listing_ref || '—'}</td>
                           <td>
                             {c.url ? (
                               <a href={c.url} target="_blank" rel="noopener noreferrer"
@@ -258,7 +258,7 @@ export default function MarketSearch() {
                               </a>
                             ) : '—'}
                           </td>
-                          <td>{c.typology || '—'}</td>
+                          <td>{extractTypology(c)}</td>
                           <td>{c.area_m2 ? `${c.area_m2} m²` : '—'}</td>
                           <td>{c.price ? formatCurrency(c.price) : '—'}</td>
                           <td className="font-medium text-brand-600">{epm2 ? `€ ${epm2}` : '—'}</td>
