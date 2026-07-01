@@ -27,7 +27,7 @@ const ALIASES: Record<string, string> = {
   'uso_bien':                       'use_type',
   'subuso_bien':                    'use_subtype',
   'estado_bien':                    'property_state',
-  'superficie_adoptada_finca':      'area_m2',
+  'superficie_adoptada_finca':      'area_considerada',
   'superficie_adoptada_garaje':     'area_garage_m2',
   'superficie_adoptada_trastero':   'area_annex_m2',
   'calle':                          'street',
@@ -89,12 +89,12 @@ const ALIASES: Record<string, string> = {
   'lugar':                          'lugar',
 }
 
-const NUMERIC = ['area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2','year_built','fee_amount','prev_valuation_value']
+const NUMERIC = ['area_considerada','area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2','year_built','fee_amount','prev_valuation_value']
 const FIELDS = [
   'external_ref','id_bien','id_registo_predial','id_registo_matricial','fracao',
   'street','number','block','floor_letter','address','parish','municipality','district','postal_code',
   'property_type','property_subtype','use_type','use_subtype','property_state','typology',
-  'area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2',
+  'area_m2','area_considerada','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2',
   'year_built','condition','fee_amount','perito_avaliador',
   'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
   'nuc_risco','data_pedido','tipo_via','escada','ampliacao','lugar','documentacao',
@@ -223,6 +223,12 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
         const tipo    = (p.property_type    || '').toUpperCase().trim()
         const subtipo = (p.property_subtype || '').toUpperCase().trim()
         let activity  = ''
+        // Propaga area_considerada → gross_area e area_m2 se não estiverem preenchidos
+        // (SUPERFICIE_ADOPTADA_FINCA da datatape é a área adoptada = área considerada = ABP para efeitos de avaliação)
+        if (p.area_considerada) {
+          if (!p.gross_area) p.gross_area = p.area_considerada
+          if (!p.area_m2)    p.area_m2    = p.area_considerada
+        }
         const area    = p.area_m2 || p.gross_area || 0
 
         if      (tipo === 'VIVIENDA (PISO)'       || tipo === 'VIVIENDA' || tipo === 'PISO' || tipo === 'ATICO' || tipo === 'DUPLEX' || tipo === 'ESTUDIO') activity = 'Apartamento'
@@ -266,7 +272,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
     'external_ref','id_bien','street','number','block','floor_letter','fracao',
     'address','parish','municipality','district','postal_code',
     'property_type','property_subtype','use_type','use_subtype','property_state',
-    'typology','year_built','condition','area_m2','gross_area','useful_area',
+    'typology','year_built','condition','area_m2','area_considerada','gross_area','useful_area',
     'land_area','area_garage_m2','area_annex_m2','fee_amount',
     'perito_avaliador','id_registo_predial','id_registo_matricial',
     'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
