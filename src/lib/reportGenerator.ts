@@ -436,14 +436,15 @@ export async function generateAbancaReport(
 
     // 7. MÉTODO COMPARATIVO DE MERCADO
     // T116 (Área Privativa) replica sempre a ABP da tab Áreas — não há campo de área próprio
-    // AD116 (Valor total) = ROUND(€/m² × Área, -2), tal como a fórmula original do template
-    // (em vez de um valor escrito directamente, que podia ficar desalinhado da área/€/m² reais)
+    // Y116 = IV-IA!P38 (média homogeneizada da folha IV-IA) — escrito mais abaixo depois de calcular
+    // AD116 (Valor total) = ROUND(€/m² × Área, -2), calculado depois de Y116 estar definido
+    // Por agora escreve Y116 a partir do campo manual se disponível — será sobrescrito pelo IV-IA avg
     set('D116', v(prop.metodo_comp_descricao))
     const area116 = parseFloat(prop.gross_area)
     if (area116 > 0) set('T116', area116)
     const valorM2_116 = parseFloat(prop.metodo_comp_valor_m2)
     if (valorM2_116 > 0) {
-      set('Y116', valorM2_116)                                          // Y116:AC116
+      set('Y116', valorM2_116)                                          // Y116:AC116 (provisório)
       if (area116 > 0) set('AD116', Math.round(valorM2_116 * area116 / 100) * 100) // AD116:AI116
     }
 
@@ -590,12 +591,18 @@ export async function generateAbancaReport(
     set('M98', v(p.year_built))
     set('D98', v(p.ano_licenca_utilizacao))
 
-    // 6. ÁREAS
-    const areaVal = p.area_considerada || p.area_m2 || p.gross_area
-    set('D105', tr(v(p.composicao_imovel, v(p.typology))))
-    set('L105', fmtArea(p.land_area))
-    set('Q105', fmtArea(areaVal))
-    set('T105', fmtArea(p.area_annex_m2))
+    // 6. ÁREAS — por cada imóvel (offset idx)
+    // Standard: headers na linha 104, dados em 105+idx (confirmar no template VRF24jun26)
+    // Multi: headers na linha 308, dados em 309+idx
+    // Coluna D = Área Considerada, L = Terreno, Q = ABP, T = ABD
+    const areasBaseRow = isMulti ? 309 : 105
+    allProps.forEach((prop: any, idx: number) => {
+      const areaVal = prop.area_considerada || prop.gross_area || prop.area_m2
+      if (areaVal)          set(`D${areasBaseRow + idx}`, parseFloat(String(areaVal)))
+      if (prop.land_area)   set(`L${areasBaseRow + idx}`, parseFloat(String(prop.land_area)))
+      if (prop.gross_area)  set(`Q${areasBaseRow + idx}`, parseFloat(String(prop.gross_area)))
+      if (prop.area_annex_m2) set(`T${areasBaseRow + idx}`, parseFloat(String(prop.area_annex_m2)))
+    })
   }
 
   // COMPARÁVEIS — apenas na tab IV-IV (não na folha principal)
@@ -653,6 +660,9 @@ export async function generateAbancaReport(
     return Math.sqrt(variance)
   }
 
+  // Variáveis de homogeneização em scope exterior para serem usadas pela IV-IA e pelo main sheet
+  let homogIndices: { col: string; pctCol: string; value: number }[] = []
+
   const wsIV = wb.getWorksheet('IV - IV')
   if (wsIV) {
     function setIV(ref: string, val: any) {
@@ -665,7 +675,6 @@ export async function generateAbancaReport(
     if (subjectArea > 0) setIV('E13', subjectArea)
 
     // Guarda o índice homogeneizado (linha 31) de cada amostra para a análise estatística seguinte
-    const homogIndices: { col: string; pctCol: string; value: number }[] = []
 
     compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
       const col      = IV_COLS[idx]
@@ -771,38 +780,112 @@ export async function generateAbancaReport(
   // e directamente no Template_Terreno.xlsx.
 
   if (!isTerreno) {
-    // VVR STANDARD/MULTI — t=1, i=5%, d=5%, c=6%
-    // P297 = ROUND(((1-Z299)*(1-P299))/(1+Z298)^P298,4) — confirmado em 002014
+    // VVR STANDARD: P277 (não P297!), params P278/Z278/P279/Z279
+    // VVR MULTI:    P685,              params P686/Z686/P687/Z687
+    // Confirmado directamente nos templates VRF24jun26.xlsx e VRF-multiplos.xlsx
     const vvrCoeff_std = calcVVR(1, 0.05, 0.05, 0.06)  // = 0.8505
-    set('P297', vvrCoeff_std)
-    set('P298', 1)    // t
-    set('Z298', 0.05) // i
-    set('P299', 0.05) // d
-    set('Z299', 0.06) // c
+    const vvrRow   = isMulti ? 685 : 277
+    const paramRow = isMulti ? 686 : 278
+    set(`P${vvrRow}`, vvrCoeff_std)            // coeficiente calculado
+    set(`P${paramRow}`, 1)                     // t = 1 ano
+    set(`Z${paramRow}`, 0.05)                  // i = 5%
+    set(`P${paramRow + 1}`, 0.05)              // d = 5%
+    set(`Z${paramRow + 1}`, 0.06)              // c = 6%
 
-    // Conclusão: J{265+idx} = D{265+idx} × P297, R{265+idx} = D{265+idx}
-    // (D265+idx já foi escrito pelo bloco "16. CONCLUSÃO" acima com valor_mercado do utilizador)
+    // CONCLUSÃO — Valor Terminado
+    // Standard: D265+idx (por imóvel), D268 (total), J=VVR, R=Seguro
+    // Multi:    D639+idx, D659 (total) — confirmado no template multiplos linhas 638/659
+    const concBaseRow   = isMulti ? 639 : 265
+    const concTotalRow  = isMulti ? 659 : 268
+    const concAtuRow    = isMulti ? 663 : 272   // Valor Atual base
+    const concAtuTotal  = isMulti ? 683 : 275   // Valor Atual total
     const nBens = allProps.length
     let totalVM = 0, totalVVR = 0, totalSeg = 0
     for (let idx = 0; idx < nBens; idx++) {
-      const vm = parseFloat(String(ws.getCell(`D${265 + idx}`).value || 0))
+      const prop = allProps[idx]
+      const vm = parseFloat(String(ws.getCell(`D${concBaseRow + idx}`).value || 0))
+              || parseFloat(prop.valor_mercado || 0)
       if (vm > 0) {
+        set(`D${concBaseRow + idx}`, vm)
         const vvr = Math.round(vm * vvrCoeff_std * 100) / 100
-        set(`J${265 + idx}`, vvr)  // VVR = D265+idx × P297
-        set(`R${265 + idx}`, vm)   // Seguro = Valor de Mercado
+        set(`J${concBaseRow + idx}`, vvr)    // J265+idx = D × P277
+        set(`R${concBaseRow + idx}`, vm)     // R265+idx = D (seguro = valor mercado)
         totalVM  += vm
         totalVVR += vvr
         totalSeg += vm
       }
     }
-    // Totais (linha 272 no standard, confirmado pelo STANDARD_BASE_ROWS[23]=285)
-    // Nota: no template standard com múltiplos bens a linha de total está em 265+nBens
-    // (abaixo do último bem). Escrevemos em D272/J272/R272 que é o que o template usa.
     if (totalVM > 0) {
-      set('D272', totalVM)
-      set('J272', Math.round(totalVVR * 100) / 100)
-      set('R272', totalSeg)
+      set(`D${concTotalRow}`, totalVM)
+      set(`J${concTotalRow}`, Math.round(totalVVR * 100) / 100)
+      set(`R${concTotalRow}`, totalSeg)
     }
+    // Valor Atual (por imóvel + total)
+    let totalVMAt = 0, totalVVRAt = 0
+    for (let idx = 0; idx < nBens; idx++) {
+      const prop = allProps[idx]
+      const vmat = parseFloat(String(ws.getCell(`D${concAtuRow + idx}`).value || 0))
+               || parseFloat(prop.valor_mercado_atual || 0)
+      if (vmat > 0) {
+        set(`D${concAtuRow + idx}`, vmat)
+        const vvrat = Math.round(vmat * vvrCoeff_std * 100) / 100
+        set(`J${concAtuRow + idx}`, vvrat)
+        totalVMAt  += vmat
+        totalVVRAt += vvrat
+      }
+    }
+    if (totalVMAt > 0) {
+      set(`D${concAtuTotal}`, totalVMAt)
+      set(`J${concAtuTotal}`, Math.round(totalVVRAt * 100) / 100)
+    }
+
+    // COMPARATIVO — AD{116/337}+idx = ROUND(Y×T,-2); total AD{119/340} = SUM
+    // Standard: base 116, total 119 (confirmar no VRF24jun26: linhas 116-118 + 119=SUM)
+    // Multi:    base 337, total 340 (confirmar no multiplos: linhas 337-339 + 340=SUM)
+    const compBaseRow  = isMulti ? 337 : 116
+    const compTotalRow = isMulti ? 340 : 119
+    let compTotal = 0
+    for (let idx = 0; idx < nBens; idx++) {
+      const prop = allProps[idx]
+      const abp = parseFloat(prop.gross_area || prop.area_considerada || prop.area_m2 || 0)
+      // Coluna T = ABP (Área); Coluna Y = valor €/m² (escritos noutros campos da tab Métodos)
+      if (abp > 0) set(`T${compBaseRow + idx}`, abp)
+      const yVal = parseFloat(String(ws.getCell(`Y${compBaseRow + idx}`).value || 0))
+      if (yVal > 0 && abp > 0) {
+        const total = Math.round(yVal * abp / 100) * 100
+        set(`AD${compBaseRow + idx}`, total)
+        compTotal += total
+      }
+    }
+    if (compTotal > 0) set(`AD${compTotalRow}`, compTotal)
+
+    // CERTIFICAÇÃO — dados na linha ABAIXO do cabeçalho
+    // Standard: cabeçalho B303, dados B304 — F8 = +V304 (feeds data do relatório)
+    // Multi:    cabeçalho B745, dados B746 — F8 = +V746
+    const certDataRow = isMulti ? 746 : 304
+    set(`K${certDataRow}`, fmtDate(p.data_pedido_relatorio || p.data_pedido))
+    set(`O${certDataRow}`, fmtDate(p.data_visita || p.visit_date))
+    set(`V${certDataRow}`, fmtDate(p.data_conclusao || p.data_relatorio))
+    set(`AC${certDataRow}`, fmtDate(p.prev_valuation_date))
+
+    // Empresa / Peritos — standard linha 306, multi linha 748
+    const certNomRow = isMulti ? 748 : 306
+    set(`F${certNomRow}`,     v(p.empresa_nome))
+    set(`F${certNomRow + 1}`, v(p.empresa_nif))
+    set(`F${certNomRow + 2}`, v(p.empresa_cmvm))
+    set(`F${certNomRow + 3}`, v(p.empresa_apolice))
+    set(`F${certNomRow + 4}`, fmtDate(p.empresa_data_validade))
+    set(`F${certNomRow + 5}`, v(p.empresa_seguradora))
+    set(`R${certNomRow}`,     v(p.pac_nome))
+    set(`R${certNomRow + 2}`, v(p.pac_cmvm))
+    set(`R${certNomRow + 3}`, v(p.pac_apolice))
+    set(`R${certNomRow + 4}`, fmtDate(p.pac_data_validade))
+    set(`R${certNomRow + 5}`, v(p.pac_seguradora))
+    set(`Y${certNomRow}`,     v(p.perito_avaliador))
+    set(`Y${certNomRow + 2}`, v(p.perito_cmvm))
+    set(`Y${certNomRow + 3}`, v(p.nr_apolice))
+    set(`Y${certNomRow + 4}`, fmtDate(p.data_validade_seguro))
+    set(`Y${certNomRow + 5}`, v(p.seguradora))
   }
 
   if (isTerreno) {
@@ -836,20 +919,49 @@ export async function generateAbancaReport(
   }
   // ──────────────────────────────────────────────────────────────────────────────────────────
 
-  // 16. CONCLUSÃO DA AVALIAÇÃO (terreno já preenchido em fillTerreno, linhas 276/283)
-  if (!isTerreno) {
-    if (p.valor_mercado)            set('D265', Number(p.valor_mercado))
-    if (p.valor_venda_rapida)       set('J265', Number(p.valor_venda_rapida))
-    if (p.valor_seguro)             set('R265', Number(p.valor_seguro))
-    if (p.valor_mercado_atual)      set('D272', Number(p.valor_mercado_atual))
-    if (p.valor_venda_rapida_atual) set('J272', Number(p.valor_venda_rapida_atual))
-  }
+  // TAB IV-IA — preenchida em paralelo com IV-IV (mesma estrutura, mesmos comparáveis)
+  // Necessário para terreno: Y116 = IV-IA!P38 (média homogeneizada da folha IV-IA)
+  // Nos outros templates, IV-IA fica vazia (não referenciada pela folha principal)
+  if (isTerreno && homogIndices.length >= 2) {
+    const wsIA = wb.getWorksheet('IV - IA')
+    if (wsIA) {
+      function setIA(ref: string, val: any) {
+        if (val === null || val === undefined || val === '') return
+        wsIA.getCell(ref).value = val
+      }
+      // Escreve E13 (ABP), dados de cada comparável e estatísticas — mesma lógica do IV-IV
+      const subjectArea_ia = parseFloat(p.gross_area)
+      if (subjectArea_ia > 0) setIA('E13', subjectArea_ia)
+      compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
+        const col = IV_COLS[idx]
+        const price = parseFloat(c.price || 0), area = parseFloat(c.area_m2 || 0)
+        setIA(`${col}9`,  v(c.address))
+        if (area > 0) setIA(`${col}13`, area)
+        if (price > 0) setIA(`${col}14`, price)
+        const baseIdx = (price > 0 && area > 0) ? price / area : null
+        if (baseIdx) { setIA(`${col}15`, baseIdx); setIA(`${col}21`, baseIdx) }
+        setIA(`${col}24`, v(c.homog_localizacao, 'Semelhante'))
+        // Índice homogeneizado — usa o mesmo valor calculado para IV-IV
+        const hEntry = homogIndices[idx]
+        if (hEntry) setIA(`${col}31`, hEntry.value)
+      })
+      // Estatísticas IV-IA — mesmas do IV-IV (usadas por Y116 via IV-IA!P38)
+      const iviaValues = homogIndices.map((h: any) => h.value)
+      const iviaAvg = iviaValues.reduce((a: number, b: number) => a + b, 0) / iviaValues.length
+      setIA('H38', Math.min(...iviaValues))
+      setIA('L38', Math.max(...iviaValues))
+      setIA('P38', iviaAvg)   // ← Y116 da folha principal referencia esta célula
+      setIA('T38', median(iviaValues))
+      setIA('X38', stdevP(iviaValues))
 
-  // 18. CERTIFICAÇÃO E ASSINATURA (terreno já preenchido em fillTerreno, linha 315)
-  if (!isTerreno) {
-    set('K303',  fmtDate(p.data_pedido_relatorio || p.data_pedido))
-    set('O303',  fmtDate(p.data_visita || p.visit_date))
-    set('V303',  fmtDate(p.data_conclusao || p.data_relatorio))
+      // Actualiza Y116 e AD116 na folha principal com o valor real (IV-IA!P38)
+      // sobrescrevendo o valor provisório escrito em fillTerreno
+      const area116_final = parseFloat(p.gross_area)
+      if (area116_final > 0 && iviaAvg > 0) {
+        set('Y116', iviaAvg)
+        set('AD116', Math.round(iviaAvg * area116_final / 100) * 100)
+      }
+    }
   }
 
   // IMAGEM DO MAPA
