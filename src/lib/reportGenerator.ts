@@ -354,7 +354,7 @@ export async function generateAbancaReport(
   function fillTerreno(prop: any) {
     const id = v(prop.id_bien)
     // Linhas onde a coluna B precisa do Id (substituem as fórmulas "=+B19" removidas na limpeza)
-    const idRows = [19, 25, 31, 38, 44, 50, 56, 62, 68, 86, 92, 98, 105, 116, 131, 137, 144, 158, 163, 170, 178, 183, 189, 195, 218, 235, 276, 283, 296, 302]
+    const idRows = [19, 25, 31, 38, 44, 50, 56, 62, 68, 86, 92, 98, 105, 116, 122, 131, 137, 144, 158, 163, 170, 178, 183, 189, 195, 218, 235, 276, 283, 296, 302]
     for (const r of idRows) set(`B${r}`, id)
 
     // 2. MORADA
@@ -435,10 +435,17 @@ export async function generateAbancaReport(
     set('T105', fmtArea(prop.area_annex_m2))
 
     // 7. MÉTODO COMPARATIVO DE MERCADO
+    // T116 (Área Privativa) replica sempre a ABP da tab Áreas — não há campo de área próprio
+    // AD116 (Valor total) = ROUND(€/m² × Área, -2), tal como a fórmula original do template
+    // (em vez de um valor escrito directamente, que podia ficar desalinhado da área/€/m² reais)
     set('D116', v(prop.metodo_comp_descricao))
-    set('T116', fmtArea(prop.metodo_comp_area))
-    if (prop.metodo_comp_valor_m2)    set('Y116', Number(prop.metodo_comp_valor_m2))   // Y116:AC116
-    if (prop.metodo_comp_valor_total) set('AD116', Number(prop.metodo_comp_valor_total)) // AD116:AI116
+    const area116 = parseFloat(prop.gross_area)
+    if (area116 > 0) set('T116', area116)
+    const valorM2_116 = parseFloat(prop.metodo_comp_valor_m2)
+    if (valorM2_116 > 0) {
+      set('Y116', valorM2_116)                                          // Y116:AC116
+      if (area116 > 0) set('AD116', Math.round(valorM2_116 * area116 / 100) * 100) // AD116:AI116
+    }
 
     // Valor de Renda Efetiva
     set('D137', v(prop.renda_ef_descricao))
@@ -503,6 +510,30 @@ export async function generateAbancaReport(
     set('AC321', fmtDate(prop.data_validade_seguro))
     set('AC322', v(prop.seguradora))
   }
+
+  // ─── VALORES DERIVADOS DE FÓRMULAS (confirmados nos 4 relatórios fechados reais) ─────────
+  //
+  // HELPER: adiciona N meses a uma data ISO (substitui EDATE do Excel)
+  function addMonths(isoDate: string, months: number): Date {
+    const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number)
+    return new Date(y, m - 1 + months, d)
+  }
+  // HELPER: calcula o coeficiente VVR — ROUND(((1-c)*(1-d))/(1+i)^t, 4)
+  function calcVVR(t: number, i: number, d: number, c: number): number {
+    return Math.round(((1 - c) * (1 - d)) / Math.pow(1 + i, t) * 10000) / 10000
+  }
+
+  // 1. CABEÇALHO — O3=F8, V3=F10, F9=EDATE(F8,6), X11=F10
+  //    Confirmado igual nos 4 relatórios fechados. Escrevemos aqui porque não dependem de fills.
+  const reportRef  = v(p.nr_relatorio, v(p.external_ref, v(p.ref, '')))
+  const reportDateStr = (p.data_relatorio || p.data_conclusao || new Date().toISOString()).slice(0, 10)
+  set('O3',  fmtDate(reportDateStr))  // Data no cabeçalho (= F8)
+  set('V3',  reportRef)               // Nº Relatório no cabeçalho (= F10)
+  set('X11', reportRef)               // Ref.ª Avaliador (= F10)
+  try {
+    // F9 como objecto Date para que o Excel o formate como data (EDATE(F8,6))
+    set('F9', addMonths(reportDateStr, 6))
+  } catch { /* ignorar datas inválidas */ }
 
   // 1. IDENTIFICAÇÃO
   set('F8',  fmtDate(p.data_relatorio || new Date().toISOString()))
@@ -716,11 +747,94 @@ export async function generateAbancaReport(
           setIV(`${col}42`, ratio < critical ? 'AMOSTRA VALIDADA' : 'AMOSTRA REJEITADA')
         }
       })
+
+      // Folha principal, linha 122 "V. Potencial de Mercado" (só no Terreno) — usa a mesma
+      // estrutura da linha 116, mas com o €/m² médio homogeneizado (equivalente a 'IV - IV'!P38
+      // no template original) em vez de um valor digitado manualmente
+      if (isTerreno) {
+        const area122 = parseFloat(p.gross_area)
+        if (area122 > 0) {
+          set('T122', area122)        // T122:X122 — Área Privativa (m2), mesma ABP da linha 116
+          set('Y122', avg)            // Y122:AC122 — Valor (€/m2) = média homogeneizada do IV-IV
+          set('AD122', Math.round(avg * area122 / 100) * 100) // AD122:AI122 — Valor total
+        }
+      }
     }
   }
 
   // 14. CONDICIONALISMOS E ADVERTÊNCIAS (linhas diferentes no template Terreno — não mapeado ainda)
   if (!isTerreno) set('B248', v(p.prev_valuation_conditions, 'Nenhum'))
+
+  // ─── FÓRMULAS CALCULADAS — correm DEPOIS de fillTerreno/fillBlock para ler valores escritos ──
+  // Substituem fórmulas removidas por cleanSharedFormulas.
+  // Referências de célula confirmadas nos 4 relatórios fechados (002014/002076/002189/002190)
+  // e directamente no Template_Terreno.xlsx.
+
+  if (!isTerreno) {
+    // VVR STANDARD/MULTI — t=1, i=5%, d=5%, c=6%
+    // P297 = ROUND(((1-Z299)*(1-P299))/(1+Z298)^P298,4) — confirmado em 002014
+    const vvrCoeff_std = calcVVR(1, 0.05, 0.05, 0.06)  // = 0.8505
+    set('P297', vvrCoeff_std)
+    set('P298', 1)    // t
+    set('Z298', 0.05) // i
+    set('P299', 0.05) // d
+    set('Z299', 0.06) // c
+
+    // Conclusão: J{265+idx} = D{265+idx} × P297, R{265+idx} = D{265+idx}
+    // (D265+idx já foi escrito pelo bloco "16. CONCLUSÃO" acima com valor_mercado do utilizador)
+    const nBens = allProps.length
+    let totalVM = 0, totalVVR = 0, totalSeg = 0
+    for (let idx = 0; idx < nBens; idx++) {
+      const vm = parseFloat(String(ws.getCell(`D${265 + idx}`).value || 0))
+      if (vm > 0) {
+        const vvr = Math.round(vm * vvrCoeff_std * 100) / 100
+        set(`J${265 + idx}`, vvr)  // VVR = D265+idx × P297
+        set(`R${265 + idx}`, vm)   // Seguro = Valor de Mercado
+        totalVM  += vm
+        totalVVR += vvr
+        totalSeg += vm
+      }
+    }
+    // Totais (linha 272 no standard, confirmado pelo STANDARD_BASE_ROWS[23]=285)
+    // Nota: no template standard com múltiplos bens a linha de total está em 265+nBens
+    // (abaixo do último bem). Escrevemos em D272/J272/R272 que é o que o template usa.
+    if (totalVM > 0) {
+      set('D272', totalVM)
+      set('J272', Math.round(totalVVR * 100) / 100)
+      set('R272', totalSeg)
+    }
+  }
+
+  if (isTerreno) {
+    // VVR TERRENO — t=2, d=10%, c=5×1,23%=6,15%, i=5% (default; VM-DCF usa taxa de capitalização)
+    // P288 = ROUND(((1-Z290)*(1-P290))/(1+Z289)^P289, 4) — confirmado em Template_Terreno.xlsx
+    const vvrCoeff_t = calcVVR(2, 0.05, 0.10, 5 * 0.0123)
+    set('P288', vvrCoeff_t)
+    set('P289', 2)         // t = 2 anos
+    set('Z289', 0.05)      // i = 5% (default)
+    set('P290', 0.10)      // d = 10%
+    set('Z290', 5 * 0.0123) // c = 5×1,23%
+
+    // J276 = D276 × P288, R276 = D276 (Seguro = Valor de Mercado)
+    // D276 foi escrito por fillTerreno a partir de prop.valor_mercado
+    const vmTerminado = parseFloat(String(ws.getCell('D276').value || 0))
+    if (vmTerminado > 0) {
+      set('J276', Math.round(vmTerminado * vvrCoeff_t * 100) / 100)
+      set('R276', vmTerminado)
+    }
+
+    // J283 = D283 × P288, D286 = D283, J286 = J283 (total = único bem)
+    // D283 foi escrito por fillTerreno a partir de prop.valor_mercado_atual (se disponível)
+    const vmAtual = parseFloat(String(ws.getCell('D283').value || 0))
+      || parseFloat(p.valor_mercado_atual || 0)
+    if (vmAtual > 0) {
+      set('D283', vmAtual)
+      set('J283', Math.round(vmAtual * vvrCoeff_t * 100) / 100)
+      set('D286', vmAtual)
+      set('J286', Math.round(vmAtual * vvrCoeff_t * 100) / 100)
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────────────────────
 
   // 16. CONCLUSÃO DA AVALIAÇÃO (terreno já preenchido em fillTerreno, linhas 276/283)
   if (!isTerreno) {
