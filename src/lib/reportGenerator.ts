@@ -233,25 +233,79 @@ export async function generateAbancaReport(
   // Pré-processa para remover TODAS as fórmulas (incluindo shared) que o ExcelJS não suporta bem
   // Não precisamos de fórmulas calculadas no resultado final, apenas valores estáticos
   async function cleanSharedFormulas(buf: ArrayBuffer): Promise<ArrayBuffer> {
+    // Expande fórmulas partilhadas (shared formulas) em fórmulas individuais.
+    // O ExcelJS não suporta slaves sem master visível → expandimos antes de carregar.
+    //
+    // BUG ANTERIOR: split por </c> agrupava múltiplas células num chunk e o regex
+    // encontrava r="D118" (célula vazia adjacente) em vez de r="AD118" (célula correcta).
+    // Resultado: dc=-26 → coluna Y tornava-se A (Y-26=1=A).
+    //
+    // FIX: usar regex que captura col+row directamente do mesmo elemento <c> que contém
+    // a fórmula slave, sem split.
+
+    const colToNum = (col: string): number =>
+      [...col].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0)
+    const numToCol = (n: number): string => {
+      let col = ''
+      while (n > 0) { const r = (n - 1) % 26; col = String.fromCharCode(65 + r) + col; n = Math.floor((n - 1) / 26) }
+      return col
+    }
+    const adjustFormula = (formula: string, dc: number, dr: number): string =>
+      formula.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)/g, (_, ac, col, ar, row) =>
+        ac + (ac ? col : numToCol(Math.max(1, colToNum(col) + dc))) +
+        ar + (ar ? row   : String(Math.max(1, parseInt(row) + dr))))
+
     try {
       const JSZip = (await import('jszip')).default
-      const zip = await JSZip.loadAsync(buf)
+      const zip   = await JSZip.loadAsync(buf)
       const sheetFiles = Object.keys(zip.files).filter(f => /xl\/worksheets\/sheet\d+\.xml/.test(f))
+
       for (const sf of sheetFiles) {
         let xml: string = await zip.files[sf].async('string')
-        // ORDEM CRÍTICA: remover primeiro as tags <f .../> auto-fechadas (usadas em
-        // fórmulas partilhadas, ex: <f t="shared" si="2"/>). Se a regex de tags com
-        // conteúdo correr primeiro, ao encontrar uma <f .../> auto-fechada ela procura
-        // o próximo </f> — que pode estar várias células/linhas depois — e apaga tudo
-        // pelo meio (linhas, valores, fronteiras de célula). Foi isto que corrompeu o
-        // relatório de Terreno (folha "VM - DCF" tem fórmulas partilhadas em quantidade).
-        xml = xml.replace(/<f[^>]*\/>/g, '')
-        xml = xml.replace(/<f[^>]*>[\s\S]*?<\/f>/g, '')
-        // Remove valores de erro em cache deixados por fórmulas removidas
-        // (#DIV/0!, #REF!, etc.) — ao gravar, o ExcelJS interpretava mal estas células
-        // e chegava a escrever literalmente "NaN" nalgumas, corrompendo o ficheiro.
+
+        // Passo 1 — Recolher masters: <c r="COL+ROW" ...><f t="shared" si="N" ref="...">formula</f>
+        const masters = new Map<string, { col: string; row: number; formula: string }>()
+        for (const m of xml.matchAll(/<c\s+r="([A-Z]+)(\d+)"[^>]*><f\b([^>]*)>([^<]+)<\/f>/g)) {
+          const fAttrs = m[3]
+          if (!fAttrs.includes('t="shared"')) continue
+          const siM = fAttrs.match(/\bsi="(\d+)"/)
+          if (!siM) continue
+          if (!masters.has(siM[1])) {
+            masters.set(siM[1], { col: m[1], row: parseInt(m[2]), formula: m[4] })
+          }
+        }
+
+        // Passo 2 — Expandir slaves: <c r="COL+ROW" ATTRS>INNER<f t="shared" si="N"/>
+        // O regex captura col+row do mesmo <c> que contém o slave → sem ambiguidade.
+        xml = xml.replace(
+          /<c\s+r="([A-Z]+)(\d+)"([^>]*)>([^<]*)<f\b([^>]*)\/>/g,
+          (full, col, row, cAttrs, inner, fAttrs) => {
+            if (!fAttrs.includes('t="shared"')) return full   // não é shared slave
+            const siM = fAttrs.match(/\bsi="(\d+)"/)
+            if (!siM) return `<c r="${col}${row}"${cAttrs}>${inner}`
+            const master = masters.get(siM[1])
+            if (!master) return `<c r="${col}${row}"${cAttrs}>${inner}`
+            const dc = colToNum(col) - colToNum(master.col)
+            const dr = parseInt(row) - master.row
+            return `<c r="${col}${row}"${cAttrs}>${inner}<f>${adjustFormula(master.formula, dc, dr)}</f>`
+          }
+        )
+
+        // Passo 3 — Converter masters shared em fórmulas regulares (remover t/si/ref)
+        xml = xml.replace(/<f\b([^>]*)>/g, (m, attrs) => {
+          if (!attrs.includes('t="shared"')) return m
+          const cleaned = attrs
+            .replace(/\s*t="shared"\s*/g, ' ')
+            .replace(/\s*si="\d+"\s*/g, ' ')
+            .replace(/\s*ref="[^"]*"\s*/g, ' ')
+            .replace(/\s+/g, ' ').trim()
+          return `<f${cleaned ? ' ' + cleaned : ''}>`
+        })
+
+        // Passo 4 — Remover valores de erro em cache (#DIV/0!, #REF!, etc.)
         xml = xml.replace(/<v>#(DIV\/0!|REF!|N\/A|NAME\?|NULL!|NUM!|VALUE!)<\/v>/g, '')
         xml = xml.replace(/\st="e"/g, '')
+
         zip.file(sf, xml)
       }
       return await zip.generateAsync({ type: 'arraybuffer' })
@@ -546,25 +600,16 @@ export async function generateAbancaReport(
     return Math.round(((1 - c) * (1 - d)) / Math.pow(1 + i, t) * 10000) / 10000
   }
 
-  // 1. CABEÇALHO — O3=F8, V3=F10, F9=EDATE(F8,6), X11=F10
-  //    Confirmado igual nos 4 relatórios fechados. Escrevemos aqui porque não dependem de fills.
-  const reportRef  = v(p.nr_relatorio, v(p.external_ref, v(p.ref, '')))
-  const reportDateStr = (p.data_relatorio || p.data_conclusao || new Date().toISOString()).slice(0, 10)
-  set('O3',  fmtDate(reportDateStr))  // Data no cabeçalho (= F8)
-  set('V3',  reportRef)               // Nº Relatório no cabeçalho (= F10)
-  set('X11', reportRef)               // Ref.ª Avaliador (= F10)
-  try {
-    // F9 como objecto Date para que o Excel o formate como data (EDATE(F8,6))
-    set('F9', addMonths(reportDateStr, 6))
-  } catch { /* ignorar datas inválidas */ }
-
-  // 1. IDENTIFICAÇÃO
-  set('F8',  fmtDate(p.data_relatorio || new Date().toISOString()))
-  set('F10', v(p.nr_relatorio, v(p.external_ref, v(p.ref))))  // Relatório N.º = Referência
+  // 1. CABEÇALHO
+  // O3=IF(F8,"",F8), V3=+F10, F9=EDATE(F8,6) são fórmulas preservadas no template — NÃO escrever.
+  // F8=+V304/V746/V315 também é fórmula — em vez de escrever F8 directamente, escrevemos
+  // na célula de data de conclusão que alimenta F8 (na secção de certificação mais abaixo).
+  // 1. IDENTIFICAÇÃO — células de input (não são fórmulas)
+  const reportRef = v(p.nr_relatorio, v(p.external_ref, v(p.ref, '')))
+  set('F10', reportRef)  // Relatório N.º — alimenta V3=+F10 (fórmula preservada)
   set('X9',  v(p.tipo_servico, 'Avaliação'))
   set('X10', v(p.finalidade, 'Adjudicado sem visita interior'))
-  // Ref. Avaliador (X11) — não preencher por agora
-  if (!isTerreno) set('D101', v(p.banco))   // Banco (célula não existe no template Terreno)
+  if (!isTerreno) set('D101', v(p.banco))
 
   // Id e IdRel — removido mapeamento automático (não preencher estas células)
 
@@ -796,154 +841,8 @@ export async function generateAbancaReport(
   // 14. CONDICIONALISMOS E ADVERTÊNCIAS (linhas diferentes no template Terreno — não mapeado ainda)
   if (!isTerreno) set('B248', v(p.prev_valuation_conditions, 'Nenhum'))
 
-  // ─── FÓRMULAS CALCULADAS — correm DEPOIS de fillTerreno/fillBlock para ler valores escritos ──
-  // Substituem fórmulas removidas por cleanSharedFormulas.
-  // Referências de célula confirmadas nos 4 relatórios fechados (002014/002076/002189/002190)
-  // e directamente no Template_Terreno.xlsx.
 
-  if (!isTerreno) {
-    // VVR STANDARD: P277 (não P297!), params P278/Z278/P279/Z279
-    // VVR MULTI:    P685,              params P686/Z686/P687/Z687
-    // Confirmado directamente nos templates VRF24jun26.xlsx e VRF-multiplos.xlsx
-    const vvrCoeff_std = calcVVR(1, 0.05, 0.05, 0.06)  // = 0.8505
-    const vvrRow   = isMulti ? 685 : 277
-    const paramRow = isMulti ? 686 : 278
-    set(`P${vvrRow}`, vvrCoeff_std)            // coeficiente calculado
-    set(`P${paramRow}`, 1)                     // t = 1 ano
-    set(`Z${paramRow}`, 0.05)                  // i = 5%
-    set(`P${paramRow + 1}`, 0.05)              // d = 5%
-    set(`Z${paramRow + 1}`, 0.06)              // c = 6%
-
-    // CONCLUSÃO — Valor Terminado
-    // Standard: D265+idx (por imóvel), D268 (total), J=VVR, R=Seguro
-    // Multi:    D639+idx, D659 (total) — confirmado no template multiplos linhas 638/659
-    const concBaseRow   = isMulti ? 639 : 265
-    const concTotalRow  = isMulti ? 659 : 268
-    const concAtuRow    = isMulti ? 663 : 272   // Valor Atual base
-    const concAtuTotal  = isMulti ? 683 : 275   // Valor Atual total
-    const nBens = allProps.length
-    let totalVM = 0, totalVVR = 0, totalSeg = 0
-    for (let idx = 0; idx < nBens; idx++) {
-      const prop = allProps[idx]
-      const vm = parseFloat(String(ws.getCell(`D${concBaseRow + idx}`).value || 0))
-              || parseFloat(prop.valor_mercado || 0)
-      if (vm > 0) {
-        set(`D${concBaseRow + idx}`, vm)
-        const vvr = Math.round(vm * vvrCoeff_std * 100) / 100
-        set(`J${concBaseRow + idx}`, vvr)    // J265+idx = D × P277
-        set(`R${concBaseRow + idx}`, vm)     // R265+idx = D (seguro = valor mercado)
-        totalVM  += vm
-        totalVVR += vvr
-        totalSeg += vm
-      }
-    }
-    if (totalVM > 0) {
-      set(`D${concTotalRow}`, totalVM)
-      set(`J${concTotalRow}`, Math.round(totalVVR * 100) / 100)
-      set(`R${concTotalRow}`, totalSeg)
-    }
-    // Valor Atual (por imóvel + total)
-    let totalVMAt = 0, totalVVRAt = 0
-    for (let idx = 0; idx < nBens; idx++) {
-      const prop = allProps[idx]
-      const vmat = parseFloat(String(ws.getCell(`D${concAtuRow + idx}`).value || 0))
-               || parseFloat(prop.valor_mercado_atual || 0)
-      if (vmat > 0) {
-        set(`D${concAtuRow + idx}`, vmat)
-        const vvrat = Math.round(vmat * vvrCoeff_std * 100) / 100
-        set(`J${concAtuRow + idx}`, vvrat)
-        totalVMAt  += vmat
-        totalVVRAt += vvrat
-      }
-    }
-    if (totalVMAt > 0) {
-      set(`D${concAtuTotal}`, totalVMAt)
-      set(`J${concAtuTotal}`, Math.round(totalVVRAt * 100) / 100)
-    }
-
-    // COMPARATIVO — AD{116/337}+idx = ROUND(Y×T,-2); total AD{119/340} = SUM
-    // Standard: base 116, total 119 (confirmar no VRF24jun26: linhas 116-118 + 119=SUM)
-    // Multi:    base 337, total 340 (confirmar no multiplos: linhas 337-339 + 340=SUM)
-    const compBaseRow  = isMulti ? 337 : 116
-    const compTotalRow = isMulti ? 340 : 119
-    let compTotal = 0
-    for (let idx = 0; idx < nBens; idx++) {
-      const prop = allProps[idx]
-      const abp = parseFloat(prop.gross_area || prop.area_considerada || prop.area_m2 || 0)
-      // Coluna T = ABP (Área); Coluna Y = valor €/m² (escritos noutros campos da tab Métodos)
-      if (abp > 0) set(`T${compBaseRow + idx}`, abp)
-      const yVal = parseFloat(String(ws.getCell(`Y${compBaseRow + idx}`).value || 0))
-      if (yVal > 0 && abp > 0) {
-        const total = Math.round(yVal * abp / 100) * 100
-        set(`AD${compBaseRow + idx}`, total)
-        compTotal += total
-      }
-    }
-    if (compTotal > 0) set(`AD${compTotalRow}`, compTotal)
-
-    // CERTIFICAÇÃO — dados na linha ABAIXO do cabeçalho
-    // Standard: cabeçalho B303, dados B304 — F8 = +V304 (feeds data do relatório)
-    // Multi:    cabeçalho B745, dados B746 — F8 = +V746
-    const certDataRow = isMulti ? 746 : 304
-    set(`K${certDataRow}`, fmtDate(p.data_pedido_relatorio || p.data_pedido))
-    set(`O${certDataRow}`, fmtDate(p.data_visita || p.visit_date))
-    set(`V${certDataRow}`, fmtDate(p.data_conclusao || p.data_relatorio))
-    set(`AC${certDataRow}`, fmtDate(p.prev_valuation_date))
-
-    // Empresa / Peritos — standard linha 306, multi linha 748
-    const certNomRow = isMulti ? 748 : 306
-    set(`F${certNomRow}`,     v(p.empresa_nome))
-    set(`F${certNomRow + 1}`, v(p.empresa_nif))
-    set(`F${certNomRow + 2}`, v(p.empresa_cmvm))
-    set(`F${certNomRow + 3}`, v(p.empresa_apolice))
-    set(`F${certNomRow + 4}`, fmtDate(p.empresa_data_validade))
-    set(`F${certNomRow + 5}`, v(p.empresa_seguradora))
-    set(`R${certNomRow}`,     v(p.pac_nome))
-    set(`R${certNomRow + 2}`, v(p.pac_cmvm))
-    set(`R${certNomRow + 3}`, v(p.pac_apolice))
-    set(`R${certNomRow + 4}`, fmtDate(p.pac_data_validade))
-    set(`R${certNomRow + 5}`, v(p.pac_seguradora))
-    set(`Y${certNomRow}`,     v(p.perito_avaliador))
-    set(`Y${certNomRow + 2}`, v(p.perito_cmvm))
-    set(`Y${certNomRow + 3}`, v(p.nr_apolice))
-    set(`Y${certNomRow + 4}`, fmtDate(p.data_validade_seguro))
-    set(`Y${certNomRow + 5}`, v(p.seguradora))
-  }
-
-  if (isTerreno) {
-    // VVR TERRENO — t=2, d=10%, c=5×1,23%=6,15%, i=5% (default; VM-DCF usa taxa de capitalização)
-    // P288 = ROUND(((1-Z290)*(1-P290))/(1+Z289)^P289, 4) — confirmado em Template_Terreno.xlsx
-    const vvrCoeff_t = calcVVR(2, 0.05, 0.10, 5 * 0.0123)
-    set('P288', vvrCoeff_t)
-    set('P289', 2)         // t = 2 anos
-    set('Z289', 0.05)      // i = 5% (default)
-    set('P290', 0.10)      // d = 10%
-    set('Z290', 5 * 0.0123) // c = 5×1,23%
-
-    // J276 = D276 × P288, R276 = D276 (Seguro = Valor de Mercado)
-    // D276 foi escrito por fillTerreno a partir de prop.valor_mercado
-    const vmTerminado = parseFloat(String(ws.getCell('D276').value || 0))
-    if (vmTerminado > 0) {
-      set('J276', Math.round(vmTerminado * vvrCoeff_t * 100) / 100)
-      set('R276', vmTerminado)
-    }
-
-    // J283 = D283 × P288, D286 = D283, J286 = J283 (total = único bem)
-    // D283 foi escrito por fillTerreno a partir de prop.valor_mercado_atual (se disponível)
-    const vmAtual = parseFloat(String(ws.getCell('D283').value || 0))
-      || parseFloat(p.valor_mercado_atual || 0)
-    if (vmAtual > 0) {
-      set('D283', vmAtual)
-      set('J283', Math.round(vmAtual * vvrCoeff_t * 100) / 100)
-      set('D286', vmAtual)
-      set('J286', Math.round(vmAtual * vvrCoeff_t * 100) / 100)
-    }
-  }
-  // ──────────────────────────────────────────────────────────────────────────────────────────
-
-  // TAB IV-IA — preenchida em paralelo com IV-IV (mesma estrutura, mesmos comparáveis)
-  // Necessário para terreno: Y116 = IV-IA!P38 (média homogeneizada da folha IV-IA)
-  // Nos outros templates, IV-IA fica vazia (não referenciada pela folha principal)
+  // TAB IV-IA — preenchida para terreno (Y116 = IV-IA!P38, média homogeneizada da folha IV-IA)
   if (isTerreno && homogIndices.length >= 2) {
     const wsIA = wb.getWorksheet('IV - IA')
     if (wsIA) {
@@ -951,7 +850,6 @@ export async function generateAbancaReport(
         if (val === null || val === undefined || val === '') return
         wsIA.getCell(ref).value = val
       }
-      // Escreve E13 (ABP), dados de cada comparável e estatísticas — mesma lógica do IV-IV
       const subjectArea_ia = parseFloat(p.gross_area)
       if (subjectArea_ia > 0) setIA('E13', subjectArea_ia)
       compsToUse.slice(0, 5).forEach((c: any, idx: number) => {
@@ -963,21 +861,16 @@ export async function generateAbancaReport(
         const baseIdx = (price > 0 && area > 0) ? price / area : null
         if (baseIdx) { setIA(`${col}15`, baseIdx); setIA(`${col}21`, baseIdx) }
         setIA(`${col}24`, v(c.homog_localizacao, 'Semelhante'))
-        // Índice homogeneizado — usa o mesmo valor calculado para IV-IV
         const hEntry = homogIndices[idx]
         if (hEntry) setIA(`${col}31`, hEntry.value)
       })
-      // Estatísticas IV-IA — mesmas do IV-IV (usadas por Y116 via IV-IA!P38)
       const iviaValues = homogIndices.map((h: any) => h.value)
       const iviaAvg = iviaValues.reduce((a: number, b: number) => a + b, 0) / iviaValues.length
       setIA('H38', Math.min(...iviaValues))
       setIA('L38', Math.max(...iviaValues))
-      setIA('P38', iviaAvg)   // ← Y116 da folha principal referencia esta célula
+      setIA('P38', iviaAvg)
       setIA('T38', median(iviaValues))
       setIA('X38', stdevP(iviaValues))
-
-      // Actualiza Y116 e AD116 na folha principal com o valor real (IV-IA!P38)
-      // sobrescrevendo o valor provisório escrito em fillTerreno
       const area116_final = parseFloat(p.gross_area)
       if (area116_final > 0 && iviaAvg > 0) {
         set('Y116', iviaAvg)
