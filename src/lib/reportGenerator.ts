@@ -20,6 +20,28 @@ function fmtArea(val: any): string {
   return f === Math.floor(f) ? String(Math.floor(f)) : f.toFixed(2).replace('.', ',')
 }
 
+// Converte valor de área para número, lidando com formatos PT ("142,6") e EN ("142.6")
+// — nunca interpreta ponto como separador de milhares a menos que haja também vírgula decimal
+function parseArea(val: any): number | null {
+  if (val === null || val === undefined || val === '') return null
+  const n = Number(val)
+  if (!isNaN(n) && typeof val !== 'string') return n // já é número JS
+  const s = String(val).trim().replace(/[€$£\s]/g, '')
+  let normalized: string
+  if (s.includes(',') && s.includes('.')) {
+    // Formato europeu completo: 1.402,50 → remove ponto milhar, substitui vírgula por ponto
+    normalized = s.replace(/\./g, '').replace(',', '.')
+  } else if (s.includes(',')) {
+    // Vírgula como decimal: 142,6 → 142.6
+    normalized = s.replace(',', '.')
+  } else {
+    // Ponto como decimal (JSON): 142.6 → mantém
+    normalized = s
+  }
+  const result = parseFloat(normalized)
+  return isNaN(result) ? null : result
+}
+
 async function fetchBuf(url: string): Promise<ArrayBuffer | null> {
   try {
     const sep = url.includes('?') ? '&' : '?'
@@ -598,10 +620,10 @@ export async function generateAbancaReport(
     const areasBaseRow = isMulti ? 309 : 105
     allProps.forEach((prop: any, idx: number) => {
       const areaVal = prop.area_considerada || prop.gross_area || prop.area_m2
-      if (areaVal)          set(`D${areasBaseRow + idx}`, parseFloat(String(areaVal)))
-      if (prop.land_area)   set(`L${areasBaseRow + idx}`, parseFloat(String(prop.land_area)))
-      if (prop.gross_area)  set(`Q${areasBaseRow + idx}`, parseFloat(String(prop.gross_area)))
-      if (prop.area_annex_m2) set(`T${areasBaseRow + idx}`, parseFloat(String(prop.area_annex_m2)))
+      const aC = parseArea(areaVal);       if (aC !== null) set(`D${areasBaseRow + idx}`, aC)
+      const aL = parseArea(prop.land_area); if (aL !== null) set(`L${areasBaseRow + idx}`, aL)
+      const aQ = parseArea(prop.gross_area); if (aQ !== null) set(`Q${areasBaseRow + idx}`, aQ)
+      const aT = parseArea(prop.area_annex_m2); if (aT !== null) set(`T${areasBaseRow + idx}`, aT)
     })
   }
 
