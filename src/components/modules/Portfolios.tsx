@@ -27,7 +27,7 @@ const ALIASES: Record<string, string> = {
   'uso_bien':                       'use_type',
   'subuso_bien':                    'use_subtype',
   'estado_bien':                    'property_state',
-  'superficie_adoptada_finca':      'area_considerada',
+  'superficie_adoptada_finca':      'area_m2',
   'superficie_adoptada_garaje':     'area_garage_m2',
   'superficie_adoptada_trastero':   'area_annex_m2',
   'calle':                          'street',
@@ -89,12 +89,12 @@ const ALIASES: Record<string, string> = {
   'lugar':                          'lugar',
 }
 
-const NUMERIC = ['area_considerada','area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2','year_built','fee_amount','prev_valuation_value']
+const NUMERIC = ['area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2','year_built','fee_amount','prev_valuation_value']
 const FIELDS = [
   'external_ref','id_bien','id_registo_predial','id_registo_matricial','fracao',
   'street','number','block','floor_letter','address','parish','municipality','district','postal_code',
   'property_type','property_subtype','use_type','use_subtype','property_state','typology',
-  'area_m2','area_considerada','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2',
+  'area_m2','gross_area','useful_area','land_area','area_garage_m2','area_annex_m2',
   'year_built','condition','fee_amount','perito_avaliador',
   'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
   'nuc_risco','data_pedido','tipo_via','escada','ampliacao','lugar','documentacao',
@@ -223,12 +223,6 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
         const tipo    = (p.property_type    || '').toUpperCase().trim()
         const subtipo = (p.property_subtype || '').toUpperCase().trim()
         let activity  = ''
-        // Propaga area_considerada → gross_area e area_m2 se não estiverem preenchidos
-        // (SUPERFICIE_ADOPTADA_FINCA da datatape é a área adoptada = área considerada = ABP para efeitos de avaliação)
-        if (p.area_considerada) {
-          if (!p.gross_area) p.gross_area = p.area_considerada
-          if (!p.area_m2)    p.area_m2    = p.area_considerada
-        }
         const area    = p.area_m2 || p.gross_area || 0
 
         if      (tipo === 'VIVIENDA (PISO)'       || tipo === 'VIVIENDA' || tipo === 'PISO' || tipo === 'ATICO' || tipo === 'DUPLEX' || tipo === 'ESTUDIO') activity = 'Apartamento'
@@ -272,7 +266,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
     'external_ref','id_bien','street','number','block','floor_letter','fracao',
     'address','parish','municipality','district','postal_code',
     'property_type','property_subtype','use_type','use_subtype','property_state',
-    'typology','year_built','condition','area_m2','area_considerada','gross_area','useful_area',
+    'typology','year_built','condition','area_m2','gross_area','useful_area',
     'land_area','area_garage_m2','area_annex_m2','fee_amount',
     'perito_avaliador','id_registo_predial','id_registo_matricial',
     'prev_valuation_date','prev_valuation_value','prev_valuation_method','prev_valuation_expert','prev_valuation_entity',
@@ -431,7 +425,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
 export default function Portfolios() {
   const qc = useQueryClient()
   const [modal, setModal]           = useState(false)
-  const [form, setForm]             = useState({ client_id:'', name:'', description:'', deadline:'', status:'active' })
+  const [form, setForm]             = useState({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape' })
   const [openImport, setOpenImport] = useState<string|null>(null)
 
   const { data: portfolios = [], isLoading } = useQuery({
@@ -447,8 +441,13 @@ export default function Portfolios() {
   })
 
   const create = useMutation({
-    mutationFn: async () => { const {error} = await supabase.from('portfolios').insert(form); if (error) throw error },
-    onSuccess: () => { qc.invalidateQueries({ queryKey:['portfolios'] }); toast.success('Portfólio criado'); setModal(false); setForm({ client_id:'', name:'', description:'', deadline:'', status:'active' }) },
+    mutationFn: async () => {
+      // deadline vazio → null para evitar "invalid input syntax for type date: ''"
+      const payload = { ...form, deadline: form.deadline || null }
+      const {error} = await supabase.from('portfolios').insert(payload)
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey:['portfolios'] }); toast.success('Projeto criado'); setModal(false); setForm({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape' }) },
     onError: (e: any) => toast.error(e.message)
   })
 
@@ -476,18 +475,18 @@ export default function Portfolios() {
       const { error } = await supabase.from('portfolios').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey:['portfolios'] }); toast.success('Portfólio eliminado') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey:['portfolios'] }); toast.success('Projeto eliminado') },
     onError: (e: any) => toast.error(e.message)
   })
 
   return (
     <div>
-      <PageHeader title="Portfólios" subtitle="Mandatos e data-tapes por cliente"
-        actions={<button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15}/> Novo portfólio</button>}
+      <PageHeader title="Projetos" subtitle="Mandatos, data-tapes e pedidos adhoc por cliente"
+        actions={<button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15}/> Novo projeto</button>}
       />
       <div className="p-6">
         {isLoading ? <p className="text-sm text-gray-400">A carregar…</p>
-          : portfolios.length === 0 ? <EmptyState message="Sem portfólios criados ainda."/>
+          : portfolios.length === 0 ? <EmptyState message="Sem projetos criados ainda."/>
           : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {portfolios.map((p: any) => {
@@ -533,6 +532,11 @@ export default function Portfolios() {
                         onClose={() => setOpenImport(null)}
                         onDone={() => { qc.invalidateQueries({ queryKey:['portfolios'] }); setOpenImport(null) }}
                       />
+                    ) : p.type === 'adhoc' ? (
+                      <Link to={`/properties/new?portfolio=${p.id}&client=${p.clients?.id || ''}`}
+                        className="btn text-xs w-full flex items-center justify-center gap-1.5 border-dashed">
+                        <Plus size={13}/> Adicionar imóvel
+                      </Link>
                     ) : (
                       <button className="btn text-xs w-full flex items-center justify-center gap-1.5 border-dashed"
                         onClick={() => setOpenImport(p.id)}>
@@ -549,8 +553,28 @@ export default function Portfolios() {
       {modal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-base font-semibold mb-5">Novo portfólio</h2>
+            <h2 className="text-base font-semibold mb-5">Novo projeto</h2>
             <div className="space-y-3">
+              {/* Tipo de projeto */}
+              <div>
+                <label className="label">Tipo de projeto *</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({...f, type:'datatape'}))}
+                    className={`flex-1 border rounded-lg px-3 py-2 text-xs text-left transition-colors ${form.type==='datatape' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                    <p className="font-semibold">Portfólio / Data-tape</p>
+                    <p className="text-gray-400 mt-0.5">Importação massiva via ficheiro Excel</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({...f, type:'adhoc'}))}
+                    className={`flex-1 border rounded-lg px-3 py-2 text-xs text-left transition-colors ${form.type==='adhoc' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                    <p className="font-semibold">Pedido adhoc</p>
+                    <p className="text-gray-400 mt-0.5">Imóveis criados individualmente</p>
+                  </button>
+                </div>
+              </div>
               <div>
                 <label className="label">Cliente *</label>
                 <select className="input" value={form.client_id} onChange={e => setForm(f => ({...f, client_id:e.target.value}))}>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/ui'
@@ -21,8 +21,9 @@ async function generateRef(): Promise<string> {
 
 export default function PropertyCreate() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState({
-    portfolio_id: '',
+    portfolio_id: searchParams.get('portfolio') || '',
     ref: '',
     external_ref: '',
     property_type: '',

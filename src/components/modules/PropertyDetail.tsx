@@ -688,9 +688,9 @@ export default function PropertyDetail() {
             <F label="Relatório n.º"              field="nr_relatorio"             value={property.nr_relatorio}                           onSave={save}/>
             <F label="Banco / Entidade"           field="banco"                    value={property.banco}                                  onSave={save}/>
             <F label="Tipo de Relatório"          field="tipo_relatorio"           value={property.tipo_relatorio}
-              opts={['Avaliação','Reavaliação','Vistoria','Portabilidade','Correção de erros']} onSave={save}/>
+              opts={['Avaliação','Vistoria','Portabilidade']} onSave={save}/>
             <F label="Finalidade"                 field="finalidade"               value={property.finalidade}
-              opts={['Adjudicado com visita interior','Adjudicado sem visita interior','Garantia hipotecária','Outros fins']} onSave={save}/>
+              opts={['Informativo','Assessoria para valor de mercado','Garantia hipotecária','Normas de informação financeira','Adjudicado com visita interior','Adjudicado sem visita interior','Validação da qualidade do valor de mercado','Validação da qualidade da garantia hipotecária','Aquisição e obras','Construção','Obras','Reavaliação','Outros']} onSave={save}/>
             <F label="Ref. Avaliador"             field="external_ref"             value={property.external_ref}                           onSave={save}/>
             <F label="ID do Bem"                  field="id_bien"                  value={property.id_bien}                                onSave={save}/>
             <F label="Tipo de Serviço"            field="tipo_servico"             value={property.tipo_servico}
@@ -703,7 +703,7 @@ export default function PropertyDetail() {
         <div style={{ display: tab === 'sec2' ? 'block' : 'none' }}>
           <Section title="Morada">
             <F label="Tipo de Via"     field="tipo_via"     value={property.tipo_via}
-              opts={['Rua','Avenida','Praça','Largo','Estrada','Travessa','Beco','Calçada','Caminho','Alameda','Outro']} onSave={save}/>
+              opts={['Alameda','Aldeia','Apartado','Ascenção','Avenida','Azinhaga','Bairro','Beco','Bloco','Caixa Postal','Calçada','Caminho','Caserio','Chalé','Colónia','Descida','Edifício','Empreendimento','Estrada Nacional','Estrada Municipal','Extensão','Gaveto','Herdade','Impasse','Inclinação','Largo','Loteamento','Lugar','Maçã','Mercado','Múnicipio','Parque','Passagem','Polígono','Praça','Praceta','Prolongamento','Quinta','Rodada','Rotunda','Rua','Travessa','Travessia','Urbanização','Vila']} onSave={save}/>
             <F label="Nome da Via"     field="street"       value={property.street}       span  onSave={save}/>
             <F label="Portal / N.º"   field="number"       value={property.number}             onSave={save}/>
             <F label="Bloco"           field="block"        value={property.block}              onSave={save}/>
@@ -746,9 +746,9 @@ export default function PropertyDetail() {
             <F label="Subuso"                field="use_subtype"        value={property.use_subtype}
               opts={['1ª residência','2ª residência','Polivalente','Não polivalente','N/A']} onSave={save}/>
             <F label="Destino"               field="destino"            value={property.destino}
-              opts={['1ª residência','2ª residência','VPO / Livre','Arrendamento']} onSave={save}/>
+              opts={['N/A','Arrendamento','Outros','Promoção para venda','Uso Próprio']} onSave={save}/>
             <F label="Tipo de Prédio"        field="tipo_predio"        value={property.tipo_predio}
-              opts={['Prédio urbano','Prédio rústico','Prédio misto']} onSave={save}/>
+              opts={['Urbano','Rústico','Urbano e Rustico']} onSave={save}/>
             <F label="Estado de Construção"  field="estado_construcao"  value={property.estado_construcao}
               opts={['Em construção','N/A','Em projeto','Em reabilitação','Terminado','Urbanização sem projeto','Urbanização c/ projeto sem iniciar','Urbanização em curso','Urbanização terminada']} onSave={save}/>
             <F label="Estado de Conservação" field="estado_conservacao" value={property.estado_conservacao}
@@ -756,7 +756,8 @@ export default function PropertyDetail() {
             <F label="Estado de Ocupação"    field="estado_ocupacao"    value={property.estado_ocupacao}
               opts={['Devoluto','Ocupado pelo proprietário','Arrendado']} onSave={save}/>
             <F label="% Obra Executada"      field="pct_obra"           value={property.pct_obra}           type="number" onSave={save}/>
-            <F label="Tipologia"             field="typology"           value={property.typology}           onSave={save}/>
+            <F label="Tipologia"             field="typology"           value={property.typology}
+              opts={['T0','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12','T13','T14','T0+1','T0+2','T1+1','T1+2','T2+1','T2+2','T3+1','T3+2','T4+1','T4+2','T5+1','T5+2','T6+1','T6+2']} onSave={save}/>
             <F label="Imóvel Singular"       field="imovel_singular"    value={property.imovel_singular}
               opts={['Sim','Não']} onSave={save}/>
           </Section>
@@ -767,6 +768,8 @@ export default function PropertyDetail() {
           </div>
 
           <Section title="Conservatória de Registo Predial">
+            <F label="Tipo de Prédio"         field="tipo_predio"         value={property.tipo_predio}
+              opts={['Urbano','Rústico','Urbano e Rustico']} onSave={save}/>
             <F label="N.º Conservatória"     field="nr_conservatoria"     value={property.nr_conservatoria}                onSave={save}/>
             <F label="Nome da Conservatória" field="nome_conservatoria"   value={property.nome_conservatoria}              onSave={save}/>
             <F label="N.º Registo Predial"   field="id_registo_predial"   value={property.id_registo_predial}              onSave={save}/>
@@ -821,7 +824,7 @@ export default function PropertyDetail() {
           <Section title="Certificado Energético">
             <F label="N.º Certificado Energético" field="nr_certificado_energ"   value={property.nr_certificado_energ}              onSave={save}/>
             <F label="Classe Energética"           field="classe_energetica"      value={property.classe_energetica}
-              opts={['A+','A','B','B-','C','D','E','F','Isento','Em curso']} onSave={save}/>
+              opts={['A+','A','B','B-','C','D','E','F','G']} onSave={save}/>
             <F label="Data Emissão"                field="data_emissao_cert"      value={property.data_emissao_cert}      type="date" onSave={save}/>
             <F label="Data Validade"               field="data_validade_cert"     value={property.data_validade_cert}     type="date" onSave={save}/>
             <F label="Nome PQ"                     field="nome_pq"                value={property.nome_pq}                           onSave={save}/>

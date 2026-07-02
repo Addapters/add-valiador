@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/ui'
-import { Link } from 'react-router-dom'
 
 declare global {
   interface Window { L: any }
@@ -25,15 +24,41 @@ function useLeaflet(cb: () => void) {
 export default function PropertyMap() {
   const mapRef   = useRef<HTMLDivElement>(null)
   const mapInst  = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
   const [ready, setReady] = useState(false)
+  const [clientId, setClientId]     = useState('')
+  const [portfolioId, setPortfolioId] = useState('')
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients-simple'],
+    queryFn: async () => {
+      const { data } = await supabase.from('clients').select('id, name').order('name')
+      return (data || []) as any[]
+    }
+  })
+
+  const { data: portfolios = [] } = useQuery({
+    queryKey: ['portfolios-simple'],
+    queryFn: async () => {
+      const { data } = await supabase.from('portfolios').select('id, name, client_id').order('name')
+      return (data || []) as any[]
+    }
+  })
+
+  const filteredPortfolios = clientId
+    ? portfolios.filter((p: any) => p.client_id === clientId)
+    : portfolios
 
   const { data: properties = [] } = useQuery({
-    queryKey: ['properties-map'],
+    queryKey: ['properties-map', portfolioId, clientId],
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from('properties')
-        .select('id, ref, external_ref, address, municipality, property_type, typology, latitude, longitude, visit_status')
+        .select('id, ref, external_ref, address, municipality, property_type, typology, latitude, longitude, visit_status, portfolio_id, client_id')
         .not('latitude', 'is', null)
+      if (portfolioId) q = q.eq('portfolio_id', portfolioId)
+      else if (clientId) q = q.eq('client_id', clientId)
+      const { data } = await q
       return (data || []) as any[]
     }
   })
@@ -45,31 +70,26 @@ export default function PropertyMap() {
     const L = window.L
     mapInst.current = L.map(mapRef.current).setView([39.5, -8.0], 7)
 
-    // Camada satélite (default)
     const satellite = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { attribution: '© Esri, Maxar, Earthstar Geographics', maxZoom: 19 }
     )
-
-    // Camada rua
     const street = L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { attribution: '© OpenStreetMap', maxZoom: 19 }
     )
-
     satellite.addTo(mapInst.current)
-
-    // Controlo de camadas (canto superior direito)
-    L.control.layers(
-      { 'Satélite': satellite, 'Mapa': street },
-      {},
-      { position: 'topright' }
-    ).addTo(mapInst.current)
+    L.control.layers({ 'Satélite': satellite, 'Mapa': street }, {}, { position: 'topright' }).addTo(mapInst.current)
   }, [ready])
 
   useEffect(() => {
-    if (!ready || !mapInst.current || !properties.length) return
+    if (!ready || !mapInst.current) return
     const L = window.L
+
+    // remove existing markers
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
     const colorMap: any = { pending: '#9ca3af', scheduled: '#3b82f6', visited: '#f59e0b', report_done: '#10b981' }
 
     properties.forEach((p: any) => {
@@ -80,7 +100,7 @@ export default function PropertyMap() {
         html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
         iconSize: [12, 12], iconAnchor: [6, 6]
       })
-      L.marker([p.latitude, p.longitude], { icon })
+      const marker = L.marker([p.latitude, p.longitude], { icon })
         .addTo(mapInst.current)
         .bindPopup(`
           <div style="font-family:sans-serif;min-width:160px">
@@ -90,6 +110,7 @@ export default function PropertyMap() {
             <a href="/properties/${p.id}" style="color:#1D9E75;font-size:12px">Abrir ficha →</a>
           </div>
         `)
+      markersRef.current.push(marker)
     })
 
     if (properties.length > 0) {
@@ -100,8 +121,28 @@ export default function PropertyMap() {
 
   return (
     <div>
-      <PageHeader title="Mapa do portfólio" subtitle={`${properties.length} imóveis georreferenciados`} />
+      <PageHeader title="Mapa" subtitle={`${properties.length} imóveis georreferenciados`} />
       <div className="p-6 space-y-4">
+        {/* Filtros em cascata */}
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Cliente</label>
+            <select className="input text-sm py-1.5 min-w-[180px]" value={clientId}
+              onChange={e => { setClientId(e.target.value); setPortfolioId('') }}>
+              <option value="">Todos os clientes</option>
+              {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Projeto</label>
+            <select className="input text-sm py-1.5 min-w-[200px]" value={portfolioId}
+              onChange={e => setPortfolioId(e.target.value)}>
+              <option value="">Todos os projetos</option>
+              {filteredPortfolios.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        </div>
+
         {/* Legenda */}
         <div className="flex gap-4 text-xs text-gray-500">
           {[['#9ca3af','Por visitar'],['#3b82f6','Agendado'],['#f59e0b','Visitado'],['#10b981','Report OK']].map(([c,l]) => (
@@ -111,9 +152,10 @@ export default function PropertyMap() {
             </span>
           ))}
         </div>
+
         {properties.length === 0 && (
           <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-            Nenhum imóvel georreferenciado. Abre a ficha de um imóvel e usa o botão "Obter coordenadas" para geocodificar automaticamente.
+            Nenhum imóvel georreferenciado para esta selecção. Abre a ficha de um imóvel e usa o botão "Obter coordenadas" para geocodificar automaticamente.
           </div>
         )}
         <div ref={mapRef} style={{ height: '520px', borderRadius: '12px', border: '0.5px solid #e5e7eb' }} />
