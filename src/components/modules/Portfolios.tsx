@@ -570,7 +570,7 @@ export default function Portfolios() {
                     type="button"
                     onClick={() => setForm(f => ({...f, type:'adhoc'}))}
                     className={`flex-1 border rounded-lg px-3 py-2 text-xs text-left transition-colors ${form.type==='adhoc' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                    <p className="font-semibold">Pedido adhoc</p>
+                    <p className="font-semibold">Pedidos Individuais</p>
                     <p className="text-gray-400 mt-0.5">Imóveis criados individualmente</p>
                   </button>
                 </div>

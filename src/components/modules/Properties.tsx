@@ -212,7 +212,7 @@ export default function Properties() {
     .filter(p => p.role === 'perito' && p.name)
     .map(p => p.name) as string[]
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isLoading, isFetching } = useQuery({
     queryKey: ['properties-all'],
     queryFn: async () => {
       const { data } = await supabase
@@ -450,11 +450,15 @@ export default function Properties() {
       )}
 
       <div className="p-6 space-y-4">
-        {isLoading ? <p className="text-sm text-gray-400">A carregar…</p>
+        {(isLoading || isFetching) ? <p className="text-sm text-gray-400">A carregar…</p>
           : grouped.length === 0 ? <EmptyState message="Nenhum imóvel encontrado."/>
           : grouped.map(([pid, { portfolio, items }]) => {
             const isOpen      = !collapsed[pid]
-            const label       = portfolio ? `${portfolio.name}${portfolio.clients?.name ? ` — ${portfolio.clients.name}` : ''}` : 'Sem portfólio'
+            const clientName    = portfolio?.clients?.name
+            const portfolioName = portfolio?.name
+            const label         = clientName && portfolioName
+              ? `${clientName} | ${portfolioName}`
+              : clientName || portfolioName || 'Sem projeto'
             const groupAllSel = items.every((i: any) => selected.has(i.id))
             return (
               <div key={pid} className="rounded-xl border border-gray-200 overflow-hidden">
@@ -464,7 +468,7 @@ export default function Properties() {
                   </button>
                   <button className="flex items-center gap-2 flex-1 text-left" onClick={() => toggleGroup(pid)}>
                     {isOpen ? <ChevronDown size={14} className="text-gray-400"/> : <ChevronRight size={14} className="text-gray-400"/>}
-                    <span className="text-sm font-semibold text-gray-700">Data Tape + {label}</span>
+                    <span className="text-sm font-semibold text-gray-700">{label}</span>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{items.length}</span>
                   </button>
                 </div>
@@ -494,7 +498,7 @@ export default function Properties() {
                       </thead>
                       <tbody>
                         {items.map((p: any, idx: number) => (
-                          <tr key={p.id} className={`border-b border-gray-100 ${p.verificado ? 'bg-green-50 hover:bg-green-100' : `hover:bg-gray-50 ${selected.has(p.id)?'bg-brand-50':idx%2===0?'bg-white':'bg-gray-50/30'}`}`}>
+                          <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selected.has(p.id)?'bg-brand-50':idx%2===0?'bg-white':'bg-gray-50/30'}`}>
                             <td className="sticky left-0 px-3 py-2 bg-inherit z-10">
                               <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
                                 {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
