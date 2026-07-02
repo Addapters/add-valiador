@@ -396,7 +396,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {filtered.map((p: any, idx: number) => (
-                    <tr key={p.id} className={selected.has(p.id) ? 'bg-brand-50' : idx%2===0 ? 'bg-white' : 'bg-gray-50/30'}>
+                    <tr key={p.id} className={p.verificado ? 'bg-green-50 hover:bg-green-100' : selected.has(p.id) ? 'bg-brand-50' : idx%2===0 ? 'bg-white' : 'bg-gray-50/30'}>
                       <td>
                         <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
                           {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
