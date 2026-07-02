@@ -394,6 +394,23 @@ export default function PropertyDetail() {
   useLeaflet(true, () => setMapReady(true))
   const markerRef = useRef<any>(null)
 
+  function makeDraggableMarker(L: any, lat: number, lng: number) {
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:16px;height:16px;border-radius:50%;background:#1D9E75;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);cursor:grab"></div>',
+      iconSize: [16, 16], iconAnchor: [8, 8]
+    })
+    const marker = L.marker([lat, lng], { icon, draggable: true })
+    marker.on('dragend', (e: any) => {
+      const { lat: newLat, lng: newLng } = e.target.getLatLng()
+      update.mutate({
+        latitude:  Math.round(newLat * 1000000) / 1000000,
+        longitude: Math.round(newLng * 1000000) / 1000000
+      })
+    })
+    return marker
+  }
+
   useEffect(() => {
     if (!mapReady || !mapRef.current || !property) return
 
@@ -402,10 +419,8 @@ export default function PropertyDetail() {
       // Actualiza marcador se coordenadas mudaram
       if (property.latitude && mapInst.current) {
         if (markerRef.current) markerRef.current.remove()
-        markerRef.current = window.L.circleMarker(
-          [property.latitude, property.longitude],
-          { radius: 8, fillColor: '#1D9E75', color: 'white', weight: 2, opacity: 1, fillOpacity: 1 }
-        ).addTo(mapInst.current)
+        markerRef.current = makeDraggableMarker(window.L, property.latitude, property.longitude)
+          .addTo(mapInst.current)
         mapInst.current.setView([property.latitude, property.longitude], 16)
       }
       return
@@ -420,9 +435,8 @@ export default function PropertyDetail() {
       satellite.addTo(mapInst.current)
       L.control.layers({'Satélite':satellite,'Mapa':street},{},{position:'topright'}).addTo(mapInst.current)
       if (property.latitude) {
-        markerRef.current = L.circleMarker([property.latitude, property.longitude], {
-          radius: 8, fillColor: '#1D9E75', color: 'white', weight: 2, opacity: 1, fillOpacity: 1,
-        }).addTo(mapInst.current)
+        markerRef.current = makeDraggableMarker(L, property.latitude, property.longitude)
+          .addTo(mapInst.current)
       }
     }, 150)
   }, [mapReady, property?.id, property?.latitude, property?.longitude, tab])

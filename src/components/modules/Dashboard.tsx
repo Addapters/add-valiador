@@ -176,7 +176,7 @@ export default function Dashboard() {
     if (filterVerificado === 'nao' &&  p.verificado)         return false
     if (search) {
       const s = search.toLowerCase()
-      if (![p.external_ref, p.id_bien, p.ref, p.address, p.municipality, p.property_type, p.perito_avaliador]
+      if (![p.external_ref, p.id_bien, p.address, p.municipality, p.property_type, p.perito_avaliador]
         .some((v: any) => v?.toLowerCase().includes(s))) return false
     }
     return true
@@ -404,6 +404,23 @@ export default function Dashboard() {
                       <div
                         className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2 cursor-pointer select-none hover:bg-gray-100"
                         onClick={() => toggleGroup(pid)}>
+                        <button
+                          className="text-gray-400 hover:text-brand-500"
+                          title="Seleccionar imóveis deste grupo"
+                          onClick={e => {
+                            e.stopPropagation()
+                            const ids = groupItems.map((p: any) => p.id)
+                            const allSel = ids.every((id: string) => selected.has(id))
+                            setSelected(prev => {
+                              const next = new Set(prev)
+                              ids.forEach((id: string) => allSel ? next.delete(id) : next.add(id))
+                              return next
+                            })
+                          }}>
+                          {groupItems.every((p: any) => selected.has(p.id)) && groupItems.length > 0
+                            ? <CheckSquare size={13} className="text-brand-400"/>
+                            : <Square size={13}/>}
+                        </button>
                         <span className={`text-gray-400 transition-transform ${collapsedGroups.has(pid) ? '' : 'rotate-90'}`}>▶</span>
                         <span className={`text-sm font-semibold ${isClosed ? 'line-through text-gray-400' : 'text-gray-700'}`}>{label}</span>
                         {isClosed && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Encerrado</span>}
@@ -415,8 +432,19 @@ export default function Dashboard() {
                           <thead>
                             <tr>
                               <th className="w-8">
-                                <button onClick={selectAll} className="text-gray-400 hover:text-brand-500">
-                                  {selected.size === filtered.length && filtered.length > 0
+                                <button
+                                  onClick={() => {
+                                    const ids = groupItems.map((p: any) => p.id)
+                                    const allSel = ids.every((id: string) => selected.has(id))
+                                    setSelected(prev => {
+                                      const next = new Set(prev)
+                                      ids.forEach((id: string) => allSel ? next.delete(id) : next.add(id))
+                                      return next
+                                    })
+                                  }}
+                                  className="text-gray-400 hover:text-brand-500"
+                                  title="Seleccionar este grupo">
+                                  {groupItems.every((p: any) => selected.has(p.id)) && groupItems.length > 0
                                     ? <CheckSquare size={13} className="text-brand-400"/>
                                     : <Square size={13}/>}
                                 </button>
@@ -445,7 +473,7 @@ export default function Dashboard() {
                                 </td>
                                 <td>
                                   <Link to={`/properties/${p.id}`} className={`text-brand-600 hover:underline font-medium whitespace-nowrap ${isClosed ? 'line-through' : ''}`}>
-                                    {p.external_ref || p.ref || p.id}
+                                    {p.external_ref || '—'}
                                   </Link>
                                 </td>
                                 <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>

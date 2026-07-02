@@ -104,7 +104,7 @@ export default function PropertyMap() {
         .addTo(mapInst.current)
         .bindPopup(`
           <div style="font-family:sans-serif;min-width:160px">
-            <p style="font-weight:600;margin:0 0 4px">${p.external_ref || p.ref}</p>
+            <p style="font-weight:600;margin:0 0 4px">${p.external_ref || '—'}</p>
             <p style="color:#6b7280;margin:0 0 2px;font-size:12px">${p.address || p.municipality || ''}</p>
             <p style="color:#6b7280;margin:0 0 6px;font-size:12px">${[p.property_type, p.typology].filter(Boolean).join(' ')}</p>
             <a href="/properties/${p.id}" style="color:#1D9E75;font-size:12px">Abrir ficha →</a>

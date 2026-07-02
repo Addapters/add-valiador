@@ -355,7 +355,7 @@ export default function Properties() {
     const cls = isAbanca ? 'text-blue-700 whitespace-nowrap' : 'text-gray-600 whitespace-nowrap'
     const portfolioStatus = p.portfolios?.status || 'active'
     switch(col) {
-      case 'external_ref':    return <Link to={`/properties/${p.id}`} className={`text-brand-600 hover:underline font-semibold whitespace-nowrap ${portfolioStatus==='closed' ? 'line-through opacity-60' : ''}`}>{p.external_ref || p.ref || '—'}</Link>
+      case 'external_ref':    return <Link to={`/properties/${p.id}`} className={`text-brand-600 hover:underline font-semibold whitespace-nowrap ${portfolioStatus==='closed' ? 'line-through opacity-60' : ''}`}>{p.external_ref || '—'}</Link>
       case 'portfolio_status': return p.portfolios ? (
         <select
           className={`text-xs border-0 bg-transparent cursor-pointer font-medium ${portfolioStatus==='closed' ? 'text-gray-400' : 'text-green-600'}`}
@@ -499,8 +499,8 @@ export default function Properties() {
                       <thead>
                         <tr className="border-b border-gray-200">
                           <th className="sticky left-0 bg-gray-50 px-3 py-2 w-8 z-10">
-                            <button onClick={selectAll} className="text-gray-400 hover:text-brand-500">
-                              {selected.size === filtered.length && filtered.length > 0 ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
+                            <button onClick={() => selectGroup(items)} className="text-gray-400 hover:text-brand-500" title="Seleccionar este grupo">
+                              {items.every((i: any) => selected.has(i.id)) && items.length > 0 ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
                             </button>
                           </th>
                           {visibleCols.map(col => {
