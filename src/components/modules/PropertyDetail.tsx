@@ -83,8 +83,8 @@ const ES_PT_MAP: Record<string, string> = {
   'APARTAMENTO':                 'Apartamento',
   'BAJO':                        'Rés-do-chão',
   'BAJO COMERCIAL':              'Rés-do-chão comercial',
-  'LIBRE':                       'Livre',
-  'OCUPADO':                     'Ocupado',
+  'LIBRE':                       'Devoluto',
+  'OCUPADO':                     'Ocupado pelo proprietário',
   'OCUPADO POR EL PROPIETARIO':  'Ocupado pelo proprietário',
   'ARRENDADO':                   'Arrendado',
   'ALQUILADO':                   'Arrendado',
@@ -170,6 +170,12 @@ const ES_PT_MAP: Record<string, string> = {
   'NORTE-SUR':                   'Norte/Sul',
   'ESTE-OESTE':                  'Este/Oeste',
   'NO INFLUYE EN EL VALOR':      'Não influi no valor',
+  'AUMENTA EL VALOR':            'Aumenta o valor',
+  'AUMENTA EN VALOR':            'Aumenta o valor',
+  'DISMINUYE EL VALOR':          'Diminui o valor',
+  'DISMINUYE EN VALOR':          'Diminui o valor',
+  'CRECIENTE':                   'Crescente',
+  'DECRECIENTE':                 'Decrescente',
   'MASCULINO':                   'Masculino',
   'FEMENINO':                    'Feminino',
   'PARTICULAR':                  'Particular',
@@ -742,11 +748,11 @@ export default function PropertyDetail() {
             <F label="Tipo de Prédio"        field="tipo_predio"        value={property.tipo_predio}
               opts={['Prédio urbano','Prédio rústico','Prédio misto']} onSave={save}/>
             <F label="Estado de Construção"  field="estado_construcao"  value={property.estado_construcao}
-              opts={['Em projecto','Em construção','Em reabilitação','Terminado','Hipótese terminado']} onSave={save}/>
+              opts={['Em construção','N/A','Em projeto','Em reabilitação','Terminado','Urbanização sem projeto','Urbanização c/ projeto sem iniciar','Urbanização em curso','Urbanização terminada']} onSave={save}/>
             <F label="Estado de Conservação" field="estado_conservacao" value={property.estado_conservacao}
-              opts={['Muito Bom','Bom','Normal','Deficiente','Muito Deficiente','Ruinoso']} onSave={save}/>
+              opts={['Bom','Regular','Mau']} onSave={save}/>
             <F label="Estado de Ocupação"    field="estado_ocupacao"    value={property.estado_ocupacao}
-              opts={['Livre','Ocupado pelo proprietário','Arrendado','Ocupado por terceiros']} onSave={save}/>
+              opts={['Devoluto','Ocupado pelo proprietário','Arrendado']} onSave={save}/>
             <F label="% Obra Executada"      field="pct_obra"           value={property.pct_obra}           type="number" onSave={save}/>
             <F label="Tipologia"             field="typology"           value={property.typology}           onSave={save}/>
             <F label="Imóvel Singular"       field="imovel_singular"    value={property.imovel_singular}
@@ -786,12 +792,12 @@ export default function PropertyDetail() {
           </div>
           <Section title="Enquadramento no Mercado">
             <F label="Tipo de expectativa de mercado"    field="tipo_expectativa_mercado" value={property.tipo_expectativa_mercado}
-              opts={['Muito positiva','Positiva','Estável','Negativa','Muito negativa']} onSave={save}/>
+              opts={['Positiva. Prevê-se uma valorização superior a 10% nos próximos 12 meses','Neutra. Não se prevê uma valorização/desvalorização superior a 10% nos próximos 12 meses','Negativa. Prevê-se uma desvalorização superior a 10% nos próximos 12 meses']} onSave={save}/>
             <F label="Ocupação laboral predominante"     field="ocupacao_laboral"         value={property.ocupacao_laboral}
-              opts={['Muito alta','Alta','Média','Baixa','Muito baixa']} onSave={save}/>
+              opts={['Agricultura','Comércio','Industria','Pesca','Serviços']} onSave={save}/>
             <F label="População do Concelho"             field="populacao_concelho"       value={property.populacao_concelho}       onSave={save}/>
             <F label="Evolução do Mercado"               field="evolucao_mercado"         value={property.evolucao_mercado}
-              opts={['Tendencialmente positiva','Estável','Tendencialmente negativa']} onSave={save}/>
+              opts={['Crescente','Decrescente','Estável']} onSave={save}/>
           </Section>
         </>)}
 
@@ -802,9 +808,9 @@ export default function PropertyDetail() {
             <F label="N.º Casas de Banho"         field="nr_inst_sanitarias"      value={property.nr_inst_sanitarias}      type="number" onSave={save}/>
             <F label="N.º Pisos"                  field="nr_pisos"                value={property.nr_pisos}                type="number" onSave={save}/>
             <F label="Qualidade de Construção"    field="qualidade_construcao"    value={property.qualidade_construcao}
-              opts={['Muito boa','Boa','Média','Baixa','Muito baixa']} onSave={save}/>
+              opts={['Muito alta','Alta','Média','Baixa']} onSave={save}/>
             <F label="Orientação Solar"           field="orientacao_solar"        value={property.orientacao_solar}
-              opts={['Norte','Sul','Este','Oeste','Norte/Sul','Este/Oeste','Não influi no valor']} onSave={save}/>
+              opts={['Aumenta o valor','Diminui o valor','Não influi no valor']} onSave={save}/>
             <F label="Categorização"              field="categorizacao"           value={property.categorizacao}           onSave={save}/>
             <F label="Tipo de Reparação"          field="tipo_reparacao"          value={property.tipo_reparacao}
               opts={['Conservação','Reabilitação','Remodelação','Ampliação','Construção nova']} onSave={save}/>
@@ -920,23 +926,9 @@ export default function PropertyDetail() {
         {/* SEC 8 ── Documentos Entregues */}
         {tab==='sec8' && (<>
           <Section title="Documentos para Avaliação">
-            {[
-              { label: 'Caderneta Predial',                 field: 'doc_caderneta' },
-              { label: 'Certidão da CRP',                   field: 'doc_certidao' },
-              { label: 'Contrato de Arrendamento',           field: 'doc_contrato_arrend' },
-              { label: 'Alvará de Loteamento',               field: 'doc_alvara' },
-              { label: 'Planta de Loteamento',               field: 'doc_planta' },
-              { label: 'Licença de Construção/Obras',        field: 'doc_licenca_constr' },
-              { label: 'Licença de Utilização',              field: 'doc_licenca_util' },
-              { label: 'Orçamento de obras',                 field: 'doc_orcamento_obras' },
-              { label: 'Memória Descritiva',                 field: 'doc_memoria_descritiva' },
-              { label: 'Ficha Técnica Habitação',             field: 'doc_ficha_tecnica' },
-              { label: 'Projeto Aprovado',                   field: 'doc_projeto_aprovado' },
-              { label: 'Projeto Não Aprovado',                field: 'doc_projeto_nao_aprovado' },
-              { label: 'Certificado Energético',             field: 'doc_cert_energetico' },
-              { label: 'Outro',                              field: 'doc_outro' },
-            ].map(({ label, field }) => {
-              return <F key={field} label={label} field={field} value={(property as any)[field]}
+            {['Caderneta Predial','Certidão da CRP','Contrato de Arrendamento','Alvará de Loteamento','Planta de Loteamento','Licença de Construção/Obras','Licença de Utilização','Orçamento de obras','Memória Descritiva','Ficha Técnica Habitação','Projeto Aprovado','Projeto Não Aprovado','Certificado Energético','Outro'].map(doc => {
+              const field = 'doc_' + doc.toLowerCase().replace(/[^a-z0-9]/g,'_')
+              return <F key={field} label={doc} field={field} value={(property as any)[field]}
                 opts={['Entregue','Não entregue','N/A']} onSave={save}/>
             })}
           </Section>
@@ -1134,7 +1126,6 @@ export default function PropertyDetail() {
             propertyId={property.id}
             comps={comps}
             onRefresh={() => qc.invalidateQueries({ queryKey: ['property', id] })}
-            subjectAreaM2={property.gross_area}
           />
         )}
 
@@ -1280,61 +1271,8 @@ function EditCell({ value, type='text', onSave, className='' }: {
 }
 
 // ── Comparáveis com Chauvenet e selecção ──────────────────────────────────
-// ── Homogeneização — opções e percentagens (extraídas do template IV-IV) ─────
-const HOMOG_OPTS_GENERIC = ['Muito inferior','Inferior','Ligeiramente inferior','Semelhante','Ligeiramente superior','Superior','Muito superior']
-const HOMOG_PCT_GENERIC: Record<string, number> = {
-  'MUITO INFERIOR': 0.15, 'INFERIOR': 0.10, 'LIGEIRAMENTE INFERIOR': 0.05,
-  'SEMELHANTE': 0, 'LIGEIRAMENTE SUPERIOR': -0.05, 'SUPERIOR': -0.10, 'MUITO SUPERIOR': -0.15,
-}
-const HOMOG_OPTS_TX = ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação']
-const HOMOG_PCT_TX: Record<string, number> = {
-  'ESPECULATIVO': -0.20, 'FÁCILMENTE NEGOCIÁVEL': -0.15, 'LIGEIRAMENTE NEGOCIÁVEL': -0.10,
-  'ALINHADO COM MERCADO': -0.05, 'SEM MARGEM NEGOCIAÇÃO': 0,
-}
-const HOMOG_CRITERIA: { key: string; label: string; tx?: boolean }[] = [
-  { key: 'homog_localizacao',       label: 'Localização' },
-  { key: 'homog_acabamentos',       label: 'Acab. e Equipamentos' },
-  { key: 'homog_conservacao',       label: 'Conservação' },
-  { key: 'homog_caract_gerais',     label: 'Caract. Gerais' },
-  { key: 'homog_classe_energetica', label: 'Classe Energética' },
-  { key: 'homog_tx_desconto',       label: 'Tx Desconto | Revisão', tx: true },
-]
-
-function fmtPct(p: number | null): string {
-  if (p === null || p === undefined || isNaN(p)) return '—'
-  return (p * 100).toFixed(1).replace('.', ',') + '%'
-}
-
-function areaAdjustment(subjectAreaM2: any, compAreaM2: any): number | null {
-  const sa = parseFloat(subjectAreaM2), ca = parseFloat(compAreaM2)
-  if (!sa || !ca || isNaN(sa) || isNaN(ca)) return null
-  const diffRatio = (sa - ca) / sa
-  const exp = diffRatio < 0.3 ? 1 / 25 : 1 / 50
-  return Math.pow(ca / sa, exp) - 1
-}
-
-function median(values: number[]): number {
-  const s = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(s.length / 2)
-  return s.length % 2 !== 0 ? s[mid] : (s[mid - 1] + s[mid]) / 2
-}
-function stdevP(values: number[]): number {
-  const mean = values.reduce((a, b) => a + b, 0) / values.length
-  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length
-  return Math.sqrt(variance)
-}
-// Valores críticos do Critério de Chauvenet por N (o template do relatório só tem 5 e 6 tabelados;
-// os restantes são a tabela estatística padrão, usada quando há menos de 5 comparáveis seleccionados)
-const CHAUVENET_CRITICAL: Record<number, number> = {
-  2: 1.15, 3: 1.38, 4: 1.54, 5: 1.65, 6: 1.73, 7: 1.80, 8: 1.86,
-}
-function fmtEpm2(val: number | null): string {
-  if (val === null || val === undefined || isNaN(val)) return '—'
-  return Math.round(val).toLocaleString('pt-PT') + ' €/m²'
-}
-
-function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
-  propertyId: string; comps: any[]; onRefresh: () => void; subjectAreaM2?: any
+function CompsSection({ propertyId, comps, onRefresh }: {
+  propertyId: string; comps: any[]; onRefresh: () => void
 }) {
   const [applying, setApplying] = useState(false)
 
@@ -1355,32 +1293,6 @@ function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
     ? selected.reduce((s: number, c: any) => s + (c.epm2 || 0), 0) / selected.filter((c:any) => c.epm2).length
     : null
 
-  // ── Homogeneização: índice de venda homogeneizado + análise estatística + Chauvenet ──
-  // Mesma fórmula confirmada nos relatórios fechados reais (folha IV-IV do template).
-  const homogResults = selected.map((c: any) => {
-    const price = parseFloat(c.price || 0)
-    const area  = parseFloat(c.area_m2 || 0)
-    const baseIndex = (price > 0 && area > 0) ? price / area : null
-    if (baseIndex === null) return { id: c.id, homogIndex: null as number | null }
-    const pctLoc   = HOMOG_PCT_GENERIC[String(c.homog_localizacao || 'Semelhante').toUpperCase().trim()] ?? 0
-    const pctArea  = areaAdjustment(subjectAreaM2, c.area_m2) ?? 0
-    const pctAcab  = HOMOG_PCT_GENERIC[String(c.homog_acabamentos || 'Semelhante').toUpperCase().trim()] ?? 0
-    const pctConsv = HOMOG_PCT_GENERIC[String(c.homog_conservacao || 'Semelhante').toUpperCase().trim()] ?? 0
-    const pctCarac = HOMOG_PCT_GENERIC[String(c.homog_caract_gerais || 'Semelhante').toUpperCase().trim()] ?? 0
-    const pctClass = HOMOG_PCT_GENERIC[String(c.homog_classe_energetica || 'Semelhante').toUpperCase().trim()] ?? 0
-    const pctTx    = HOMOG_PCT_TX[String(c.homog_tx_desconto || 'Alinhado com Mercado').toUpperCase().trim()] ?? 0
-    const sumAdj   = pctLoc + pctArea + pctAcab + pctConsv + pctCarac + pctClass + pctTx
-    return { id: c.id, homogIndex: baseIndex * (1 + sumAdj) }
-  })
-  const validHomog = homogResults.filter(r => r.homogIndex !== null).map(r => r.homogIndex as number)
-  const homogN      = validHomog.length
-  const homogMin     = homogN ? Math.min(...validHomog) : null
-  const homogMax     = homogN ? Math.max(...validHomog) : null
-  const homogAvg      = homogN ? validHomog.reduce((a, b) => a + b, 0) / homogN : null
-  const homogMedian  = homogN ? median(validHomog) : null
-  const homogStdev    = homogN ? stdevP(validHomog) : null
-  const chauvenetR  = homogN ? CHAUVENET_CRITICAL[homogN] : undefined
-
   function fmtPrice(val: any): string {
     if (!val) return '—'
     const n = parseFloat(val)
@@ -1389,11 +1301,7 @@ function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
   }
 
   async function updateComp(compId: string, patch: any) {
-    const { error } = await supabase.from('market_comps').update(patch).eq('id', compId)
-    if (error) {
-      toast.error(`Erro ao guardar: ${error.message}`)
-      return
-    }
+    await supabase.from('market_comps').update(patch).eq('id', compId)
     onRefresh()
   }
 
@@ -1595,125 +1503,6 @@ function CompsSection({ propertyId, comps, onRefresh, subjectAreaM2 }: {
           {selected.some((c:any) => c.chauvenet_rejected) && (
             <p className="text-xs text-red-500">⚠️ Um ou mais comparáveis seleccionados foram identificados como outliers pelo Critério de Chauvenet.</p>
           )}
-        </div>
-      )}
-
-      {/* 5 ── Homogeneização dos comparáveis seleccionados */}
-      {selected.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Homogeneização (em relação ao imóvel em avaliação)
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="table-base text-xs">
-              <thead>
-                <tr>
-                  <th></th>
-                  {selected.map((c: any, i: number) => (
-                    <th key={c.id} colSpan={2} className="text-center">Amostra {i + 1}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {/* Área — calculada automaticamente, não editável */}
-                <tr className="bg-gray-50">
-                  <td className="font-medium text-gray-500 whitespace-nowrap">Área</td>
-                  {selected.map((c: any) => {
-                    const adj = areaAdjustment(subjectAreaM2, c.area_m2)
-                    return (
-                      <td key={c.id} colSpan={2} className="text-gray-400 italic">
-                        {fmtPct(adj)} <span className="text-[10px]">(auto)</span>
-                      </td>
-                    )
-                  })}
-                </tr>
-                {HOMOG_CRITERIA.map(({ key, label, tx }) => {
-                  const opts = tx ? HOMOG_OPTS_TX : HOMOG_OPTS_GENERIC
-                  const pctMap = tx ? HOMOG_PCT_TX : HOMOG_PCT_GENERIC
-                  return (
-                    <tr key={key}>
-                      <td className="font-medium text-gray-500 whitespace-nowrap">{label}</td>
-                      {selected.map((c: any) => {
-                        const val = c[key] || (tx ? 'Alinhado com Mercado' : 'Semelhante')
-                        const pct = pctMap[String(val).toUpperCase().trim()]
-                        return (
-                          <td key={c.id} colSpan={2}>
-                            <div className="flex items-center gap-1.5">
-                              <select
-                                className="input text-xs py-1"
-                                value={val}
-                                onChange={e => updateComp(c.id, { [key]: e.target.value })}
-                              >
-                                {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                              <span className="text-gray-400 whitespace-nowrap">{fmtPct(pct)}</span>
-                            </div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  )
-                })}
-                {/* Oferta Homogeneizada — índice final por amostra (€/m²) */}
-                <tr className="bg-brand-50 font-semibold">
-                  <td className="text-brand-700 whitespace-nowrap">Oferta Homogeneizada</td>
-                  {selected.map((c: any) => {
-                    const r = homogResults.find(h => h.id === c.id)
-                    return (
-                      <td key={c.id} colSpan={2} className="text-brand-700">
-                        {fmtEpm2(r?.homogIndex ?? null)}
-                      </td>
-                    )
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Análise Estatística */}
-          {homogN >= 2 && (
-            <div className="rounded-lg border border-gray-100 overflow-hidden">
-              <div className="grid grid-cols-5 bg-gray-50 text-xs px-3 py-2">
-                <div className="font-semibold text-gray-600 col-span-5 mb-1">
-                  Análise Estatística — Oferta Homogeneizada
-                </div>
-                <div>Mínimo: <span className="font-medium">{fmtEpm2(homogMin)}</span></div>
-                <div>Máximo: <span className="font-medium">{fmtEpm2(homogMax)}</span></div>
-                <div>Média: <span className="font-medium">{fmtEpm2(homogAvg)}</span></div>
-                <div>Mediana: <span className="font-medium">{fmtEpm2(homogMedian)}</span></div>
-                <div>DesvPad: <span className="font-medium">{fmtEpm2(homogStdev)}</span></div>
-              </div>
-              <div className="grid grid-cols-[140px_1fr] gap-3 px-3 py-2 text-xs border-t border-gray-100">
-                <div className="text-gray-500">
-                  Saneamento<br/>(Critério de Chauvenet)<br/>
-                  N = {homogN}{chauvenetR !== undefined && <><br/>r = {chauvenetR.toFixed(2).replace('.',',')}</>}
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {selected.map((c: any) => {
-                    const r = homogResults.find(h => h.id === c.id)
-                    const idx = r?.homogIndex ?? null
-                    if (idx === null || homogAvg === null || homogStdev === null) {
-                      return <div key={c.id} className="text-gray-400">—</div>
-                    }
-                    const ratio = homogStdev > 0 ? Math.abs(idx - homogAvg) / homogStdev : 0
-                    const validated = chauvenetR !== undefined ? ratio < chauvenetR : null
-                    return (
-                      <div key={c.id} className={validated === false ? 'text-red-600' : 'text-gray-700'}>
-                        <div>{ratio.toFixed(5).replace('.',',')}</div>
-                        <div className="text-[10px] font-medium">
-                          {validated === null ? '—' : validated ? 'AMOSTRA VALIDADA' : 'AMOSTRA REJEITADA'}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <p className="text-xs text-gray-400 italic">
-            Estes ajustes e a Oferta Homogeneizada são escritos no relatório (folha IV-IV) junto com o respectivo comparável.
-          </p>
         </div>
       )}
 
