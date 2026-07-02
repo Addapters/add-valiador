@@ -738,11 +738,13 @@ export default function PropertyDetail() {
         {tab==='sec3' && (<>
           <Section title="Tipo e Estado">
             <F label="Tipo de Bem"           field="property_type"      value={property.property_type}
-              opts={['Apartamento','Moradia','Moradias unifamiliares','Moradias em banda','Habitação','Loja','Comércio','Escritórios','Armazém','Naves industriais','Garagem','Arrumos','Outros Anexos','Terreno rústico','Terreno urbano','Edifício']} onSave={save}/>
-            <F label="Subtipo de Bem"        field="property_subtype"   value={property.property_subtype}   onSave={save}/>
+              opts={['Apartamento','Armazém','Arrumos','Concessão administrativa','Direitos de superfície','Edifício','Fundo de comércio','Garagem','Loja','Moradia','Navio','Outro anexo','Terreno','Aeronave']} onSave={save}/>
+            <F label="Subtipo de Bem"        field="property_subtype"   value={property.property_subtype}
+              opts={['de habitação','de escritórios','de comércio','de moradias unifamiliares','de moradias em banda','de naves industriais','de parqueamento','Centro comercial','Centro logístico','Centro de ensino e instalações culturais','Hospital','Hotel','Instalações desportivas e recreativas','Posto de abastecimento','Habitação a custos controlados','Habitação a preços de mercado','Residência de estudantes','Residência geriátrica','Terreno rústico','Terreno urbano','N/A']} onSave={save}/>
             <F label="Uso"                   field="use_type"           value={property.use_type}
-              opts={['Residencial','Comercial','Industrial','Serviços','Misto','Rústico']} onSave={save}/>
-            <F label="Subuso"                field="use_subtype"        value={property.use_subtype}        onSave={save}/>
+              opts={['Residencial','Comercial','Industrial','Serviços','Ligado à exploração económica','Não ligado à exploração económica']} onSave={save}/>
+            <F label="Subuso"                field="use_subtype"        value={property.use_subtype}
+              opts={['1ª residência','2ª residência','Polivalente','Não polivalente','N/A']} onSave={save}/>
             <F label="Destino"               field="destino"            value={property.destino}
               opts={['1ª residência','2ª residência','VPO / Livre','Arrendamento']} onSave={save}/>
             <F label="Tipo de Prédio"        field="tipo_predio"        value={property.tipo_predio}
@@ -811,9 +813,10 @@ export default function PropertyDetail() {
               opts={['Muito alta','Alta','Média','Baixa']} onSave={save}/>
             <F label="Orientação Solar"           field="orientacao_solar"        value={property.orientacao_solar}
               opts={['Aumenta o valor','Diminui o valor','Não influi no valor']} onSave={save}/>
-            <F label="Categorização"              field="categorizacao"           value={property.categorizacao}           onSave={save}/>
+            <F label="Categorização"              field="categorizacao"           value={property.categorizacao}
+              opts={['Excelente estado','Bom estado','Necessita de manutenção/reparação','Liquidação']} onSave={save}/>
             <F label="Tipo de Reparação"          field="tipo_reparacao"          value={property.tipo_reparacao}
-              opts={['Conservação','Reabilitação','Remodelação','Ampliação','Construção nova']} onSave={save}/>
+              opts={['Troca de fechadura','Retirada de objetos','Limpeza','Desinfestação','Outra reparação']} onSave={save}/>
           </Section>
           <Section title="Certificado Energético">
             <F label="N.º Certificado Energético" field="nr_certificado_energ"   value={property.nr_certificado_energ}              onSave={save}/>
