@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/ui'
 import toast from 'react-hot-toast'
 
-const PROPERTY_TYPES = ['Apartamento','Moradia','Moradias unifamiliares','Moradias em banda','Habitação','Loja','Comércio','Escritórios','Armazém','Naves industriais','Garagem','Arrumos','Outros Anexos','Terreno rústico','Terreno urbano','Edifício']
+const PROPERTY_TYPES = ['Apartamento','Armazém','Arrumos','Concessão administrativa','Direitos de superfície','Edifício','Fundo de comércio','Garagem','Loja','Moradia','Navio','Outro anexo','Terreno','Aeronave']
 
 async function generateRef(): Promise<string> {
   const { data } = await supabase
@@ -24,12 +24,12 @@ export default function PropertyCreate() {
   const [searchParams] = useSearchParams()
   const [form, setForm] = useState({
     portfolio_id: searchParams.get('portfolio') || '',
-    ref: '',
     external_ref: '',
     property_type: '',
     typology: '',
     street: '',
     number: '',
+    postal_code: '',
     municipality: '',
     district: '',
   })
@@ -56,7 +56,7 @@ export default function PropertyCreate() {
       const portfolio = portfolios.find((p: any) => p.id === form.portfolio_id)
       const clientId = (portfolio as any)?.client_id ?? null
 
-      const ref = form.ref.trim() || (await generateRef())
+      const ref = await generateRef()   // sempre auto-gerada, não exposta ao utilizador
 
       const { data, error } = await supabase
         .from('properties')
@@ -69,6 +69,7 @@ export default function PropertyCreate() {
           typology: form.typology.trim() || null,
           street: form.street.trim() || null,
           number: form.number.trim() || null,
+          postal_code: form.postal_code.trim() || null,
           municipality: form.municipality.trim() || null,
           district: form.district.trim() || null,
           visit_status: 'pending',
@@ -98,21 +99,15 @@ export default function PropertyCreate() {
             <option value="">— selecciona —</option>
             {portfolios.map((p: any) => (
               <option key={p.id} value={p.id}>
-                {p.name}{p.clients?.name ? ` — ${p.clients.name}` : ''}
+                {p.clients?.name ? `${p.clients.name} | ${p.name}` : p.name}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">Referência interna</label>
-            <input className="input w-full" placeholder="Auto (AV-NNNN)" value={form.ref} onChange={e => set('ref', e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Ref. externa (cliente)</label>
-            <input className="input w-full" value={form.external_ref} onChange={e => set('external_ref', e.target.value)} />
-          </div>
+        <div>
+          <label className="label">Ref. externa (cliente)</label>
+          <input className="input w-full" value={form.external_ref} onChange={e => set('external_ref', e.target.value)} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -140,7 +135,17 @@ export default function PropertyCreate() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="label">Código Postal</label>
+            <input className="input w-full" placeholder="1234-567" maxLength={8}
+              value={form.postal_code}
+              onChange={e => {
+                const d = e.target.value.replace(/\D/g, '').slice(0, 7)
+                set('postal_code', d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d)
+              }}
+            />
+          </div>
           <div>
             <label className="label">Município</label>
             <input className="input w-full" value={form.municipality} onChange={e => set('municipality', e.target.value)} />

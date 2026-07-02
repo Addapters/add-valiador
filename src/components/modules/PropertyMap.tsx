@@ -49,7 +49,7 @@ export default function PropertyMap() {
     ? portfolios.filter((p: any) => p.client_id === clientId)
     : portfolios
 
-  const { data: properties = [] } = useQuery({
+  const { data: properties = [], isFetching: propertiesFetching } = useQuery({
     queryKey: ['properties-map', portfolioId, clientId],
     queryFn: async () => {
       let q = supabase
@@ -153,11 +153,15 @@ export default function PropertyMap() {
           ))}
         </div>
 
-        {properties.length === 0 && (
+        {propertiesFetching ? (
+          <div className="text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+            A carregar imóveis…
+          </div>
+        ) : properties.length === 0 ? (
           <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
             Nenhum imóvel georreferenciado para esta selecção. Abre a ficha de um imóvel e usa o botão "Obter coordenadas" para geocodificar automaticamente.
           </div>
-        )}
+        ) : null}
         <div ref={mapRef} style={{ height: '520px', borderRadius: '12px', border: '0.5px solid #e5e7eb' }} />
       </div>
     </div>
