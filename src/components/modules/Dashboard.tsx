@@ -122,6 +122,14 @@ export default function Dashboard() {
   const recent = (data?.recent     || []) as any[]
 
   // Agrupar imóveis por projeto (portfolio)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  function toggleGroup(pid: string) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      next.has(pid) ? next.delete(pid) : next.add(pid)
+      return next
+    })
+  }
   const groupedByPortfolio = useMemo(() => {
     const map = new Map<string, { label: string; items: any[]; status: string }>()
     recent.forEach((p: any) => {
@@ -393,11 +401,15 @@ export default function Dashboard() {
                   const isClosed = status === 'closed'
                   return (
                     <div key={pid}>
-                      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+                      <div
+                        className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2 cursor-pointer select-none hover:bg-gray-100"
+                        onClick={() => toggleGroup(pid)}>
+                        <span className={`text-gray-400 transition-transform ${collapsedGroups.has(pid) ? '' : 'rotate-90'}`}>▶</span>
                         <span className={`text-sm font-semibold ${isClosed ? 'line-through text-gray-400' : 'text-gray-700'}`}>{label}</span>
                         {isClosed && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Encerrado</span>}
                         <span className="ml-2 text-xs text-gray-400">{groupItems.length} imóveis</span>
                       </div>
+                      {!collapsedGroups.has(pid) && (
                       <div className="overflow-x-auto">
                         <table className="table-base">
                           <thead>
@@ -476,6 +488,7 @@ export default function Dashboard() {
                           </tbody>
                         </table>
                       </div>
+                      )}
                     </div>
                   )
                 })}

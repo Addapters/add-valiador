@@ -12,6 +12,7 @@ export const DEFAULT_FILTERS: PropertyFilters = {
 
 export const ALL_COLUMNS: Record<string, ColDef> = {
   // Base fields
+  portfolio_status:       { label:'Estado Projeto',        group:'base' },
   external_ref:           { label:'Ref. Externa',          group:'base' },
   id_bien:                { label:'ID do Bem',             group:'base' },
   id_registo_predial:     { label:'Reg. Predial',          group:'base' },

@@ -207,9 +207,10 @@ function toDisplay(val: any, type: string): string {
   }
   return s
 }
-function F({ label, value, field, type='text', onSave, opts, span, textarea, half }: {
+function F({ label, value, field, type='text', onSave, opts, span, textarea, half, format }: {
   label:string; value:any; field:string; type?:string
   onSave:(p:any)=>void; opts?:string[]; span?:boolean; textarea?:boolean; half?:boolean
+  format?: (v: string) => string   // máscara aplicada em tempo real durante a digitação
 }) {
   const [val, setVal] = useState(value ?? '')
   const [dirty, setDirty] = useState(false)
@@ -217,10 +218,11 @@ function F({ label, value, field, type='text', onSave, opts, span, textarea, hal
   useEffect(() => { setVal(value ?? ''); setDirty(false) }, [value])
 
   function handleChange(newVal: string) {
-    setVal(newVal); setDirty(true)
+    const formatted = format ? format(newVal) : newVal
+    setVal(formatted); setDirty(true)
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
-      const v = type === 'number' ? (newVal ? parseFloat(newVal) : null) : (newVal || null)
+      const v = type === 'number' ? (formatted ? parseFloat(formatted) : null) : (formatted || null)
       onSave({ [field]: v })
       setDirty(false)
     }, 800)
@@ -725,7 +727,9 @@ export default function PropertyDetail() {
             <F label="Andar / Piso"   field="floor_letter" value={property.floor_letter}        onSave={save}/>
             <F label="Porta / Fração" field="fracao"       value={property.fracao}             onSave={save}/>
             <F label="Complemento"    field="lugar"        value={property.lugar}              onSave={save}/>
-            <F label="Código Postal"  field="postal_code"  value={property.postal_code}        onSave={save}/>
+            <F label="Código Postal"  field="postal_code"  value={property.postal_code}
+              format={v => { const d = v.replace(/\D/g,'').slice(0,7); return d.length > 4 ? d.slice(0,4)+'-'+d.slice(4) : d }}
+              onSave={save}/>
             <F label="Freguesia"      field="parish"       value={property.parish}             onSave={save}/>
             <F label="Concelho"       field="municipality" value={property.municipality}        onSave={save}/>
             <F label="Distrito"       field="district"     value={property.district}           onSave={save}/>

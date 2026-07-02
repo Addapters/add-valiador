@@ -232,7 +232,7 @@ export default function Properties() {
           prev_valuation_date, prev_valuation_value, prev_valuation_method,
           prev_valuation_expert, prev_valuation_entity,
           tem_fotos, tem_comparaveis, verificado,
-          portfolios(id, name, clients(name))
+          portfolios(id, name, status, clients(name))
         `)
         .order('portfolio_id').order('ref')
       return (data||[]) as any[]
@@ -342,11 +342,31 @@ export default function Properties() {
     onError: (e: any) => toast.error(e.message)
   })
 
+  const updatePortfolioStatus = useMutation({
+    mutationFn: async ({ portfolioId, status }: { portfolioId:string; status:string }) => {
+      const { error } = await supabase.from('portfolios').update({ status }).eq('id', portfolioId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey:['properties-all'] })
+  })
+
   function cellVal(p: any, col: string) {
     const isAbanca = ALL_COLUMNS[col]?.group === 'abanca'
     const cls = isAbanca ? 'text-blue-700 whitespace-nowrap' : 'text-gray-600 whitespace-nowrap'
+    const portfolioStatus = p.portfolios?.status || 'active'
     switch(col) {
-      case 'external_ref':    return <Link to={`/properties/${p.id}`} className="text-brand-600 hover:underline font-semibold whitespace-nowrap">{p.external_ref || p.ref || '—'}</Link>
+      case 'external_ref':    return <Link to={`/properties/${p.id}`} className={`text-brand-600 hover:underline font-semibold whitespace-nowrap ${portfolioStatus==='closed' ? 'line-through opacity-60' : ''}`}>{p.external_ref || p.ref || '—'}</Link>
+      case 'portfolio_status': return p.portfolios ? (
+        <select
+          className={`text-xs border-0 bg-transparent cursor-pointer font-medium ${portfolioStatus==='closed' ? 'text-gray-400' : 'text-green-600'}`}
+          value={portfolioStatus}
+          onChange={e => updatePortfolioStatus.mutate({ portfolioId: p.portfolios.id, status: e.target.value })}>
+          <option value="active">Activo</option>
+          <option value="delivered">Entregue</option>
+          <option value="awaiting_payment">Aguarda Pagamento</option>
+          <option value="closed">Encerrado</option>
+        </select>
+      ) : <span className="text-gray-300 text-xs">—</span>
       case 'visit_status':    return (
         <select className="text-xs border-0 bg-transparent cursor-pointer" value={p.visit_status||''} onChange={e => updateField.mutate({ id:p.id, field:'visit_status', value:e.target.value })}>
           <option value="">—</option>
