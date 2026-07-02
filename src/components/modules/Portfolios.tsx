@@ -525,11 +525,30 @@ export default function Portfolios() {
                       <select className="input text-xs py-1.5" value={p.template_type||''}
                         onChange={e => supabase.from('portfolios').update({ template_type: e.target.value || null }).eq('id', p.id).then(() => qc.invalidateQueries({ queryKey:['portfolios'] }))}>
                         <option value="">Automático (pelo nº de bens)</option>
-                        <option value="standard">Standard (1-3 bens)</option>
-                        <option value="multi">Multi (4+ bens)</option>
-                        <option value="terreno">Terreno</option>
+                        <option value="standard">Forçar Standard (1-3 bens)</option>
+                        <option value="multi">Forçar Multi (4+ bens)</option>
+                        <option value="terreno">Forçar Terreno</option>
                       </select>
                     </div>
+                    {/* URLs de templates customizados — se preenchidos, substituem os templates globais */}
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-gray-400 hover:text-gray-600 select-none">Templates customizados (URLs do Supabase Storage)</summary>
+                      <div className="mt-2 space-y-2">
+                        {(['template_url_standard','template_url_multi','template_url_terreno'] as const).map(field => (
+                          <div key={field}>
+                            <label className="text-[10px] text-gray-400 uppercase tracking-wide">{field.replace('template_url_','').replace('standard','Standard').replace('multi','Multi').replace('terreno','Terreno')}</label>
+                            <input className="input text-xs" placeholder="https://... (vazio = usa template global)"
+                              defaultValue={p[field]||''}
+                              onBlur={e => {
+                                const val = e.target.value.trim() || null
+                                supabase.from('portfolios').update({ [field]: val }).eq('id', p.id)
+                                  .then(() => qc.invalidateQueries({ queryKey:['portfolios'] }))
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </details>
 
                     <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-50">
                       <span>{p.properties?.[0]?.count || 0} imóveis</span>

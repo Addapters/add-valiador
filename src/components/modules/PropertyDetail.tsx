@@ -348,7 +348,7 @@ export default function PropertyDetail() {
     queryKey: ['property', id],
     queryFn: async () => {
       const [pR, phR, cR, docR] = await Promise.all([
-        supabase.from('properties').select('*, portfolios(name, clients(name))').eq('id', id as string).single(),
+        supabase.from('properties').select('*, portfolios(name, status, template_type, template_url_standard, template_url_multi, template_url_terreno, clients(name))').eq('id', id as string).single(),
         supabase.from('property_photos').select('*').eq('property_id', id as string).order('slot').order('sort_order'),
         supabase.from('market_comps').select('*, selected, chauvenet_rejected, uso, tipologia, ano_estado').eq('property_id', id as string).order('created_at', { ascending: false }),
         supabase.from('property_documents').select('*').eq('property_id', id as string).order('created_at', { ascending: false }),
@@ -511,13 +511,27 @@ export default function PropertyDetail() {
       }
 
       const totalBens = 1 + siblings.length
+      const proj = property.portfolios  // dados do projecto (inclui template_type e URLs customizados)
 
-      // Selecciona template: multi para 4+ bens, standard para 1-3
-      const standardUrl = import.meta.env.VITE_REPORT_TEMPLATE_URL
-      const multiUrl    = import.meta.env.VITE_REPORT_TEMPLATE_MULTI_URL || standardUrl
-      const templateUrl = totalBens >= 4 ? multiUrl : standardUrl
+      // Templates por projecto: usa os URLs do projecto se existirem, senão cai para variáveis de ambiente
+      const envStandard = import.meta.env.VITE_REPORT_TEMPLATE_URL
+      const envMulti    = import.meta.env.VITE_REPORT_TEMPLATE_MULTI_URL || envStandard
+      const envTerreno  = import.meta.env.VITE_REPORT_TEMPLATE_TERRENO_URL
 
-      if (!templateUrl) throw new Error('VITE_REPORT_TEMPLATE_URL não está configurada.')
+      const standardUrl = proj?.template_url_standard || envStandard
+      const multiUrl    = proj?.template_url_multi    || envMulti
+      const terrUrl     = proj?.template_url_terreno  || envTerreno
+
+      // Selecção do template: respeita override do projecto; senão, lógica automática
+      const isTerreno = (property.property_subtype || '').toUpperCase().includes('URBANIZABLE')
+        || (proj?.template_type === 'terreno')
+      const templateUrl = isTerreno
+        ? (terrUrl || standardUrl)
+        : proj?.template_type === 'multi' ? multiUrl
+        : proj?.template_type === 'standard' ? standardUrl
+        : totalBens >= 4 ? multiUrl : standardUrl   // automático pelo nº de bens
+
+      if (!templateUrl) throw new Error('Template não configurado. Verifique as variáveis VITE_REPORT_TEMPLATE_URL ou o template do projecto.')
 
       let mapImageBlob: Blob | null = null
       if (property.latitude && property.longitude) {

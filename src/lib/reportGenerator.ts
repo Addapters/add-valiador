@@ -275,10 +275,12 @@ export async function generateAbancaReport(
           }
         }
 
-        // Passo 2 — Expandir slaves: <c r="COL+ROW" ATTRS>INNER<f t="shared" si="N"/>
-        // O regex captura col+row do mesmo <c> que contém o slave → sem ambiguidade.
+        // Passo 2 — Expandir slaves: <c r="COL+ROW" ATTRS>(qualquer conteúdo, incluindo <v>)<f t="shared" si="N"/>
+        // BUG anterior: [^<]* falhava quando <v>0</v> aparecia ANTES de <f/> na mesma célula.
+        // Fix: ((?:(?!<\/c>)[\s\S])*?) — token temperado que permite qualquer conteúdo
+        //      mas NUNCA atravessa </c>, garantindo que col+row pertencem à célula correcta.
         xml = xml.replace(
-          /<c\s+r="([A-Z]+)(\d+)"([^>]*)>([^<]*)<f\b([^>]*)\/>/g,
+          /<c\s+r="([A-Z]+)(\d+)"([^>]*)>((?:(?!<\/c>)[\s\S])*?)<f\b([^>]*)\/>/g,
           (full, col, row, cAttrs, inner, fAttrs) => {
             if (!fAttrs.includes('t="shared"')) return full   // não é shared slave
             const siM = fAttrs.match(/\bsi="(\d+)"/)
