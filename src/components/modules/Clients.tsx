@@ -83,16 +83,17 @@ export default function Clients() {
                       </button>
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500 space-y-0.5">
-                    {c.email && <p>{c.email}</p>}
-                    {c.phone && <p>{c.phone}</p>}
-                    {c.address && <p>{c.address}</p>}
+                  <div className="text-xs text-gray-600 space-y-1">
+                    {c.email   && <p className="flex items-center gap-1.5">📧 {c.email}</p>}
+                    {c.phone   && <p className="flex items-center gap-1.5">📞 {c.phone}</p>}
+                    {c.address && <p className="flex items-center gap-1.5">📍 {c.address}</p>}
+                    {c.notes   && <p className="text-gray-400 italic mt-1">{c.notes}</p>}
                   </div>
                   <div className="flex gap-3 mt-auto pt-2 border-t border-gray-50 text-xs text-gray-400">
-                    <span>{c.portfolios?.[0]?.count || 0} portfólios</span>
+                    <span>{c.portfolios?.[0]?.count || 0} projetos</span>
                     <span>{c.client_templates?.[0]?.count || 0} templates</span>
                     <a href={`/portfolios?client=${c.id}`} className="ml-auto text-brand-500 flex items-center gap-0.5 hover:underline">
-                      Ver <ChevronRight size={11}/>
+                      Ver projetos <ChevronRight size={11}/>
                     </a>
                   </div>
                 </div>

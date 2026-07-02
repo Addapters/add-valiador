@@ -74,6 +74,11 @@ export const DEFAULT_VISIBLE = [
   'nuc_risco','data_pedido',
 ]
 
+export const DEFAULT_MINIMUM = [
+  'external_ref','district','municipality','parish',
+  'street','property_type','visit_status','verificado','fee_amount',
+]
+
 // No-op stubs kept for compatibility — não usam localStorage
 export function getSavedFilters(): PropertyFilters  { return { ...DEFAULT_FILTERS } }
 export function saveFilters(_f: PropertyFilters)    { /* sem persistência */ }

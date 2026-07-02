@@ -8,7 +8,7 @@ import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pe
 import toast from 'react-hot-toast'
 import {
   getSavedFilters as _getSavedFilters, saveFilters as _saveFilters, clearFilters as _clearFilters, type PropertyFilters,
-  getSavedVisibleCols, saveVisibleCols, ALL_COLUMNS, DEFAULT_VISIBLE, type ColDef
+  getSavedVisibleCols, saveVisibleCols, ALL_COLUMNS, DEFAULT_VISIBLE, DEFAULT_MINIMUM, type ColDef
 } from '@/lib/userPrefs'
 
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
@@ -88,7 +88,7 @@ function ColumnPicker({ visible, onChange }: { visible:string[]; onChange:(v:str
             <span className="text-xs font-semibold text-gray-600">Colunas visíveis</span>
             <div className="flex gap-2">
               <button className="text-xs text-brand-500 hover:underline" onClick={() => { const all = Object.keys(ALL_COLUMNS); onChange(all); saveVisibleCols(all) }}>Todas</button>
-              <button className="text-xs text-gray-400 hover:underline" onClick={() => { const min=['ref','district','municipality','parish','street','property_type','visit_status','billing_status','fee_amount']; onChange(min); saveVisibleCols(min) }}>Mínimo</button>
+              <button className="text-xs text-gray-400 hover:underline" onClick={() => { onChange(DEFAULT_MINIMUM); saveVisibleCols(DEFAULT_MINIMUM) }}>Mínimo</button>
             </div>
           </div>
 
