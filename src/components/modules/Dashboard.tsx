@@ -102,14 +102,14 @@ export default function Dashboard() {
   const [bulkPerito,     setBulkPerito]     = useState('')
   const [showBulkPerito, setShowBulkPerito] = useState(false)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ['dashboard-stats', role, name],
     queryFn: async () => {
       let statsQ = supabase.from('properties').select('visit_status, billing_status, fee_amount')
       if (role === 'perito' && name) statsQ = statsQ.eq('perito_avaliador', name)
 
       let tableQ = supabase.from('properties')
-        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado')
+        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado, portfolio_id, portfolios(id, name, status, clients(name))')
         .order('updated_at', { ascending: false })
       if (role === 'perito' && name) tableQ = tableQ.eq('perito_avaliador', name)
 
@@ -120,6 +120,21 @@ export default function Dashboard() {
 
   const props  = (data?.properties || []) as any[]
   const recent = (data?.recent     || []) as any[]
+
+  // Agrupar imóveis por projeto (portfolio)
+  const groupedByPortfolio = useMemo(() => {
+    const map = new Map<string, { label: string; items: any[]; status: string }>()
+    recent.forEach((p: any) => {
+      const pid    = p.portfolio_id || '__none__'
+      const pName  = p.portfolios?.name
+      const cName  = p.portfolios?.clients?.name
+      const label  = cName && pName ? `${cName} | ${pName}` : pName || cName || 'Sem projeto'
+      const status = p.portfolios?.status || 'active'
+      if (!map.has(pid)) map.set(pid, { label, items: [], status })
+      map.get(pid)!.items.push(p)
+    })
+    return [...map.entries()].sort(([,a],[,b]) => a.label.localeCompare(b.label))
+  }, [recent])
 
   // KPIs
   const total     = props.length
@@ -364,97 +379,106 @@ export default function Dashboard() {
             </div>
           )}
 
-          {isLoading ? (
+          {(isLoading || isFetching) ? (
             <p className="text-sm text-gray-400 py-4 text-center">A carregar…</p>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Nenhum imóvel encontrado.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table-base">
-                <thead>
-                  <tr>
-                    <th className="w-8">
-                      <button onClick={selectAll} className="text-gray-400 hover:text-brand-500">
-                        {selected.size === filtered.length && filtered.length > 0
-                          ? <CheckSquare size={13} className="text-brand-400"/>
-                          : <Square size={13}/>}
-                      </button>
-                    </th>
-                    <th>Ref. Externa</th>
-                    <th>ID Bem</th>
-                    <th>Localização</th>
-                    <th>Tipo</th>
-                    {role === 'admin' && <th>Perito</th>}
-                    <th>Visita</th>
-                    <th className="text-center">Fotos</th>
-                    <th className="text-center">Comparáveis</th>
-                    <th className="text-center">Verificado</th>
-                    <th>Honorário</th>
-                    <th>Hon. Addapters</th>
-                    <th>Actualizado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((p: any, idx: number) => (
-                    <tr key={p.id} className={p.verificado ? 'bg-green-50 hover:bg-green-100' : selected.has(p.id) ? 'bg-brand-50' : idx%2===0 ? 'bg-white' : 'bg-gray-50/30'}>
-                      <td>
-                        <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
-                          {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
-                        </button>
-                      </td>
-
-                      {/* Ref. externa como identificador principal */}
-                      <td>
-                        <Link to={`/properties/${p.id}`} className="text-brand-600 hover:underline font-medium whitespace-nowrap">
-                          {p.external_ref || p.ref || p.id}
-                        </Link>
-                      </td>
-                      <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>
-
-                      <td className="text-gray-600 max-w-[160px] truncate">{toDisplayDash(p.municipality || p.address) || '—'}</td>
-                      <td className="text-gray-600 whitespace-nowrap">{toDisplayDash([p.property_type, p.typology].filter(Boolean).join(' ')) || '—'}</td>
-
-                      {role === 'admin' && (
-                        <td>
-                          <InlineEdit value={p.perito_avaliador}
-                            onSave={val => updateField.mutate({ id:p.id, field:'perito_avaliador', value:val||null })}/>
-                        </td>
-                      )}
-
-                      {/* Visita — inline select */}
-                      <td>
-                        <InlineSelect
-                          value={p.visit_status}
-                          options={VISIT_LABELS}
-                          renderValue={v => <VisitBadge status={v} />}
-                          onChange={val => updateField.mutate({ id:p.id, field:'visit_status', value:val })}
-                        />
-                      </td>
-
-                      <td className="text-center">
-                        <BoolBadge value={!!p.tem_fotos} trueLabel="Sim" falseLabel="Não"
-                          color="bg-blue-100 text-blue-600 hover:bg-blue-200"
-                          onClick={() => updateField.mutate({ id:p.id, field:'tem_fotos', value:!p.tem_fotos })}/>
-                      </td>
-                      <td className="text-center">
-                        <BoolBadge value={!!p.tem_comparaveis} trueLabel="Sim" falseLabel="Não"
-                          color="bg-purple-100 text-purple-600 hover:bg-purple-200"
-                          onClick={() => updateField.mutate({ id:p.id, field:'tem_comparaveis', value:!p.tem_comparaveis })}/>
-                      </td>
-                      <td className="text-center">
-                        <BoolBadge value={!!p.verificado} trueLabel="Sim" falseLabel="Não"
-                          color="bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
-                          onClick={() => updateField.mutate({ id:p.id, field:'verificado', value:!p.verificado })}/>
-                      </td>
-
-                      <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
-                      <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
-
-                      <td className="text-gray-400 whitespace-nowrap">{formatDate(p.updated_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              {groupedByPortfolio
+                .filter(([, { items }]) => items.some(p => filtered.includes(p)))
+                .map(([pid, { label, items, status }]) => {
+                  const groupItems = items.filter(p => filtered.includes(p))
+                  if (groupItems.length === 0) return null
+                  const isClosed = status === 'closed'
+                  return (
+                    <div key={pid}>
+                      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+                        <span className={`text-sm font-semibold ${isClosed ? 'line-through text-gray-400' : 'text-gray-700'}`}>{label}</span>
+                        {isClosed && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Encerrado</span>}
+                        <span className="ml-2 text-xs text-gray-400">{groupItems.length} imóveis</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="table-base">
+                          <thead>
+                            <tr>
+                              <th className="w-8">
+                                <button onClick={selectAll} className="text-gray-400 hover:text-brand-500">
+                                  {selected.size === filtered.length && filtered.length > 0
+                                    ? <CheckSquare size={13} className="text-brand-400"/>
+                                    : <Square size={13}/>}
+                                </button>
+                              </th>
+                              <th>Ref. Externa</th>
+                              <th>ID Bem</th>
+                              <th>Localização</th>
+                              <th>Tipo</th>
+                              {role === 'admin' && <th>Perito</th>}
+                              <th>Visita</th>
+                              <th className="text-center">Fotos</th>
+                              <th className="text-center">Comparáveis</th>
+                              <th className="text-center">Verificado</th>
+                              <th>Honorário</th>
+                              <th>Hon. Addapters</th>
+                              <th>Actualizado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {groupItems.map((p: any, idx: number) => (
+                              <tr key={p.id} className={`${p.verificado ? 'bg-green-50 hover:bg-green-100' : selected.has(p.id) ? 'bg-brand-50' : idx%2===0 ? 'bg-white' : 'bg-gray-50/30'} ${isClosed ? 'opacity-60' : ''}`}>
+                                <td>
+                                  <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
+                                    {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
+                                  </button>
+                                </td>
+                                <td>
+                                  <Link to={`/properties/${p.id}`} className={`text-brand-600 hover:underline font-medium whitespace-nowrap ${isClosed ? 'line-through' : ''}`}>
+                                    {p.external_ref || p.ref || p.id}
+                                  </Link>
+                                </td>
+                                <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>
+                                <td className="text-gray-600 max-w-[160px] truncate">{toDisplayDash(p.municipality || p.address) || '—'}</td>
+                                <td className="text-gray-600 whitespace-nowrap">{toDisplayDash([p.property_type, p.typology].filter(Boolean).join(' ')) || '—'}</td>
+                                {role === 'admin' && (
+                                  <td>
+                                    <InlineEdit value={p.perito_avaliador}
+                                      onSave={val => updateField.mutate({ id:p.id, field:'perito_avaliador', value:val||null })}/>
+                                  </td>
+                                )}
+                                <td>
+                                  <InlineSelect
+                                    value={p.visit_status}
+                                    options={VISIT_LABELS}
+                                    renderValue={v => <VisitBadge status={v} />}
+                                    onChange={val => updateField.mutate({ id:p.id, field:'visit_status', value:val })}
+                                  />
+                                </td>
+                                <td className="text-center">
+                                  <BoolBadge value={!!p.tem_fotos} trueLabel="Sim" falseLabel="Não"
+                                    color="bg-blue-100 text-blue-600 hover:bg-blue-200"
+                                    onClick={() => updateField.mutate({ id:p.id, field:'tem_fotos', value:!p.tem_fotos })}/>
+                                </td>
+                                <td className="text-center">
+                                  <BoolBadge value={!!p.tem_comparaveis} trueLabel="Sim" falseLabel="Não"
+                                    color="bg-purple-100 text-purple-600 hover:bg-purple-200"
+                                    onClick={() => updateField.mutate({ id:p.id, field:'tem_comparaveis', value:!p.tem_comparaveis })}/>
+                                </td>
+                                <td className="text-center">
+                                  <BoolBadge value={!!p.verificado} trueLabel="Sim" falseLabel="Não"
+                                    color="bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
+                                    onClick={() => updateField.mutate({ id:p.id, field:'verificado', value:!p.verificado })}/>
+                                </td>
+                                <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
+                                <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
+                                <td className="text-gray-400 whitespace-nowrap">{formatDate(p.updated_at)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>

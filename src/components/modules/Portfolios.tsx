@@ -425,7 +425,7 @@ function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:s
 export default function Portfolios() {
   const qc = useQueryClient()
   const [modal, setModal]           = useState(false)
-  const [form, setForm]             = useState({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape' })
+  const [form, setForm]             = useState({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape', template_type:'' })
   const [openImport, setOpenImport] = useState<string|null>(null)
 
   const { data: portfolios = [], isLoading } = useQuery({
@@ -442,12 +442,11 @@ export default function Portfolios() {
 
   const create = useMutation({
     mutationFn: async () => {
-      // deadline vazio → null para evitar "invalid input syntax for type date: ''"
       const payload = { ...form, deadline: form.deadline || null }
       const {error} = await supabase.from('portfolios').insert(payload)
       if (error) throw error
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey:['portfolios'] }); toast.success('Projeto criado'); setModal(false); setForm({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape' }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey:['portfolios'] }); toast.success('Projeto criado'); setModal(false); setForm({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape', template_type:'' }) },
     onError: (e: any) => toast.error(e.message)
   })
 
@@ -495,8 +494,13 @@ export default function Portfolios() {
                   <div key={p.id} className="card flex flex-col gap-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="font-semibold text-gray-900">{p.name}</p>
+                        <p className={`font-semibold ${p.status === 'closed' ? 'line-through text-gray-400' : 'text-gray-900'}`}>{p.name}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{p.clients?.name}</p>
+                        {p.template_type && (
+                          <p className="text-xs text-brand-500 mt-0.5">
+                            Template: {p.template_type === 'standard' ? 'Standard (1-3 bens)' : p.template_type === 'multi' ? 'Multi (4+ bens)' : p.template_type === 'terreno' ? 'Terreno' : p.template_type}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Badge variant={statusInfo.badge as any}>{statusInfo.label}</Badge>
@@ -514,6 +518,16 @@ export default function Portfolios() {
                       <select className="input text-xs py-1.5" value={p.status||'active'}
                         onChange={e => updateStatus.mutate({ id:p.id, status:e.target.value })}>
                         {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Template do relatório</label>
+                      <select className="input text-xs py-1.5" value={p.template_type||''}
+                        onChange={e => supabase.from('portfolios').update({ template_type: e.target.value || null }).eq('id', p.id).then(() => qc.invalidateQueries({ queryKey:['portfolios'] }))}>
+                        <option value="">Automático (pelo nº de bens)</option>
+                        <option value="standard">Standard (1-3 bens)</option>
+                        <option value="multi">Multi (4+ bens)</option>
+                        <option value="terreno">Terreno</option>
                       </select>
                     </div>
 
@@ -582,7 +596,15 @@ export default function Portfolios() {
                   {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div><label className="label">Nome *</label><input className="input" value={form.name} onChange={e => setForm(f => ({...f, name:e.target.value}))}/></div>
+              <div>
+                <label className="label">Template do relatório</label>
+                <select className="input" value={form.template_type} onChange={e => setForm(f => ({...f, template_type:e.target.value}))}>
+                  <option value="">Automático (pelo nº de bens)</option>
+                  <option value="standard">Standard (1-3 bens)</option>
+                  <option value="multi">Multi (4+ bens)</option>
+                  <option value="terreno">Terreno</option>
+                </select>
+              </div>
               <div><label className="label">Descrição</label><input className="input" value={form.description} onChange={e => setForm(f => ({...f, description:e.target.value}))}/></div>
               <div><label className="label">Prazo</label><input type="date" className="input" value={form.deadline} onChange={e => setForm(f => ({...f, deadline:e.target.value}))}/></div>
               <div>
