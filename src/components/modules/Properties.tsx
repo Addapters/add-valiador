@@ -234,7 +234,7 @@ export default function Properties() {
           tem_fotos, tem_comparaveis, verificado,
           portfolios(id, name, status, clients(name))
         `)
-        .order('portfolio_id').order('ref')
+        .order('portfolio_id').order('external_ref')
       return (data||[]) as any[]
     }
   })
@@ -508,7 +508,7 @@ export default function Properties() {
                             const isAbanca = def?.group === 'abanca'
                             return (
                               <th key={col}
-                                className={`px-3 py-2 font-semibold whitespace-nowrap ${col==='ref'?'sticky left-8 z-10':''} ${isAbanca?'bg-blue-50 text-blue-700':'bg-gray-50 text-gray-600'}`}
+                                className={`px-3 py-2 font-semibold whitespace-nowrap ${isAbanca?'bg-blue-50 text-blue-700':'bg-gray-50 text-gray-600'}`}
                                 style={{ minWidth: col==='street'||col==='ampliacao'?'160px':'80px' }}>
                                 {def?.label || col}
                               </th>
@@ -527,7 +527,7 @@ export default function Properties() {
                             {visibleCols.map(col => {
                               const isAbanca = ALL_COLUMNS[col]?.group === 'abanca'
                               return (
-                                <td key={col} className={`px-3 py-2 ${col==='ref'?'sticky left-8 bg-inherit z-10':''} ${isAbanca&&!selected.has(p.id)?'bg-blue-50/40':''}`}>
+                                <td key={col} className={`px-3 py-2 ${isAbanca&&!selected.has(p.id)?'bg-blue-50/40':''}`}>
                                   {cellVal(p, col)}
                                 </td>
                               )
