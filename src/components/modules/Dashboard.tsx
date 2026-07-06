@@ -110,7 +110,7 @@ export default function Dashboard() {
 
       let tableQ = supabase.from('properties')
         .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado, portfolio_id, portfolios(id, name, status, clients(name))')
-        .order('updated_at', { ascending: false })
+        .order('portfolio_id').order('external_ref', { ascending: true })
       if (role === 'perito' && name) tableQ = tableQ.eq('perito_avaliador', name)
 
       const [statsRes, tableRes] = await Promise.all([statsQ, tableQ])
