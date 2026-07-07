@@ -189,7 +189,16 @@ function translateES(s: string): string {
 // ── Auto-save field component ──────────────────────────────────────────────
 function toDisplay(val: any, type: string): string {
   if (!val && val !== 0) return ''
-  if (type === 'number' || type === 'date') return String(val)
+  if (type === 'date') return String(val)
+  if (type === 'number') {
+    const n = parseFloat(val)
+    if (isNaN(n)) return String(val)
+    // Separador de milhar: espaço (estilo português) — ex: 1 420, 106 784
+    const decimals = Number.isInteger(n) ? 0 : 2
+    const parts = n.toFixed(decimals).split('.')
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')
+    return decimals > 0 ? parts.join(',') : parts[0]
+  }
   let s = String(val)
   // Traduz termos espanhóis conhecidos primeiro
   s = translateES(s)
@@ -892,8 +901,20 @@ export default function PropertyDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Método Comparativo de Mercado</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
               <F label="Descrição"                        field="metodo_comp_descricao"   value={property.metodo_comp_descricao}   onSave={save}/>
-              <F label="Área (m²)"                       field="metodo_comp_area"        value={property.metodo_comp_area}        type="number" onSave={save}/>
-              <F label="Valor (€/m²)"                    field="metodo_comp_valor_m2"    value={property.metodo_comp_valor_m2}    type="number" onSave={save}/>
+              <F label="Área (m²)"                       field="metodo_comp_area"        value={property.metodo_comp_area}        type="number"
+                onSave={patch => {
+                  const area = parseFloat(patch.metodo_comp_area)
+                  const vm2  = parseFloat(property.metodo_comp_valor_m2)
+                  if (area && vm2) save({ ...patch, metodo_comp_valor_total: Math.round(area * vm2) })
+                  else save(patch)
+                }}/>
+              <F label="Valor (€/m²)"                    field="metodo_comp_valor_m2"    value={property.metodo_comp_valor_m2}    type="number"
+                onSave={patch => {
+                  const vm2  = parseFloat(patch.metodo_comp_valor_m2)
+                  const area = parseFloat(property.metodo_comp_area)
+                  if (vm2 && area) save({ ...patch, metodo_comp_valor_total: Math.round(vm2 * area) })
+                  else save(patch)
+                }}/>
               <F label="Valor Total (€)"                 field="metodo_comp_valor_total" value={property.metodo_comp_valor_total} type="number" onSave={save}/>
               <F label="Valor Comparativo Ajustado (€)"  field="valor_comparativo"       value={property.valor_comparativo}       type="number" onSave={save}/>
             </div>
@@ -902,8 +923,20 @@ export default function PropertyDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Valor de Renda Efetiva</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
               <F label="Descrição"           field="renda_ef_descricao"   value={property.renda_ef_descricao}              onSave={save}/>
-              <F label="Área (m²)"           field="renda_ef_area"        value={property.renda_ef_area}        type="number" onSave={save}/>
-              <F label="Renda (€/m²)"        field="renda_ef_valor_m2"    value={property.renda_ef_valor_m2}    type="number" onSave={save}/>
+              <F label="Área (m²)"           field="renda_ef_area"        value={property.renda_ef_area}        type="number"
+                onSave={patch => {
+                  const area = parseFloat(patch.renda_ef_area)
+                  const vm2  = parseFloat(property.renda_ef_valor_m2)
+                  if (area && vm2) save({ ...patch, renda_ef_mensal: Math.round(area * vm2) })
+                  else save(patch)
+                }}/>
+              <F label="Renda (€/m²)"        field="renda_ef_valor_m2"    value={property.renda_ef_valor_m2}    type="number"
+                onSave={patch => {
+                  const vm2  = parseFloat(patch.renda_ef_valor_m2)
+                  const area = parseFloat(property.renda_ef_area)
+                  if (vm2 && area) save({ ...patch, renda_ef_mensal: Math.round(vm2 * area) })
+                  else save(patch)
+                }}/>
               <F label="Renda Mensal (€)"    field="renda_ef_mensal"      value={property.renda_ef_mensal}      type="number" onSave={save}/>
               <F label="Taxa Capit. (%)"     field="renda_ef_taxa"        value={property.renda_ef_taxa}        type="number" onSave={save}/>
               <F label="Valor Total (€)"     field="renda_ef_total"       value={property.renda_ef_total}       type="number" onSave={save}/>
@@ -913,8 +946,20 @@ export default function PropertyDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Valor de Renda Potencial</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
               <F label="Descrição"           field="renda_pot_descricao"  value={property.renda_pot_descricao}              onSave={save}/>
-              <F label="Área (m²)"           field="renda_pot_area"       value={property.renda_pot_area}       type="number" onSave={save}/>
-              <F label="Renda (€/m²)"        field="renda_pot_valor_m2"   value={property.renda_pot_valor_m2}   type="number" onSave={save}/>
+              <F label="Área (m²)"           field="renda_pot_area"       value={property.renda_pot_area}       type="number"
+                onSave={patch => {
+                  const area = parseFloat(patch.renda_pot_area)
+                  const vm2  = parseFloat(property.renda_pot_valor_m2)
+                  if (area && vm2) save({ ...patch, renda_pot_mensal: Math.round(area * vm2) })
+                  else save(patch)
+                }}/>
+              <F label="Renda (€/m²)"        field="renda_pot_valor_m2"   value={property.renda_pot_valor_m2}   type="number"
+                onSave={patch => {
+                  const vm2  = parseFloat(patch.renda_pot_valor_m2)
+                  const area = parseFloat(property.renda_pot_area)
+                  if (vm2 && area) save({ ...patch, renda_pot_mensal: Math.round(vm2 * area) })
+                  else save(patch)
+                }}/>
               <F label="Renda Mensal (€)"    field="renda_pot_mensal"     value={property.renda_pot_mensal}     type="number" onSave={save}/>
               <F label="Taxa Capit. (%)"     field="renda_pot_taxa"       value={property.renda_pot_taxa}       type="number" onSave={save}/>
               <F label="Valor Total (€)"     field="renda_pot_total"      value={property.renda_pot_total}      type="number" onSave={save}/>
