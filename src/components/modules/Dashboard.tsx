@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, KpiCard, VisitBadge, BillingBadge } from '@/components/ui'
@@ -84,6 +84,43 @@ function BoolBadge({ value, trueLabel, falseLabel, color, onClick }: {
   )
 }
 
+// Badge com motivo editável — hover mostra razão, clique abre edição
+function MotivoBadge({ value, color, label, onSave }: {
+  value: string|null; color: string; label: string; onSave: (v: string|null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState(value || '')
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => { if (editing && ref.current) ref.current.focus() }, [editing])
+  function commit() { const v = draft.trim() || null; onSave(v); setEditing(false) }
+  if (editing) return (
+    <div className="flex flex-col gap-1 min-w-[180px] z-20 relative">
+      <textarea ref={ref} rows={2}
+        className="text-xs border border-gray-300 rounded px-2 py-1 resize-none focus:outline-none focus:border-brand-400"
+        placeholder={`Motivo: ${label.toLowerCase()}…`}
+        value={draft} onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit()} if(e.key==='Escape') setEditing(false) }}
+      />
+      <div className="flex gap-1">
+        <button className="btn btn-primary text-[10px] py-0.5 px-2" onClick={commit}>Guardar</button>
+        <button className="btn text-[10px] py-0.5 px-2 text-red-400" onClick={() => { onSave(null); setDraft(''); setEditing(false) }}>Limpar</button>
+      </div>
+    </div>
+  )
+  return (
+    <div className="relative group inline-block cursor-pointer" onClick={() => { setDraft(value||''); setEditing(true) }}>
+      {value
+        ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{label}</span>
+        : <span className="text-gray-200 text-xs select-none hover:text-gray-400">+</span>}
+      {value && (
+        <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-50 bg-gray-900 text-white text-xs rounded px-2 py-1.5 max-w-[220px] whitespace-pre-wrap shadow-lg pointer-events-none">
+          {value}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { role, name } = useAuth()
   const qc = useQueryClient()
@@ -109,7 +146,7 @@ export default function Dashboard() {
       if (role === 'perito' && name) statsQ = statsQ.eq('perito_avaliador', name)
 
       let tableQ = supabase.from('properties')
-        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado, portfolio_id, portfolios(id, name, status, clients(name))')
+        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado, pendente_motivo, anulado_motivo, portfolio_id, portfolios(id, name, status, clients(name))')
         .order('portfolio_id').order('external_ref', { ascending: true })
       if (role === 'perito' && name) tableQ = tableQ.eq('perito_avaliador', name)
 
@@ -460,6 +497,8 @@ export default function Dashboard() {
                               <th className="text-center">Verificado</th>
                               <th>Honorário</th>
                               <th>Hon. Addapters</th>
+                              <th>Pendente</th>
+                              <th>Anulado</th>
                               <th>Actualizado</th>
                             </tr>
                           </thead>
@@ -510,6 +549,16 @@ export default function Dashboard() {
                                 </td>
                                 <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
                                 <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
+                                <td className="px-1">
+                                  <MotivoBadge value={p.pendente_motivo} label="Pendente"
+                                    color="bg-amber-100 text-amber-700"
+                                    onSave={v => updateField.mutate({ id:p.id, field:'pendente_motivo', value:v })}/>
+                                </td>
+                                <td className="px-1">
+                                  <MotivoBadge value={p.anulado_motivo} label="Anulado"
+                                    color="bg-red-100 text-red-600"
+                                    onSave={v => updateField.mutate({ id:p.id, field:'anulado_motivo', value:v })}/>
+                                </td>
                                 <td className="text-gray-400 whitespace-nowrap">{formatDate(p.updated_at)}</td>
                               </tr>
                             ))}
