@@ -219,19 +219,22 @@ function toDisplay(val: any, type: string): string {
 function F({ label, value, field, type='text', onSave, opts, span, textarea, half, format }: {
   label:string; value:any; field:string; type?:string
   onSave:(p:any)=>void; opts?:string[]; span?:boolean; textarea?:boolean; half?:boolean
-  format?: (v: string) => string   // máscara aplicada em tempo real durante a digitação
+  format?: (v: string) => string
 }) {
-  const [val, setVal] = useState(value ?? '')
-  const [dirty, setDirty] = useState(false)
+  const [val,      setVal]      = useState(value ?? '')
+  const [dirty,    setDirty]    = useState(false)
+  const [focused,  setFocused]  = useState(false)
   const timerRef = useRef<any>(null)
   useEffect(() => { setVal(value ?? ''); setDirty(false) }, [value])
 
   function handleChange(newVal: string) {
-    const formatted = format ? format(newVal) : newVal
+    // Para campos numéricos: strip de espaços antes de guardar
+    const clean = type === 'number' ? newVal.replace(/[\s\u00A0,]/g, '.').replace(/[^\d.+-]/g,'') : newVal
+    const formatted = format ? format(clean) : clean
     setVal(formatted); setDirty(true)
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
-      const v = type === 'number' ? (formatted ? parseFloat(formatted) : null) : (formatted || null)
+      const v = type === 'number' ? (formatted !== '' ? parseFloat(formatted) : null) : (formatted || null)
       onSave({ [field]: v })
       setDirty(false)
     }, 800)
@@ -239,7 +242,7 @@ function F({ label, value, field, type='text', onSave, opts, span, textarea, hal
 
   function saveNow() {
     if (timerRef.current) clearTimeout(timerRef.current)
-    const v = type === 'number' ? (val ? parseFloat(val) : null) : (val || null)
+    const v = type === 'number' ? (val !== '' ? parseFloat(String(val)) : null) : (val || null)
     onSave({ [field]: v }); setDirty(false)
   }
 
@@ -279,8 +282,15 @@ function F({ label, value, field, type='text', onSave, opts, span, textarea, hal
       </div>
       {textarea
         ? <textarea className="input text-sm w-full min-h-[80px]" value={toDisplay(val, type)} onChange={e => handleChange(e.target.value)}/>
-        : <input type={type} className="input text-sm w-full" value={toDisplay(val, type)} onChange={e => handleChange(e.target.value)}
-            onBlur={saveNow}/>
+        : <input
+            type={type === 'number' ? 'text' : type}
+            inputMode={type === 'number' ? 'decimal' : undefined}
+            className="input text-sm w-full"
+            value={type === 'number' && !focused ? toDisplay(val, type) : String(val ?? '')}
+            onChange={e => handleChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => { setFocused(false); saveNow() }}
+          />
       }
     </div>
   )
