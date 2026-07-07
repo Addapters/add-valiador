@@ -26,7 +26,10 @@ export default function PropertyCreate() {
     portfolio_id: searchParams.get('portfolio') || '',
     external_ref: '',
     property_type: '',
+    property_subtype: '',
     typology: '',
+    use_type: '',
+    year_built: '',
     street: '',
     number: '',
     postal_code: '',
@@ -65,8 +68,11 @@ export default function PropertyCreate() {
           client_id: clientId,
           ref,
           external_ref: form.external_ref.trim() || null,
-          property_type: form.property_type || null,
-          typology: form.typology.trim() || null,
+          property_type:    form.property_type    || null,
+          property_subtype: form.property_subtype  || null,
+          typology:         form.typology          || null,
+          use_type:         form.use_type          || null,
+          year_built:       form.year_built ? parseInt(form.year_built) : null,
           street: form.street.trim() || null,
           number: form.number.trim() || null,
           postal_code: form.postal_code.trim() || null,
@@ -112,15 +118,40 @@ export default function PropertyCreate() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Tipo de imóvel</label>
+            <label className="label">Tipo de Bem</label>
             <select className="input w-full" value={form.property_type} onChange={e => set('property_type', e.target.value)}>
               <option value="">—</option>
               {PROPERTY_TYPES.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div>
+            <label className="label">Subtipo</label>
+            <select className="input w-full" value={form.property_subtype} onChange={e => set('property_subtype', e.target.value)}>
+              <option value="">—</option>
+              {['de habitação','de escritórios','de comércio','de moradias unifamiliares','de moradias em banda','de naves industriais','de parqueamento','Centro comercial','Centro logístico','Centro de ensino e instalações culturais','Hospital'].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
             <label className="label">Tipologia</label>
-            <input className="input w-full" placeholder="ex: T2" value={form.typology} onChange={e => set('typology', e.target.value)} />
+            <select className="input w-full" value={form.typology} onChange={e => set('typology', e.target.value)}>
+              <option value="">—</option>
+              {['T0','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T0+1','T0+2','T1+1','T1+2','T2+1','T2+2','T3+1','T3+2','T4+1','T4+2'].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Uso</label>
+            <select className="input w-full" value={form.use_type} onChange={e => set('use_type', e.target.value)}>
+              <option value="">—</option>
+              {['Residencial','Comercial','Industrial','Serviços','Ligado à exploração económica','Não ligado à exploração económica'].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Ano de construção</label>
+            <input className="input w-full" type="number" placeholder="ex: 2005" min="1800" max="2030"
+              value={form.year_built} onChange={e => set('year_built', e.target.value)} />
           </div>
         </div>
 
