@@ -1574,12 +1574,13 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
           { key: 'homog_conservacao',      label: 'CONSERVAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
           { key: 'homog_caract_gerais',    label: 'CARACT. GERAIS',       opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
           { key: 'homog_classe_energetica',label: 'CLASSE ENERGÉTICA',    opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_tx_desconto',      label: 'TX DESCONTO | REVISÃO',opts: ['Sem Margem Negociação','Alinhado com Mercado','Especulativo'] },
+          { key: 'homog_tx_desconto',      label: 'TX DESCONTO | REVISÃO',opts: ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação'] },
         ]
         const PCT: Record<string,number> = {
           'Muito superior': -0.15, 'Superior': -0.10, 'Ligeiramente superior': -0.05,
           'Semelhante': 0, 'Ligeiramente inferior': 0.05, 'Inferior': 0.10, 'Muito inferior': 0.15,
-          'Sem Margem Negociação': 0, 'Alinhado com Mercado': -0.05, 'Especulativo': -0.20,
+          'Especulativo': -0.20, 'Fácilmente negociável': -0.15, 'Ligeiramente negociável': -0.10,
+          'Alinhado com Mercado': -0.05, 'Sem Margem Negociação': 0,
         }
         const propArea = propertyArea ? parseFloat(String(propertyArea)) : null
 
@@ -1676,6 +1677,82 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
                 </tbody>
               </table>
             </div>
+
+            {/* Análise estatística da oferta homogeneizada */}
+            {(() => {
+              const vals = selected.map((c: any) => calcHomog(c)).filter((v): v is number => v !== null)
+              if (vals.length < 2) return null
+              const min  = Math.min(...vals)
+              const max  = Math.max(...vals)
+              const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+              const sorted = [...vals].sort((a, b) => a - b)
+              const mid  = Math.floor(sorted.length / 2)
+              const median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2
+              const std  = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length)
+              const fmt  = (v: number) => Math.round(v).toLocaleString('pt-PT') + ' €/m²'
+              const CHAUVENET: Record<number,number> = { 2:1.15, 3:1.38, 4:1.54, 5:1.65, 6:1.73, 7:1.80, 8:1.86 }
+              const r = CHAUVENET[vals.length] ?? 1.65
+              return (
+                <div className="mt-3 rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    Análise Estatística — Oferta Homogeneizada
+                  </div>
+                  <div className="grid grid-cols-5 divide-x divide-gray-100 text-center py-3">
+                    {[['Mínimo', fmt(min)], ['Máximo', fmt(max)], ['Média', fmt(mean)], ['Mediana', fmt(median)], ['Desvio Padrão', fmt(std)]].map(([label, val]) => (
+                      <div key={label} className="px-3">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
+                        <p className="text-sm font-semibold text-gray-800 mt-0.5">{val}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-gray-100 px-4 py-2 bg-gray-50">
+                    <p className="text-[10px] text-gray-500 mb-1 font-semibold">SANEAMENTO — Critério de Chauvenet (r = {r.toFixed(2).replace('.',',')})</p>
+                    <div className="flex gap-4 flex-wrap">
+                      {selected.map((c: any, i: number) => {
+                        const h = calcHomog(c)
+                        if (!h) return null
+                        const z = std > 0 ? Math.abs(h - mean) / std : 0
+                        const valid = z < r
+                        return (
+                          <div key={c.id} className={`text-xs px-2 py-1 rounded ${valid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                            Comp. {i+1}: {z.toFixed(5).replace('.',',')} → <strong>{valid ? 'AMOSTRA VALIDADA' : 'OUTLIER'}</strong>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Quadro de valorização — legenda das percentagens */}
+            <details className="mt-3">
+              <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">📋 Quadro de valorização (referência)</summary>
+              <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-amber-50 px-3 py-1.5 text-center font-semibold text-amber-800 text-[10px] uppercase tracking-wide">LOC / ACAB / CONSERV / OUTRA</div>
+                  {[['Muito inferior','+15,0%'],['Inferior','+10,0%'],['Ligeiramente inferior','+5,0%'],['Semelhante','0,0%'],['Ligeiramente superior','-5,0%'],['Superior','-10,0%'],['Muito superior','-15,0%']].map(([l,p]) => (
+                    <div key={l} className="flex justify-between px-3 py-1 border-t border-gray-100">
+                      <span className="text-gray-600">{l}</span><span className="font-medium text-gray-800">{p}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-amber-50 px-3 py-1.5 text-center font-semibold text-amber-800 text-[10px] uppercase tracking-wide">TX REVISÃO | DESCONTO</div>
+                  {[['Especulativo','-20,0%'],['Fácilmente negociável','-15,0%'],['Ligeiramente negociável','-10,0%'],['Alinhado com Mercado','-5,0%'],['Sem Margem Negociação','0,0%']].map(([l,p]) => (
+                    <div key={l} className="flex justify-between px-3 py-1 border-t border-gray-100">
+                      <span className="text-gray-600">{l}</span><span className="font-medium text-gray-800">{p}</span>
+                    </div>
+                  ))}
+                  <div className="bg-amber-50 px-3 py-1.5 text-center font-semibold text-amber-800 text-[10px] uppercase tracking-wide border-t border-gray-200 mt-1">CHAUVENET</div>
+                  {[[5,'1,65'],[6,'1,73']].map(([n,r]) => (
+                    <div key={n} className="flex justify-between px-3 py-1 border-t border-gray-100">
+                      <span className="text-gray-600">N = {n}</span><span className="font-medium text-gray-800">{r}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
           </div>
         )
       })()}
