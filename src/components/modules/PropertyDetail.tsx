@@ -915,8 +915,14 @@ export default function PropertyDetail() {
                 onSave={patch => {
                   const area = parseFloat(patch.metodo_comp_area)
                   const vm2  = parseFloat(property.metodo_comp_valor_m2)
-                  if (area && vm2) save({ ...patch, metodo_comp_valor_total: Math.round(area * vm2) })
-                  else save(patch)
+                  const updates: any = { ...patch }
+                  if (area && vm2) updates.metodo_comp_valor_total = Math.round(area * vm2)
+                  // Auto-preencher áreas dos outros métodos se ainda estiverem vazias
+                  if (area) {
+                    if (!property.renda_ef_area)  updates.renda_ef_area  = area
+                    if (!property.renda_pot_area) updates.renda_pot_area = area
+                  }
+                  save(updates)
                 }}/>
               <F label="Valor (€/m²)"                    field="metodo_comp_valor_m2"    value={property.metodo_comp_valor_m2}    type="number"
                 onSave={patch => {
