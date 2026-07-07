@@ -1163,6 +1163,7 @@ export default function PropertyDetail() {
           <CompsSection
             propertyId={property.id}
             comps={comps}
+            propertyArea={property.area_m2}
             onRefresh={() => qc.invalidateQueries({ queryKey: ['property', id] })}
           />
         )}
@@ -1328,8 +1329,8 @@ function EditCell({ value, type='text', onSave, className='' }: {
 }
 
 // ── Comparáveis com Chauvenet e selecção ──────────────────────────────────
-function CompsSection({ propertyId, comps, onRefresh }: {
-  propertyId: string; comps: any[]; onRefresh: () => void
+function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
+  propertyId: string; comps: any[]; onRefresh: () => void; propertyArea?: number | null
 }) {
   const [applying, setApplying] = useState(false)
 
@@ -1580,7 +1581,7 @@ function CompsSection({ propertyId, comps, onRefresh }: {
           'Semelhante': 0, 'Ligeiramente inferior': 0.05, 'Inferior': 0.10, 'Muito inferior': 0.15,
           'Sem Margem Negociação': 0, 'Alinhado com Mercado': -0.05, 'Especulativo': -0.20,
         }
-        const propArea = property.area_m2 ? parseFloat(property.area_m2) : null
+        const propArea = propertyArea ? parseFloat(String(propertyArea)) : null
 
         function calcAreaPct(compArea: any): number {
           if (!propArea || !compArea) return 0
@@ -1602,7 +1603,7 @@ function CompsSection({ propertyId, comps, onRefresh }: {
 
         async function saveHomog(compId: string, field: string, val: string) {
           await supabase.from('market_comps').update({ [field]: val || null }).eq('id', compId)
-          qc.invalidateQueries({ queryKey: ['property', property.id] })
+          onRefresh()
         }
 
         return (
