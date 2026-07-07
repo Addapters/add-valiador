@@ -772,7 +772,7 @@ export default function PropertyDetail() {
             <F label="Tipo de Bem"           field="property_type"      value={property.property_type}
               opts={['Apartamento','Armazém','Arrumos','Concessão administrativa','Direitos de superfície','Edifício','Fundo de comércio','Garagem','Loja','Moradia','Navio','Outro anexo','Terreno','Aeronave']} onSave={save}/>
             <F label="Subtipo de Bem"        field="property_subtype"   value={property.property_subtype}
-              opts={['de habitação','de escritórios','de comércio','de moradias unifamiliares','de moradias em banda','de naves industriais','de parqueamento','Centro comercial','Centro logístico','Centro de ensino e instalações culturais','Hospital','Hotel','Instalações desportivas e recreativas','Posto de abastecimento','Habitação a custos controlados','Habitação a preços de mercado','Residência de estudantes','Residência geriátrica','Terreno rústico','Terreno urbano','N/A']} onSave={save}/>
+              opts={['de habitação','de escritórios','de comércio','de moradias unifamiliares','de moradias em banda','de naves industriais','de parqueamento','Centro comercial','Centro logístico','Centro de ensino e instalações culturais','Hospital']} onSave={save}/>
             <F label="Uso"                   field="use_type"           value={property.use_type}
               opts={['Residencial','Comercial','Industrial','Serviços','Ligado à exploração económica','Não ligado à exploração económica']} onSave={save}/>
             <F label="Subuso"                field="use_subtype"        value={property.use_subtype}
@@ -1170,6 +1170,25 @@ export default function PropertyDetail() {
         {/* SEC 17 ── Avaliação Anterior */}
         {tab==='sec17' && (
           <div className="space-y-6">
+
+            {/* Campos da avaliação anterior (da datatape ou preenchidos manualmente) */}
+            {(property.prev_valuation_date || property.prev_valuation_value || property.prev_valuation_method || property.prev_valuation_expert || property.prev_valuation_entity) && (
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Dados da Avaliação Anterior</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <F label="Data da avaliação anterior" field="prev_valuation_date"   value={property.prev_valuation_date}   type="date" onSave={save}/>
+                  <F label="Valor da avaliação anterior" field="prev_valuation_value"  value={property.prev_valuation_value}  type="number" onSave={save}/>
+                  <F label="Método de avaliação"         field="prev_valuation_method" value={property.prev_valuation_method} onSave={save}/>
+                  <F label="Perito avaliador anterior"   field="prev_valuation_expert" value={property.prev_valuation_expert} onSave={save}/>
+                  <F label="Entidade avaliadora"         field="prev_valuation_entity" value={property.prev_valuation_entity} onSave={save} span/>
+                </div>
+              </div>
+            )}
+            {!(property.prev_valuation_date || property.prev_valuation_value) && (
+              <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                Nenhum dado de avaliação anterior registado para este imóvel.
+              </div>
+            )}
 
             {/* Documentos de avaliações anteriores */}
             <div>
