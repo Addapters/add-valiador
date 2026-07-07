@@ -1563,6 +1563,122 @@ function CompsSection({ propertyId, comps, onRefresh }: {
         </div>
       )}
 
+      {/* 5 ── Tabela de Homogeneização */}
+      {selected.length > 0 && (() => {
+        // Factores e mapeamento para percentagem
+        const HOMOG_ROWS: { key: string; label: string; opts?: string[]; calc?: boolean }[] = [
+          { key: 'homog_localizacao',      label: 'LOCALIZAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'area',                   label: 'ÁREA',                 calc: true },
+          { key: 'homog_acabamentos',      label: 'ACAB. E EQUIPAMENTOS', opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_conservacao',      label: 'CONSERVAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_caract_gerais',    label: 'CARACT. GERAIS',       opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_classe_energetica',label: 'CLASSE ENERGÉTICA',    opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_tx_desconto',      label: 'TX DESCONTO | REVISÃO',opts: ['Sem Margem Negociação','Alinhado com Mercado','Especulativo'] },
+        ]
+        const PCT: Record<string,number> = {
+          'Muito superior': -0.15, 'Superior': -0.10, 'Ligeiramente superior': -0.05,
+          'Semelhante': 0, 'Ligeiramente inferior': 0.05, 'Inferior': 0.10, 'Muito inferior': 0.15,
+          'Sem Margem Negociação': 0, 'Alinhado com Mercado': -0.05, 'Especulativo': -0.20,
+        }
+        const propArea = property.area_m2 ? parseFloat(property.area_m2) : null
+
+        function calcAreaPct(compArea: any): number {
+          if (!propArea || !compArea) return 0
+          const ca = parseFloat(compArea)
+          if (!ca) return 0
+          return (propArea - ca) / ca * 0.5  // factor de área padrão (elasticidade 0.5)
+        }
+
+        function calcHomog(c: any): number | null {
+          if (!c.epm2) return null
+          let factor = 1
+          for (const row of HOMOG_ROWS) {
+            if (row.calc) { factor *= (1 + calcAreaPct(c.area_m2)); continue }
+            const val = c[row.key]
+            if (val && PCT[val] !== undefined) factor *= (1 + PCT[val])
+          }
+          return c.epm2 * factor
+        }
+
+        async function saveHomog(compId: string, field: string, val: string) {
+          await supabase.from('market_comps').update({ [field]: val || null }).eq('id', compId)
+          qc.invalidateQueries({ queryKey: ['property', property.id] })
+        }
+
+        return (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Homogeneização</h3>
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-3 py-2 font-semibold text-gray-600 w-40">Factor</th>
+                    {selected.map((c: any, i: number) => (
+                      <th key={c.id} className="px-3 py-2 text-center font-semibold text-gray-600 min-w-[160px]">
+                        Comp. {i + 1}
+                        <div className="font-normal text-gray-400 truncate max-w-[150px]">{c.address || '—'}</div>
+                        <div className="font-semibold text-emerald-700">{c.epm2 ? c.epm2.toFixed(0) + ' €/m²' : '—'}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOMOG_ROWS.map(row => (
+                    <tr key={row.key} className="border-b border-gray-100">
+                      <td className="px-3 py-2 font-medium text-gray-600 bg-gray-50">{row.label}</td>
+                      {selected.map((c: any) => {
+                        if (row.calc) {
+                          const pct = calcAreaPct(c.area_m2)
+                          return (
+                            <td key={c.id} className="px-3 py-2 text-center text-gray-500">
+                              <span className={pct > 0 ? 'text-emerald-600' : pct < 0 ? 'text-red-500' : 'text-gray-400'}>
+                                {pct !== 0 ? (pct > 0 ? '+' : '') + (pct * 100).toFixed(2).replace('.',',') + '%' : '0,00%'}
+                              </span>
+                            </td>
+                          )
+                        }
+                        const val = c[row.key] || ''
+                        const pct = PCT[val]
+                        return (
+                          <td key={c.id} className="px-2 py-1 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <select
+                                className="text-xs border border-gray-200 rounded px-1 py-0.5 w-full max-w-[150px] focus:outline-none focus:border-brand-400"
+                                value={val}
+                                onChange={e => saveHomog(c.id, row.key, e.target.value)}>
+                                <option value="">—</option>
+                                {row.opts!.map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                              {val && (
+                                <span className={`text-[10px] font-medium ${pct < 0 ? 'text-red-500' : pct > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                  {pct > 0 ? '+' : ''}{(pct * 100).toFixed(2).replace('.',',') + '%'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                  {/* Linha HOMOGENEIZADO */}
+                  <tr className="bg-emerald-50 border-t-2 border-emerald-200">
+                    <td className="px-3 py-2 font-bold text-emerald-800 bg-emerald-100">HOMOGENEIZADO</td>
+                    {selected.map((c: any) => {
+                      const h = calcHomog(c)
+                      return (
+                        <td key={c.id} className="px-3 py-2 text-center font-bold text-emerald-800">
+                          {h ? h.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €/m²' : '—'}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
+
     </div>
   )
 }
