@@ -160,6 +160,18 @@ export default function Dashboard() {
 
   // Agrupar imóveis por projeto (portfolio)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [sortCol, setSortCol] = useState<string>('external_ref')
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+  const [colFilter, setColFilter] = useState<Record<string,string>>({})
+  const BOOL_COLS_DB = ['tem_fotos','tem_comparaveis','verificado','pendente_motivo','anulado_motivo']
+
+  function dbToggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  function dbCycleFilter(col: string) {
+    setColFilter(prev => ({ ...prev, [col]: (prev[col]||'')==='' ? 'sim' : (prev[col]==='sim' ? 'nao' : '') }))
+  }
   function toggleGroup(pid: string) {
     setCollapsedGroups(prev => {
       const next = new Set(prev)
@@ -168,18 +180,39 @@ export default function Dashboard() {
     })
   }
   const groupedByPortfolio = useMemo(() => {
+    // Filtros rápidos por coluna booleana
+    const items = recent.filter((p: any) => {
+      for (const [col, val] of Object.entries(colFilter)) {
+        if (!val) continue
+        if (col==='tem_fotos')       { if (val==='sim'&&!p.tem_fotos)       return false; if (val==='nao'&&p.tem_fotos)       return false }
+        if (col==='tem_comparaveis') { if (val==='sim'&&!p.tem_comparaveis) return false; if (val==='nao'&&p.tem_comparaveis) return false }
+        if (col==='verificado')      { if (val==='sim'&&!p.verificado)       return false; if (val==='nao'&&p.verificado)       return false }
+        if (col==='pendente_motivo') { if (val==='sim'&&!p.pendente_motivo)  return false; if (val==='nao'&&p.pendente_motivo)  return false }
+        if (col==='anulado_motivo')  { if (val==='sim'&&!p.anulado_motivo)   return false; if (val==='nao'&&p.anulado_motivo)   return false }
+      }
+      return true
+    })
+    // Agrupar
     const map = new Map<string, { label: string; items: any[]; status: string }>()
-    recent.forEach((p: any) => {
-      const pid    = p.portfolio_id || '__none__'
-      const pName  = p.portfolios?.name
-      const cName  = p.portfolios?.clients?.name
-      const label  = cName && pName ? `${cName} | ${pName}` : pName || cName || 'Sem projeto'
+    items.forEach((p: any) => {
+      const pid   = p.portfolio_id || '__none__'
+      const pName = p.portfolios?.name
+      const cName = p.portfolios?.clients?.name
+      const label = cName && pName ? `${cName} | ${pName}` : pName || cName || 'Sem projeto'
       const status = p.portfolios?.status || 'active'
       if (!map.has(pid)) map.set(pid, { label, items: [], status })
       map.get(pid)!.items.push(p)
     })
+    // Ordenar itens dentro de cada grupo
+    const sortFn = (a: any, b: any) => {
+      const av = a[sortCol] ?? ''; const bv = b[sortCol] ?? ''
+      const cmp = typeof av==='number'&&typeof bv==='number' ? av-bv
+        : String(av).localeCompare(String(bv), 'pt', { sensitivity:'base' })
+      return sortDir==='asc' ? cmp : -cmp
+    }
+    for (const g of map.values()) g.items.sort(sortFn)
     return [...map.entries()].sort(([,a],[,b]) => a.label.localeCompare(b.label))
-  }, [recent])
+  }, [recent, sortCol, sortDir, colFilter])
 
   // KPIs
   const total     = props.length
@@ -486,20 +519,42 @@ export default function Dashboard() {
                                     : <Square size={13}/>}
                                 </button>
                               </th>
-                              <th>Ref. Externa</th>
-                              <th>ID Bem</th>
-                              <th>Localização</th>
-                              <th>Tipo</th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('external_ref')}>
+                                Ref. Externa <span className="text-[10px] text-gray-300">{sortCol==='external_ref'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                              </th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('id_bien')}>
+                                ID Bem <span className="text-[10px] text-gray-300">{sortCol==='id_bien'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                              </th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('municipality')}>
+                                Localização <span className="text-[10px] text-gray-300">{sortCol==='municipality'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                              </th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('property_type')}>
+                                Tipo <span className="text-[10px] text-gray-300">{sortCol==='property_type'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                              </th>
                               {role === 'admin' && <th>Perito</th>}
                               <th>Visita</th>
-                              <th className="text-center">Fotos</th>
-                              <th className="text-center">Comparáveis</th>
-                              <th className="text-center">Verificado</th>
-                              <th>Honorário</th>
+                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('tem_fotos')} title="Filtrar fotos">
+                                Fotos <span className={`text-[10px] ${colFilter['tem_fotos']==='sim'?'text-emerald-500':colFilter['tem_fotos']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['tem_fotos']==='sim'?'✓':colFilter['tem_fotos']==='nao'?'✗':'⇅'}</span>
+                              </th>
+                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('tem_comparaveis')} title="Filtrar comparáveis">
+                                Comparáveis <span className={`text-[10px] ${colFilter['tem_comparaveis']==='sim'?'text-emerald-500':colFilter['tem_comparaveis']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['tem_comparaveis']==='sim'?'✓':colFilter['tem_comparaveis']==='nao'?'✗':'⇅'}</span>
+                              </th>
+                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('verificado')} title="Filtrar verificados">
+                                Verificado <span className={`text-[10px] ${colFilter['verificado']==='sim'?'text-emerald-500':colFilter['verificado']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['verificado']==='sim'?'✓':colFilter['verificado']==='nao'?'✗':'⇅'}</span>
+                              </th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('fee_amount')}>
+                                Honorário <span className="text-[10px] text-gray-300">{sortCol==='fee_amount'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                              </th>
                               <th>Hon. Addapters</th>
-                              <th>Pendente</th>
-                              <th>Anulado</th>
-                              <th>Actualizado</th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('pendente_motivo')} title="Filtrar pendentes">
+                                Pendente <span className={`text-[10px] ${colFilter['pendente_motivo']==='sim'?'text-amber-500':colFilter['pendente_motivo']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['pendente_motivo']==='sim'?'✓':colFilter['pendente_motivo']==='nao'?'✗':'⇅'}</span>
+                              </th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('anulado_motivo')} title="Filtrar anulados">
+                                Anulado <span className={`text-[10px] ${colFilter['anulado_motivo']==='sim'?'text-red-500':colFilter['anulado_motivo']==='nao'?'text-emerald-400':'text-gray-300'}`}>{colFilter['anulado_motivo']==='sim'?'✓':colFilter['anulado_motivo']==='nao'?'✗':'⇅'}</span>
+                              </th>
+                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('updated_at')}>
+                                Actualizado <span className="text-[10px] text-gray-300">{sortCol==='updated_at'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                              </th>
                             </tr>
                           </thead>
                           <tbody>

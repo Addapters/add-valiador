@@ -220,6 +220,24 @@ export default function Properties() {
   const [bulkBilling, setBulkBilling] = useState('')
   const [bulkPerito,  setBulkPerito]  = useState('')
   const [showBulkPerito, setShowBulkPerito] = useState(false)
+  // Ordenação e filtro rápido por coluna
+  const [sortCol,  setSortCol]  = useState<string>('external_ref')
+  const [sortDir,  setSortDir]  = useState<'asc'|'desc'>('asc')
+  const [colFilter, setColFilter] = useState<Record<string, string>>({})
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  // Para colunas booleanas/motivo: cicla entre '' (todos) → 'sim' → 'nao'
+  function cycleColFilter(col: string) {
+    setColFilter(prev => {
+      const cur = prev[col] || ''
+      return { ...prev, [col]: cur === '' ? 'sim' : cur === 'sim' ? 'nao' : '' }
+    })
+  }
+  const BOOL_COLS = ['tem_fotos','tem_comparaveis','verificado','pendente_motivo','anulado_motivo']
+  const SORT_INDICATOR: Record<string,string> = { '': ' ⇅', 'sim': ' ✓', 'nao': ' ✗' }
 
   function setFilters(f: PropertyFilters | ((prev: PropertyFilters) => PropertyFilters)) {
     setFiltersRaw(prev => {
@@ -299,14 +317,35 @@ export default function Properties() {
   }), [rows, filters])
 
   const grouped = useMemo(() => {
+    // Aplicar filtros rápidos por coluna
+    let items = filtered.filter((r: any) => {
+      for (const [col, val] of Object.entries(colFilter)) {
+        if (!val) continue
+        if (col === 'tem_fotos')       { if (val==='sim' && !r.tem_fotos)        return false; if (val==='nao' && r.tem_fotos)        return false }
+        if (col === 'tem_comparaveis') { if (val==='sim' && !r.tem_comparaveis)  return false; if (val==='nao' && r.tem_comparaveis)  return false }
+        if (col === 'verificado')      { if (val==='sim' && !r.verificado)        return false; if (val==='nao' && r.verificado)        return false }
+        if (col === 'pendente_motivo') { if (val==='sim' && !r.pendente_motivo)   return false; if (val==='nao' && r.pendente_motivo)   return false }
+        if (col === 'anulado_motivo')  { if (val==='sim' && !r.anulado_motivo)    return false; if (val==='nao' && r.anulado_motivo)    return false }
+      }
+      return true
+    })
+    // Ordenar
+    items = [...items].sort((a: any, b: any) => {
+      const av = a[sortCol] ?? ''; const bv = b[sortCol] ?? ''
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv), 'pt', { sensitivity: 'base' })
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    // Agrupar por portfolio
     const map: Record<string,{portfolio:any;items:any[]}> = {}
-    filtered.forEach((r: any) => {
+    items.forEach((r: any) => {
       const pid = r.portfolios?.id || 'sem-portfolio'
       if (!map[pid]) map[pid] = { portfolio: r.portfolios, items: [] }
       map[pid].items.push(r)
     })
     return Object.entries(map)
-  }, [filtered])
+  }, [filtered, sortCol, sortDir, colFilter])
 
   function toggleGroup(pid: string) { setCollapsed(prev => ({...prev, [pid]: !prev[pid]})) }
   function toggleSelect(id: string) { setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
@@ -553,11 +592,20 @@ export default function Properties() {
                           {visibleCols.map(col => {
                             const def = ALL_COLUMNS[col]
                             const isAbanca = def?.group === 'abanca'
+                            const isBool = BOOL_COLS.includes(col)
+                            const isSort = sortCol === col
+                            const fval   = colFilter[col] || ''
                             return (
                               <th key={col}
-                                className={`px-3 py-2 font-semibold whitespace-nowrap ${isAbanca?'bg-blue-50 text-blue-700':'bg-gray-50 text-gray-600'}`}
-                                style={{ minWidth: col==='street'||col==='ampliacao'?'160px':'80px' }}>
+                                className={`px-3 py-2 font-semibold whitespace-nowrap cursor-pointer select-none hover:bg-gray-100 transition-colors ${isAbanca?'bg-blue-50 text-blue-700':'bg-gray-50 text-gray-600'} ${isSort?'text-brand-600':''}`}
+                                style={{ minWidth: col==='street'||col==='ampliacao'?'160px':'80px' }}
+                                onClick={() => isBool ? cycleColFilter(col) : toggleSort(col)}
+                                title={isBool ? `Filtrar: ${fval||'todos'}` : `Ordenar por ${def?.label||col}`}>
                                 {def?.label || col}
+                                {isBool
+                                  ? <span className={`ml-1 text-[10px] ${fval==='sim'?'text-emerald-500':fval==='nao'?'text-red-400':'text-gray-300'}`}>{SORT_INDICATOR[fval]}</span>
+                                  : <span className={`ml-1 text-[10px] ${isSort?'text-brand-500':'text-gray-300'}`}>{isSort ? (sortDir==='asc'?'↑':'↓') : '⇅'}</span>
+                                }
                               </th>
                             )
                           })}
