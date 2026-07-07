@@ -119,6 +119,42 @@ function ColumnPicker({ visible, onChange }: { visible:string[]; onChange:(v:str
   )
 }
 
+function MotivoBadge({ value, color, label, onSave }: {
+  value: string|null; color: string; label: string; onSave: (v: string|null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState(value || '')
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => { if (editing && ref.current) ref.current.focus() }, [editing])
+  function commit() { const v = draft.trim() || null; onSave(v); setEditing(false) }
+  if (editing) return (
+    <div className="flex flex-col gap-1 min-w-[180px] z-20 relative">
+      <textarea ref={ref} rows={2}
+        className="text-xs border border-gray-300 rounded px-2 py-1 resize-none focus:outline-none focus:border-brand-400"
+        placeholder={`Motivo: ${label.toLowerCase()}…`}
+        value={draft} onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit()} if(e.key==='Escape') setEditing(false) }}
+      />
+      <div className="flex gap-1">
+        <button className="btn btn-primary text-[10px] py-0.5 px-2" onClick={commit}>Guardar</button>
+        <button className="btn text-[10px] py-0.5 px-2 text-red-400" onClick={() => { onSave(null); setDraft(''); setEditing(false) }}>Limpar</button>
+      </div>
+    </div>
+  )
+  return (
+    <div className="relative group inline-block cursor-pointer" onClick={() => { setDraft(value||''); setEditing(true) }}>
+      {value
+        ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{label}</span>
+        : <span className="text-gray-200 text-xs select-none hover:text-gray-400">+</span>}
+      {value && (
+        <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-50 bg-gray-900 text-white text-xs rounded px-2 py-1.5 max-w-[220px] whitespace-pre-wrap shadow-lg pointer-events-none">
+          {value}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function InlineEdit({ value, onSave, datalistId, options }: { value:string|null; onSave:(v:string)=>void; datalistId?:string; options?:string[] }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal]         = useState(value || '')
@@ -232,6 +268,7 @@ export default function Properties() {
           prev_valuation_date, prev_valuation_value, prev_valuation_method,
           prev_valuation_expert, prev_valuation_entity,
           tem_fotos, tem_comparaveis, verificado,
+          pendente_motivo, anulado_motivo,
           portfolios(id, name, status, clients(name))
         `)
         .order('portfolio_id').order('external_ref')
@@ -390,6 +427,16 @@ export default function Properties() {
           className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.verificado ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
           {p.verificado ? 'Sim' : 'Não'}
         </button>
+      )
+      case 'pendente_motivo': return (
+        <MotivoBadge value={p.pendente_motivo} label="Pendente"
+          color="bg-amber-100 text-amber-700"
+          onSave={v => updateField.mutate({ id:p.id, field:'pendente_motivo', value:v })}/>
+      )
+      case 'anulado_motivo': return (
+        <MotivoBadge value={p.anulado_motivo} label="Anulado"
+          color="bg-red-100 text-red-600"
+          onSave={v => updateField.mutate({ id:p.id, field:'anulado_motivo', value:v })}/>
       )
       case 'fee_amount':       return <span className="font-medium text-gray-800 whitespace-nowrap">{p.fee_amount?formatCurrency(p.fee_amount):'—'}</span>
       case 'honorarios_addapters': return <span className="font-medium text-emerald-700 whitespace-nowrap">{p.fee_amount?formatCurrency(Math.round(p.fee_amount*0.6)):'—'}</span>

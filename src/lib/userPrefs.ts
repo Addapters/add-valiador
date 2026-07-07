@@ -44,6 +44,8 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
   tem_fotos:              { label:'Fotos',                 group:'base' },
   tem_comparaveis:        { label:'Comparáveis',           group:'base' },
   verificado:             { label:'Verificado',            group:'base' },
+  pendente_motivo:        { label:'Pendente',               group:'base' },
+  anulado_motivo:         { label:'Anulado',                group:'base' },
   visit_date:             { label:'Data visita',           group:'base' },
   fee_amount:             { label:'Honorário',             group:'base' },
   honorarios_addapters:   { label:'Honorários Addapters',  group:'base' },
@@ -71,6 +73,7 @@ export const DEFAULT_VISIBLE = [
   'street','number','postal_code',
   'property_type','typology','area_m2',
   'perito_avaliador','visit_status','tem_fotos','tem_comparaveis','verificado',
+  'pendente_motivo','anulado_motivo',
   'fee_amount','honorarios_addapters',
   'nuc_risco','data_pedido',
 ]
