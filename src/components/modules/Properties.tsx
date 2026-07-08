@@ -236,7 +236,7 @@ export default function Properties() {
       return { ...prev, [col]: cur === '' ? 'sim' : cur === 'sim' ? 'nao' : '' }
     })
   }
-  const BOOL_COLS = ['tem_fotos','tem_comparaveis','verificado','pendente_motivo','anulado_motivo']
+  const BOOL_COLS = ['tem_fotos','tem_comparaveis','verificado','para_verificacao','pendente_motivo','anulado_motivo']
   const SORT_INDICATOR: Record<string,string> = { '': ' ⇅', 'sim': ' ✓', 'nao': ' ✗' }
 
   function setFilters(f: PropertyFilters | ((prev: PropertyFilters) => PropertyFilters)) {
@@ -285,7 +285,7 @@ export default function Properties() {
           nuc_risco, data_pedido, tipo_via, escada, ampliacao, lugar,
           prev_valuation_date, prev_valuation_value, prev_valuation_method,
           prev_valuation_expert, prev_valuation_entity,
-          tem_fotos, tem_comparaveis, verificado,
+          tem_fotos, tem_comparaveis, para_verificacao, verificado,
           pendente_motivo, anulado_motivo,
           portfolios(id, name, status, clients(name))
         `)
@@ -321,9 +321,10 @@ export default function Properties() {
     let items = filtered.filter((r: any) => {
       for (const [col, val] of Object.entries(colFilter)) {
         if (!val) continue
-        if (col === 'tem_fotos')       { if (val==='sim' && !r.tem_fotos)        return false; if (val==='nao' && r.tem_fotos)        return false }
-        if (col === 'tem_comparaveis') { if (val==='sim' && !r.tem_comparaveis)  return false; if (val==='nao' && r.tem_comparaveis)  return false }
-        if (col === 'verificado')      { if (val==='sim' && !r.verificado)        return false; if (val==='nao' && r.verificado)        return false }
+        if (col === 'tem_fotos')        { if (val==='sim' && !r.tem_fotos)        return false; if (val==='nao' && r.tem_fotos)        return false }
+        if (col === 'tem_comparaveis')  { if (val==='sim' && !r.tem_comparaveis)  return false; if (val==='nao' && r.tem_comparaveis)  return false }
+        if (col === 'para_verificacao') { if (val==='sim' && !r.para_verificacao) return false; if (val==='nao' && r.para_verificacao) return false }
+        if (col === 'verificado')       { if (val==='sim' && !r.verificado)        return false; if (val==='nao' && r.verificado)        return false }
         if (col === 'pendente_motivo') { if (val==='sim' && !r.pendente_motivo)   return false; if (val==='nao' && r.pendente_motivo)   return false }
         if (col === 'anulado_motivo')  { if (val==='sim' && !r.anulado_motivo)    return false; if (val==='nao' && r.anulado_motivo)    return false }
       }
@@ -459,6 +460,12 @@ export default function Properties() {
         <button onClick={() => updateField.mutate({ id:p.id, field:'tem_comparaveis', value:!p.tem_comparaveis })}
           className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.tem_comparaveis ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-400'}`}>
           {p.tem_comparaveis ? 'Sim' : 'Não'}
+        </button>
+      )
+      case 'para_verificacao': return (
+        <button onClick={() => updateField.mutate({ id:p.id, field:'para_verificacao', value:!p.para_verificacao })}
+          className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.para_verificacao ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>
+          {p.para_verificacao ? 'Sim' : 'Não'}
         </button>
       )
       case 'verificado':      return (

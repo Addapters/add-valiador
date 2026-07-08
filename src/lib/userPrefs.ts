@@ -43,6 +43,7 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
   visit_status:           { label:'Visita',               group:'base' },
   tem_fotos:              { label:'Fotos',                 group:'base' },
   tem_comparaveis:        { label:'Comparáveis',           group:'base' },
+  para_verificacao:       { label:'Para Verificação',     group:'base' },
   verificado:             { label:'Verificado',            group:'base' },
   pendente_motivo:        { label:'Pendente',               group:'base' },
   anulado_motivo:         { label:'Anulado',                group:'base' },
@@ -71,8 +72,8 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
 export const DEFAULT_VISIBLE = [
   'external_ref','id_bien','district','municipality','parish',
   'street','number','postal_code',
-  'property_type','typology','area_m2',
-  'perito_avaliador','visit_status','tem_fotos','tem_comparaveis','verificado',
+  'property_type','property_subtype','typology','use_type','year_built','area_m2',
+  'perito_avaliador','visit_status','tem_fotos','tem_comparaveis','para_verificacao','verificado',
   'pendente_motivo','anulado_motivo',
   'fee_amount','honorarios_addapters',
   'nuc_risco','data_pedido',

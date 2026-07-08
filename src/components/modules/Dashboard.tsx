@@ -146,7 +146,7 @@ export default function Dashboard() {
       if (role === 'perito' && name) statsQ = statsQ.eq('perito_avaliador', name)
 
       let tableQ = supabase.from('properties')
-        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, verificado, pendente_motivo, anulado_motivo, portfolio_id, portfolios(id, name, status, clients(name))')
+        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, para_verificacao, verificado, pendente_motivo, anulado_motivo, portfolio_id, portfolios(id, name, status, clients(name))')
         .order('portfolio_id').order('external_ref', { ascending: true })
       if (role === 'perito' && name) tableQ = tableQ.eq('perito_avaliador', name)
 
@@ -163,7 +163,7 @@ export default function Dashboard() {
   const [sortCol, setSortCol] = useState<string>('external_ref')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [colFilter, setColFilter] = useState<Record<string,string>>({})
-  const BOOL_COLS_DB = ['tem_fotos','tem_comparaveis','verificado','pendente_motivo','anulado_motivo']
+  const BOOL_COLS_DB = ['tem_fotos','tem_comparaveis','para_verificacao','verificado','pendente_motivo','anulado_motivo']
 
   function dbToggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -184,9 +184,10 @@ export default function Dashboard() {
     const items = recent.filter((p: any) => {
       for (const [col, val] of Object.entries(colFilter)) {
         if (!val) continue
-        if (col==='tem_fotos')       { if (val==='sim'&&!p.tem_fotos)       return false; if (val==='nao'&&p.tem_fotos)       return false }
-        if (col==='tem_comparaveis') { if (val==='sim'&&!p.tem_comparaveis) return false; if (val==='nao'&&p.tem_comparaveis) return false }
-        if (col==='verificado')      { if (val==='sim'&&!p.verificado)       return false; if (val==='nao'&&p.verificado)       return false }
+        if (col==='tem_fotos')        { if (val==='sim'&&!p.tem_fotos)        return false; if (val==='nao'&&p.tem_fotos)        return false }
+        if (col==='tem_comparaveis')  { if (val==='sim'&&!p.tem_comparaveis)  return false; if (val==='nao'&&p.tem_comparaveis)  return false }
+        if (col==='para_verificacao') { if (val==='sim'&&!p.para_verificacao) return false; if (val==='nao'&&p.para_verificacao) return false }
+        if (col==='verificado')       { if (val==='sim'&&!p.verificado)        return false; if (val==='nao'&&p.verificado)        return false }
         if (col==='pendente_motivo') { if (val==='sim'&&!p.pendente_motivo)  return false; if (val==='nao'&&p.pendente_motivo)  return false }
         if (col==='anulado_motivo')  { if (val==='sim'&&!p.anulado_motivo)   return false; if (val==='nao'&&p.anulado_motivo)   return false }
       }
@@ -539,6 +540,9 @@ export default function Dashboard() {
                               <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('tem_comparaveis')} title="Filtrar comparáveis">
                                 Comparáveis <span className={`text-[10px] ${colFilter['tem_comparaveis']==='sim'?'text-emerald-500':colFilter['tem_comparaveis']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['tem_comparaveis']==='sim'?'✓':colFilter['tem_comparaveis']==='nao'?'✗':'⇅'}</span>
                               </th>
+                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('para_verificacao')} title="Filtrar para verificação">
+                                Para Verificação <span className={`text-[10px] ${colFilter['para_verificacao']==='sim'?'text-amber-500':colFilter['para_verificacao']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['para_verificacao']==='sim'?'✓':colFilter['para_verificacao']==='nao'?'✗':'⇅'}</span>
+                              </th>
                               <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('verificado')} title="Filtrar verificados">
                                 Verificado <span className={`text-[10px] ${colFilter['verificado']==='sim'?'text-emerald-500':colFilter['verificado']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['verificado']==='sim'?'✓':colFilter['verificado']==='nao'?'✗':'⇅'}</span>
                               </th>
@@ -596,6 +600,11 @@ export default function Dashboard() {
                                   <BoolBadge value={!!p.tem_comparaveis} trueLabel="Sim" falseLabel="Não"
                                     color="bg-purple-100 text-purple-600 hover:bg-purple-200"
                                     onClick={() => updateField.mutate({ id:p.id, field:'tem_comparaveis', value:!p.tem_comparaveis })}/>
+                                </td>
+                                <td className="text-center">
+                                  <BoolBadge value={!!p.para_verificacao} trueLabel="Sim" falseLabel="Não"
+                                    color="bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                    onClick={() => updateField.mutate({ id:p.id, field:'para_verificacao', value:!p.para_verificacao })}/>
                                 </td>
                                 <td className="text-center">
                                   <BoolBadge value={!!p.verificado} trueLabel="Sim" falseLabel="Não"
