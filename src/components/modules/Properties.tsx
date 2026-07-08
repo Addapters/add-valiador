@@ -496,7 +496,7 @@ export default function Properties() {
     }
   }
 
-  const hasFilters = filters.districtFilter.length || filters.parishFilter.length || filters.peritoFilter || filters.visitFilter || filters.billingFilter || filters.search
+  const hasFilters = filters.districtFilter.length || filters.parishFilter.length || filters.peritoFilter || filters.visitFilter || filters.billingFilter || filters.search || Object.values(colFilter).some(v => v)
 
   return (
     <div>
@@ -564,7 +564,20 @@ export default function Properties() {
 
       <div className="p-6 space-y-4">
         {(isLoading || isFetching) ? <p className="text-sm text-gray-400">A carregar…</p>
-          : grouped.length === 0 ? <EmptyState message="Nenhum imóvel encontrado."/>
+          : grouped.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <EmptyState message="Nenhum imóvel encontrado."/>
+              {hasFilters && (
+                <button className="btn text-xs mt-1" onClick={() => {
+                  try { sessionStorage.removeItem(FILTER_KEY) } catch {}
+                  setFilters({ search:'', visitFilter:'', billingFilter:'', districtFilter:[], parishFilter:[], peritoFilter:'' })
+                  setColFilter({})
+                }}>
+                  ✕ Limpar todos os filtros
+                </button>
+              )}
+            </div>
+          )
           : grouped.map(([pid, { portfolio, items }]) => {
             const isOpen      = !collapsed[pid]
             const clientName    = portfolio?.clients?.name
