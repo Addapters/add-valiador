@@ -1,5 +1,8 @@
-export function formatCurrency(value: number, currency = 'EUR', locale = 'pt-PT') {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(value)
+// Separador de milhar: espaço (estilo português) — ex: 106 784 €, 1 234 567 €
+export function formatCurrency(value: number, currency = 'EUR') {
+  const n    = Math.round(Math.abs(value))
+  const fmtd = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')
+  return (value < 0 ? '-' : '') + fmtd + '\u00A0€'
 }
 
 export function formatDate(iso: string | null | undefined, locale = 'pt-PT') {
