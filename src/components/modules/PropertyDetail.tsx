@@ -460,6 +460,15 @@ export default function PropertyDetail() {
     }, 150)
   }, [mapReady, property?.id, property?.latitude, property?.longitude, tab])
 
+  // Auto-preencher áreas de renda com o valor da área do método comparativo (quando tab sec7 abre)
+  useEffect(() => {
+    if (tab !== 'sec7' || !property?.metodo_comp_area) return
+    const updates: any = {}
+    if (!property.renda_ef_area)  updates.renda_ef_area  = property.metodo_comp_area
+    if (!property.renda_pot_area) updates.renda_pot_area = property.metodo_comp_area
+    if (Object.keys(updates).length > 0) save(updates)
+  }, [tab, property?.id])
+
   const onDrop = useCallback(async (files: globalThis.File[]) => {
     if (!property) return
     setUploading(true)
