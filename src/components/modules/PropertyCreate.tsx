@@ -35,6 +35,9 @@ export default function PropertyCreate() {
     postal_code: '',
     municipality: '',
     district: '',
+    area_m2: '',
+    gross_area: '',
+    useful_area: '',
   })
 
   const { data: portfolios = [] } = useQuery({
@@ -73,6 +76,9 @@ export default function PropertyCreate() {
           typology:         form.typology          || null,
           use_type:         form.use_type          || null,
           year_built:       form.year_built ? parseInt(form.year_built) : null,
+          area_m2:          form.area_m2    ? parseFloat(form.area_m2)  : null,
+          gross_area:       form.gross_area  ? parseFloat(form.gross_area) : null,
+          useful_area:      form.useful_area ? parseFloat(form.useful_area) : null,
           street: form.street.trim() || null,
           number: form.number.trim() || null,
           postal_code: form.postal_code.trim() || null,
@@ -163,6 +169,24 @@ export default function PropertyCreate() {
           <div>
             <label className="label">Número</label>
             <input className="input w-full" value={form.number} onChange={e => set('number', e.target.value)} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="label">Área N (m²) *</label>
+            <input className="input w-full" type="number" placeholder="ex: 120"
+              value={form.area_m2} onChange={e => set('area_m2', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Área Bruta (m²)</label>
+            <input className="input w-full" type="number" placeholder="ex: 135"
+              value={form.gross_area} onChange={e => set('gross_area', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Área Útil (m²)</label>
+            <input className="input w-full" type="number" placeholder="ex: 110"
+              value={form.useful_area} onChange={e => set('useful_area', e.target.value)} />
           </div>
         </div>
 

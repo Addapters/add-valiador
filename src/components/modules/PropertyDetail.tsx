@@ -460,12 +460,14 @@ export default function PropertyDetail() {
     }, 150)
   }, [mapReady, property?.id, property?.latitude, property?.longitude, tab])
 
-  // Auto-preencher áreas de renda com o valor da área do método comparativo (quando tab sec7 abre)
+  // Auto-preencher áreas dos métodos a partir da área principal (area_m2) quando sec7 abre
   useEffect(() => {
-    if (tab !== 'sec7' || !property?.metodo_comp_area) return
+    if (tab !== 'sec7' || !property?.area_m2) return
+    const area = property.area_m2
     const updates: any = {}
-    if (!property.renda_ef_area)  updates.renda_ef_area  = property.metodo_comp_area
-    if (!property.renda_pot_area) updates.renda_pot_area = property.metodo_comp_area
+    if (!property.metodo_comp_area) updates.metodo_comp_area = area
+    if (!property.renda_ef_area)    updates.renda_ef_area    = area
+    if (!property.renda_pot_area)   updates.renda_pot_area   = area
     if (Object.keys(updates).length > 0) save(updates)
   }, [tab, property?.id])
 
