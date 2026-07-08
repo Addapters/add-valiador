@@ -523,7 +523,7 @@ export default function Properties() {
           <option value="">Estado financeiro</option>
           {Object.entries(BILLING_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        {hasFilters && <button className="btn text-xs" onClick={() => { try { sessionStorage.removeItem(FILTER_KEY) } catch {} setFilters({ search:'', visitFilter:'', billingFilter:'', districtFilter:[], parishFilter:[], peritoFilter:'' }) }}>Limpar</button>}
+        {hasFilters && <button className="btn text-xs" onClick={() => { try { sessionStorage.removeItem(FILTER_KEY) } catch {} setFilters({ search:'', visitFilter:'', billingFilter:'', districtFilter:[], parishFilter:[], peritoFilter:'' }); setColFilter({}) }}>Limpar</button>}
       </div>
 
       {selected.size > 0 && (

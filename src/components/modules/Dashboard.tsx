@@ -379,7 +379,7 @@ export default function Dashboard() {
             </select>
             {hasFilters && (
               <button className="btn text-xs" onClick={() => {
-                setFilterVisita(''); setFilterFotos(''); setFilterComps(''); setFilterVerificado(''); setSearch('')
+                setFilterVisita(''); setFilterFotos(''); setFilterComps(''); setFilterVerificado(''); setSearch(''); setColFilter({})
               }}>Limpar</button>
             )}
           </div>
