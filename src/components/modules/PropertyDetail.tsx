@@ -1425,7 +1425,7 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
     if (!val) return '—'
     const n = parseFloat(val)
     if (isNaN(n)) return '—'
-    return n.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €'
+    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + ' €'
   }
 
   async function updateComp(compId: string, patch: any) {
@@ -1526,7 +1526,7 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
                     <td><EditCell value={c.area_m2}    type="number" onSave={v => updateComp(c.id, { area_m2: v })}/></td>
                     <td className="whitespace-nowrap">
                       <EditCell
-                        value={c.price ? parseFloat(c.price).toLocaleString('pt-PT', { minimumFractionDigits:0, maximumFractionDigits:0 }) : ''}
+                        value={c.price ? Math.round(parseFloat(c.price)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + ' €' : ''}
                         type="number"
                         onSave={v => updateComp(c.id, { price: v })}
                       />
@@ -1759,7 +1759,7 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
               const mid  = Math.floor(sorted.length / 2)
               const median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2
               const std  = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length)
-              const fmt  = (v: number) => Math.round(v).toLocaleString('pt-PT') + ' €/m²'
+              const fmt  = (v: number) => Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + ' €/m²'
               const CHAUVENET: Record<number,number> = { 2:1.15, 3:1.38, 4:1.54, 5:1.65, 6:1.73, 7:1.80, 8:1.86 }
               const r = CHAUVENET[vals.length] ?? 1.65
               return (
@@ -1843,13 +1843,17 @@ function CompForm({ propertyId, onAdded }: { propertyId: string; onAdded: () => 
     setSaving(true)
     const { error } = await supabase.from('market_comps').insert({
       property_id: propertyId,
-      portal:      form.portal,
-      listing_ref: form.listing_ref,
-      url:         form.url,
-      address:     form.address,
+      portal:      form.portal      || 'Outro',
+      listing_ref: form.listing_ref || null,
+      url:         form.url         || null,
+      address:     form.address     || null,
+      uso:         form.uso         || null,
+      tipologia:   form.tipologia   || null,
+      ano_estado:  form.ano_estado  || null,
       area_m2:     form.area_m2 ? parseFloat(form.area_m2) : null,
       price:       form.price   ? parseFloat(form.price)   : null,
-      notes:       [form.tipologia, form.uso, form.ano_estado, form.notes].filter(Boolean).join(' | '),
+      notes:       form.notes       || null,
+      selected:    false,
     })
     setSaving(false)
     if (error) { toast.error(error.message); return }
