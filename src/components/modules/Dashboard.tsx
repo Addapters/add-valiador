@@ -311,7 +311,7 @@ export default function Dashboard() {
     setSelected(prev => prev.size === allIds.length ? new Set() : new Set(allIds))
   }
 
-  const hasFilters = filterVisita || filterFotos || filterComps || filterVerificado || search
+  const hasFilters = filterVisita || filterFotos || filterComps || filterVerificado || search || Object.values(colFilter).some(v => v)
 
   return (
     <div>
@@ -461,7 +461,16 @@ export default function Dashboard() {
           {(isLoading || isFetching) ? (
             <p className="text-sm text-gray-400 py-4 text-center">A carregar…</p>
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Nenhum imóvel encontrado.</p>
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-sm text-gray-400">Nenhum imóvel encontrado para esta selecção.</p>
+              {hasFilters && (
+                <button className="btn text-xs" onClick={() => {
+                  setFilterVisita(''); setFilterFotos(''); setFilterComps(''); setFilterVerificado(''); setSearch(''); setColFilter({})
+                }}>
+                  ✕ Limpar todos os filtros
+                </button>
+              )}
+            </div>
           ) : (
             <div className="space-y-4">
               {groupedByPortfolio
