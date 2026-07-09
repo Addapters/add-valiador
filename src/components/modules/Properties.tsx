@@ -633,7 +633,7 @@ export default function Properties() {
                       </thead>
                       <tbody>
                         {items.map((p: any, idx: number) => (
-                          <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selected.has(p.id)?'bg-brand-50':idx%2===0?'bg-white':'bg-gray-50/30'}`}>
+                          <tr key={p.id} className={`border-b border-gray-100 ${p.verificado ? 'bg-green-50 hover:bg-green-100' : `hover:bg-gray-50 ${selected.has(p.id)?'bg-brand-50':idx%2===0?'bg-white':'bg-gray-50/30'}`}`}>
                             <td className="sticky left-0 px-3 py-2 bg-inherit z-10">
                               <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
                                 {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
