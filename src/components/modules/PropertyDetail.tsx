@@ -997,20 +997,53 @@ export default function PropertyDetail() {
           </div>
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">9. Método do Custo de Construção ou Reposição — Estado Terminado</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
-              <F label="Custo do Terreno (€/m²)"         field="custo_terreno_m2"       value={property.custo_terreno_m2}       type="number" onSave={save}/>
-              <F label="Custo de Construção (€/m²)"      field="custo_construcao_m2"    value={property.custo_construcao_m2}    type="number" onSave={save}/>
-              <F label="Custos Indirectos (%)"           field="custos_indiretos_pct"   value={property.custos_indiretos_pct}   type="number" onSave={save}/>
-              <F label="Margem do Promotor (%)"          field="margem_promotor_pct"    value={property.margem_promotor_pct}    type="number" onSave={save}/>
-              <F label="Depreciação (%)"                 field="depreciacao_pct"        value={property.depreciacao_pct}        type="number" onSave={save}/>
-              <F label="Área (m²)"                       field="custo_area"             value={property.custo_area}             type="number" onSave={save}/>
-              <F label="C. Terreno (€)"                  field="custo_terreno_total"    value={property.custo_terreno_total}    type="number" onSave={save}/>
-              <F label="C. Const. CC (€)"                field="custo_construcao_total" value={property.custo_construcao_total} type="number" onSave={save}/>
-              <F label="C. Repos. Bruto (€)"             field="custo_repos_bruto"      value={property.custo_repos_bruto}      type="number" onSave={save}/>
-              <F label="Depreciação (€)"                 field="depreciacao_valor"      value={property.depreciacao_valor}      type="number" onSave={save}/>
-              <F label="C. Repos. Líquido (€)"           field="custo_repos_liquido"    value={property.custo_repos_liquido}    type="number" onSave={save}/>
-              <F label="Valor de Seguro CC+CI (€)"       field="valor_seguro_cc_ci"     value={property.valor_seguro_cc_ci}     type="number" onSave={save}/>
-            </div>
+            {(() => {
+              // Helper: recalcula todos os campos derivados a partir dos valores actuais + patch
+              function calcCusto(base: any, patch: any = {}) {
+                const p = { ...base, ...patch }
+                const area  = parseFloat(p.custo_area)             || 0
+                const ctm2  = parseFloat(p.custo_terreno_m2)       || 0
+                const ccm2  = parseFloat(p.custo_construcao_m2)    || 0
+                const cipct = parseFloat(p.custos_indiretos_pct)   || 0
+                const mpct  = parseFloat(p.margem_promotor_pct)    || 0
+                const dpct  = parseFloat(p.depreciacao_pct)        || 0
+                if (!area && !ccm2) return patch
+                const ct   = Math.round(area * ctm2)
+                const cc   = Math.round(area * ccm2)
+                const ci   = Math.round(cc * cipct / 100)
+                const mp   = Math.round(cc * mpct  / 100)
+                const bruto = ct + cc + ci + mp
+                const depr  = Math.round(dpct / 100 * (cc + ci + mp))
+                const liq   = bruto - depr
+                const vs    = cc + ci
+                return {
+                  ...patch,
+                  custo_terreno_total:    ct   || null,
+                  custo_construcao_total: cc   || null,
+                  custo_repos_bruto:      bruto || null,
+                  depreciacao_valor:      depr  || null,
+                  custo_repos_liquido:    liq   || null,
+                  valor_seguro_cc_ci:     vs    || null,
+                }
+              }
+              const sc = (patch: any) => save(calcCusto(property, patch))
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+                  <F label="Custo do Terreno (€/m²)"    field="custo_terreno_m2"       value={property.custo_terreno_m2}       type="number" onSave={sc}/>
+                  <F label="Custo de Construção (€/m²)" field="custo_construcao_m2"    value={property.custo_construcao_m2}    type="number" onSave={sc}/>
+                  <F label="Custos Indirectos (%)"      field="custos_indiretos_pct"   value={property.custos_indiretos_pct}   type="number" onSave={sc}/>
+                  <F label="Margem do Promotor (%)"     field="margem_promotor_pct"    value={property.margem_promotor_pct}    type="number" onSave={sc}/>
+                  <F label="Depreciação (%)"            field="depreciacao_pct"        value={property.depreciacao_pct}        type="number" onSave={sc}/>
+                  <F label="Área (m²)"                  field="custo_area"             value={property.custo_area}             type="number" onSave={sc}/>
+                  <F label="C. Terreno (€)"             field="custo_terreno_total"    value={property.custo_terreno_total}    type="number" onSave={save}/>
+                  <F label="C. Const. CC (€)"           field="custo_construcao_total" value={property.custo_construcao_total} type="number" onSave={save}/>
+                  <F label="C. Repos. Bruto (€)"        field="custo_repos_bruto"      value={property.custo_repos_bruto}      type="number" onSave={save}/>
+                  <F label="Depreciação (€)"            field="depreciacao_valor"      value={property.depreciacao_valor}      type="number" onSave={save}/>
+                  <F label="C. Repos. Líquido (€)"      field="custo_repos_liquido"    value={property.custo_repos_liquido}    type="number" onSave={save}/>
+                  <F label="Valor de Seguro CC+CI (€)"  field="valor_seguro_cc_ci"     value={property.valor_seguro_cc_ci}     type="number" onSave={save}/>
+                </div>
+              )
+            })()}
           </div>
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">9. Método do Custo — Estado Em Projecto / Em Construção</h3>
