@@ -104,7 +104,7 @@ function CalcWindow({ onClose }: { onClose: () => void }) {
       else if (e.key === '-') doOp('−')
       else if (e.key === '*') doOp('×')
       else if (e.key === '/') { e.preventDefault(); doOp('÷') }
-      else if (e.key === 'Enter' || e.key === '=') doEq()
+      else if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); doEq() }
       else if (e.key === 'Escape') doClear()
       else if (e.key === 'Backspace') doBack()
     }
@@ -112,7 +112,18 @@ function CalcWindow({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [doDigit, doDot, doOp, doEq, doClear, doBack])
 
-  const displayVal = cur.length > 12 ? parseFloat(cur).toExponential(4) : cur.replace('.', ',')
+  function formatDisplay(val: string): string {
+    const n = parseFloat(val)
+    if (isNaN(n) || val === '') return val || '0'
+    // Arredondar a 2 casas decimais
+    const rounded = Math.round(n * 100) / 100
+    const isInt = Number.isInteger(rounded)
+    const str = isInt ? rounded.toFixed(0) : rounded.toFixed(2)
+    const parts = str.split('.')
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') // espaço como milhar
+    return isInt ? parts[0] : parts.join(',')
+  }
+  const displayVal = formatDisplay(cur)
 
   const Btn = ({ label, action, wide, color }: { label: string; action: () => void; wide?: boolean; color?: string }) => (
     <button
