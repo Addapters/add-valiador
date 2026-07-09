@@ -765,13 +765,14 @@ export default function PropertyDetail() {
             <F label="Tipo de Via"     field="tipo_via"     value={property.tipo_via}
               opts={['Alameda','Aldeia','Apartado','Ascenção','Avenida','Azinhaga','Bairro','Beco','Bloco','Caixa Postal','Calçada','Caminho','Caserio','Chalé','Colónia','Descida','Edifício','Empreendimento','Estrada Nacional','Estrada Municipal','Extensão','Gaveto','Herdade','Impasse','Inclinação','Largo','Loteamento','Lugar','Maçã','Mercado','Múnicipio','Parque','Passagem','Polígono','Praça','Praceta','Prolongamento','Quinta','Rodada','Rotunda','Rua','Travessa','Travessia','Urbanização','Vila']} onSave={save}/>
             <F label="Nome da Via"     field="street"       value={property.street}       span  onSave={save}/>
-            <F label="Portal / N.º"   field="number"       value={property.number}             onSave={save}/>
+            <F label="N.º"            field="number"       value={property.number}             onSave={save}/>
             <F label="Bloco"           field="block"        value={property.block}              onSave={save}/>
             <F label="Escada"          field="escada"       value={property.escada}             onSave={save}/>
             <F label="Andar / Piso"   field="floor_letter" value={property.floor_letter}        onSave={save}/>
             <F label="Porta / Fração" field="fracao"       value={property.fracao}             onSave={save}/>
             <F label="Complemento"    field="lugar"        value={property.lugar}              onSave={save}/>
-            <F label="Código Postal"  field="postal_code"  value={property.postal_code}
+            <F label="Código Postal"  field="postal_code"
+              value={property.postal_code ? (() => { const d = String(property.postal_code).replace(/\D/g,'').slice(0,7); return d.length > 4 ? d.slice(0,4)+'-'+d.slice(4) : d })() : ''}
               format={v => { const d = v.replace(/\D/g,'').slice(0,7); return d.length > 4 ? d.slice(0,4)+'-'+d.slice(4) : d }}
               onSave={save}/>
             <F label="Freguesia"      field="parish"       value={property.parish}             onSave={save}/>

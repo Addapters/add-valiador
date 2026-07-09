@@ -602,7 +602,7 @@ export async function generateAbancaReport(
     set('AC319', v(prop.perito_cmvm))
     set('AC320', v(prop.nr_apolice))
     set('AC321', fmtDate(prop.data_validade_seguro))
-    set('AC318', 'Arq.')
+    set('AC318', v(prop.perito_ordem, 'Arq.'))
 
     // DOCUMENTOS (L235-L241 = esquerda, AC235-AC241 = direita)
     set('L235', v((prop as any).doc_caderneta_predial,           'Não entregue'))
