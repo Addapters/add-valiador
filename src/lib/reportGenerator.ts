@@ -211,10 +211,13 @@ function traduzTipo(val: any): string {
   return translated || titleCase(val)
 }
 
-// Traduz e aplica titleCase
+  // Traduz e deixa tal como está — sem titleCase (usa exactamente o que está no portal)
 function tr(val: any): string {
   if (!val) return ''
-  return traduzTipo(val)
+  const upper = String(val).toUpperCase().trim()
+  const translated = traduzTipo(upper)
+  // Se traduzido, devolve a tradução; se não, devolve o valor original sem transformação
+  return translated || String(val).trim()
 }
 
 export async function generateAbancaReport(
@@ -403,9 +406,9 @@ export async function generateAbancaReport(
 
     // Código postal / localização
     set(`D${codPostalRow + off}`,  v(prop.postal_code))
-    set(`I${codPostalRow + off}`,  titleCase(v(prop.district)))
-    set(`P${codPostalRow + off}`,  titleCase(v(prop.municipality)))
-    set(`W${codPostalRow + off}`,  titleCase(v(prop.parish)))
+    set(`I${codPostalRow + off}`,  v(prop.district))
+    set(`P${codPostalRow + off}`,  v(prop.municipality))
+    set(`W${codPostalRow + off}`,  v(prop.parish))
 
     // Coordenadas
     if (prop.longitude) set(`D${coordRow + off}`, prop.longitude)
@@ -528,17 +531,19 @@ export async function generateAbancaReport(
     set('T105', fmtArea(prop.area_annex_m2))
 
     // 7. MÉTODO COMPARATIVO DE MERCADO
-    // T116 (Área Privativa) replica sempre a ABP da tab Áreas — não há campo de área próprio
-    // Y116 = IV-IA!P38 (média homogeneizada da folha IV-IA) — escrito mais abaixo depois de calcular
-    // AD116 (Valor total) = ROUND(€/m² × Área, -2), calculado depois de Y116 estar definido
-    // Por agora escreve Y116 a partir do campo manual se disponível — será sobrescrito pelo IV-IA avg
     set('D116', v(prop.metodo_comp_descricao))
-    const area116 = parseFloat(prop.gross_area)
+    // Área: usa metodo_comp_area (preenchido pelo utilizador na tab Métodos), fallback gross_area
+    const area116 = parseFloat(prop.metodo_comp_area || prop.gross_area || prop.area_m2)
     if (area116 > 0) set('T116', area116)
     const valorM2_116 = parseFloat(prop.metodo_comp_valor_m2)
     if (valorM2_116 > 0) {
-      set('Y116', valorM2_116)                                          // Y116:AC116 (provisório)
-      if (area116 > 0) set('AD116', Math.round(valorM2_116 * area116 / 100) * 100) // AD116:AI116
+      set('Y116', valorM2_116)   // Y116 (algumas versões do template têm merge em Y)
+      set('Z116', valorM2_116)   // Z116 = cabeçalho 'Valor (€/m2)' no template inspeccionado
+      const totalComp = area116 > 0 ? Math.round(valorM2_116 * area116 / 100) * 100 : null
+      if (totalComp) {
+        set('AD116', totalComp)  // AD116 em alguns templates
+        set('AE116', totalComp)  // AE116 = cabeçalho 'Valor total' no template inspeccionado
+      }
     }
 
     // Valor de Renda Efetiva
@@ -788,21 +793,21 @@ export async function generateAbancaReport(
       const price     = parseFloat(c.price   || 0)
       const area      = parseFloat(c.area_m2 || 0)
 
-      setIV(`${col}9`,  v(c.address))           // Localização
-      setIV(`${col}10`, uso)                     // Uso
-      setIV(`${col}11`, tipologia)               // Tipologia
-      setIV(`${col}12`, anoEstado)               // Ano/Estado
-      if (area > 0) setIV(`${col}13`, area)      // Área — valor numérico (não texto), usado nos cálculos
-      if (price > 0) setIV(`${col}14`, price)    // Asking Price
+      // Dados exactamente como estão no portal — sem transformação de case
+      setIV(`${col}9`,  v(c.address))           // Localização (zona/morada breve)
+      setIV(`${col}10`, v(c.uso))               // Uso (exactamente como no portal)
+      setIV(`${col}11`, v(c.tipologia))         // Tipologia
+      setIV(`${col}12`, v(c.ano_estado))        // Ano/Estado
+      if (area > 0) setIV(`${col}13`, area)     // Área
+      if (price > 0) setIV(`${col}14`, price)   // Asking Price
 
-      // Índice base (Asking Index, Uso Principal) — sem áreas acessórias (Outros I/II, Logradouro),
-      // que esta plataforma não recolhe; equivale a H15/H21 do template quando essas parcelas são 0
+      // Índice base (Asking Index)
       const baseIndex = (price > 0 && area > 0) ? price / area : null
       if (baseIndex !== null) setIV(`${col}15`, baseIndex)
       if (baseIndex !== null) setIV(`${col}21`, baseIndex)
 
-      setIV(`${col}22`, descricao)               // Descrição
-      setIV(`${col}34`, v(c.url))                // Fonte
+      setIV(`${col}22`, v(c.notes || c.address))   // Localização / Descrição Geral
+      setIV(`${col}34`, v(c.url))                   // Fonte
 
       // HOMOGENEIZAÇÃO (linhas 24-30) — label escolhido na tab Comparáveis + % correspondente
       const pctLoc   = pctGeneric(c.homog_localizacao)

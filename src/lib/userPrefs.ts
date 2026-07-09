@@ -70,11 +70,12 @@ export const ALL_COLUMNS: Record<string, ColDef> = {
 }
 
 export const DEFAULT_VISIBLE = [
-  'external_ref','id_bien','district','municipality','parish',
+  'external_ref','id_bien',
+  'tem_fotos','tem_comparaveis','para_verificacao','verificado','pendente_motivo','anulado_motivo',
+  'district','municipality','parish',
   'street','number','postal_code',
   'property_type','property_subtype','typology','use_type','year_built','area_m2',
-  'perito_avaliador','visit_status','tem_fotos','tem_comparaveis','para_verificacao','verificado',
-  'pendente_motivo','anulado_motivo',
+  'perito_avaliador','visit_status',
   'fee_amount','honorarios_addapters',
   'nuc_risco','data_pedido',
 ]

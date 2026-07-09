@@ -13,19 +13,20 @@ import toast from 'react-hot-toast'
 declare global { interface Window { L: any } }
 
 const TABS = [
-  'sec1','sec2','sec3','sec4','sec5','sec6','sec7','residual','obras','sec8',
-  'sec9','sec10','sec11',
-  'sec13','sec14','sec15','sec16','sec17','sec18'
+  'sec1','sec3','sec2','sec4',
+  'sec15','sec16','sec17',
+  'sec5','sec6','sec7','residual','obras',
+  'sec8','sec9','sec10','sec11',
+  'sec13','sec14','sec18'
 ] as const
 type Tab = typeof TABS[number]
 const TAB_LABELS: Record<Tab, string> = {
-  sec1:'Identificação', sec2:'Morada', sec3:'Descrição',
-  sec4:'Localização', sec5:'Construção', sec6:'Áreas',
-  sec7:'Métodos', residual:'Método Residual', obras:'Obras de Beneficiação',
-  sec8:'Documentos', sec9:'Condicionalismos',
-  sec10:'Advertências', sec11:'Conclusão',
-  sec13:'Certificação', sec14:'Faturação',
-  sec15:'Fotos', sec16:'Comparáveis', sec17:'Aval. anterior', sec18:'Notas',
+  sec1:'Identificação', sec3:'Descrição', sec2:'Morada',
+  sec4:'Localização',   sec15:'Fotos',    sec16:'Comparáveis', sec17:'Aval. anterior',
+  sec5:'Construção',    sec6:'Áreas',     sec7:'Métodos',
+  residual:'Método Residual', obras:'Obras de Beneficiação',
+  sec8:'Documentos',   sec9:'Condicionalismos', sec10:'Advertências', sec11:'Conclusão',
+  sec13:'Certificação', sec14:'Faturação', sec18:'Notas',
 }
 
 function useLeaflet(active: boolean, cb: () => void) {
