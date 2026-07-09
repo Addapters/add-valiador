@@ -350,10 +350,26 @@ export async function generateAbancaReport(
 
   function set(ref: string, val: any) {
     if (val === null || val === undefined || val === '') return
-    ws.getCell(ref).value = val
+    const cell = ws.getCell(ref)
+    cell.value = val
+    // O template usa fonte branca (theme=1) na maioria das células de dados.
+    // Forçar preto para garantir visibilidade no ficheiro gerado.
+    try {
+      const f = cell.font || {}
+      cell.font = {
+        name:      f.name      || 'Arial',
+        size:      f.size      || 10,
+        bold:      f.bold      || false,
+        italic:    f.italic    || false,
+        underline: f.underline || false,
+        color: { argb: 'FF000000' }
+      }
+    } catch(_) {}
   }
   function setFormula(ref: string, formula: string) {
-    ws.getCell(ref).value = { formula, result: 0 }
+    const cell = ws.getCell(ref)
+    cell.value = { formula, result: 0 }
+    try { cell.font = { name: cell.font?.name || 'Arial', size: cell.font?.size || 10, color: { argb: 'FF000000' } } } catch(_) {}
   }
 
   // Linhas base para template standard (offset +1 por imóvel, max 3)
@@ -610,20 +626,25 @@ export async function generateAbancaReport(
     set('AC318', v(prop.perito_ordem, 'Arq.'))
 
     // DOCUMENTOS (L235-L241 = esquerda, AC235-AC241 = direita)
-    set('L235', v((prop as any).doc_caderneta_predial,           'Não entregue'))
-    set('L236', v((prop as any).doc_certid_o_da_crp,             'Não entregue'))
-    set('L237', v((prop as any).doc_contrato_de_arrendamento,    'Não entregue'))
-    set('L238', v((prop as any).doc_alvar__de_loteamento,        'Não entregue'))
-    set('L239', v((prop as any).doc_planta_de_loteamento,        'Não entregue'))
-    set('L240', v((prop as any).doc_licen_a_de_constru__o_obras, 'Não entregue'))
-    set('L241', v((prop as any).doc_licen_a_de_utiliza__o,       'Não entregue'))
-    set('AC235', v((prop as any).doc_or_amento_de_obras,         'Não entregue'))
-    set('AC236', v((prop as any).doc_mem_ria_descritiva,         'Não entregue'))
-    set('AC237', v((prop as any).doc_ficha_t_cnica_habita__o,    'Não entregue'))
-    set('AC238', v((prop as any).doc_projeto_aprovado,           'Não entregue'))
-    set('AC239', v((prop as any).doc_projeto_n_o_aprovado,       'Não entregue'))
-    set('AC240', v((prop as any).doc_certificado_energ_tico,     'Não entregue'))
-    set('AC241', v((prop as any).doc_outro,                      'Não entregue'))
+    const docPairs: [any, string][] = [
+      [(prop as any).doc_caderneta_predial,           'L235'],
+      [(prop as any).doc_certid_o_da_crp,             'L236'],
+      [(prop as any).doc_contrato_de_arrendamento,    'L237'],
+      [(prop as any)['doc_alvar__de_loteamento'],      'L238'],
+      [(prop as any).doc_planta_de_loteamento,        'L239'],
+      [(prop as any).doc_licen_a_de_constru__o_obras, 'L240'],
+      [(prop as any).doc_licen_a_de_utiliza__o,       'L241'],
+      [(prop as any).doc_or_amento_de_obras,          'AC235'],
+      [(prop as any).doc_mem_ria_descritiva,          'AC236'],
+      [(prop as any).doc_ficha_t_cnica_habita__o,     'AC237'],
+      [(prop as any).doc_projeto_aprovado,            'AC238'],
+      [(prop as any).doc_projeto_n_o_aprovado,        'AC239'],
+      [(prop as any).doc_certificado_energ_tico,      'AC240'],
+      [(prop as any).doc_outro,                       'AC241'],
+    ]
+    for (const [dbVal, ref] of docPairs) {
+      set(ref, v(dbVal, 'Não entregue'))
+    }
 
     set('AC322', v(prop.seguradora))
   }
