@@ -1656,12 +1656,16 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
         }
         const propArea = propertyArea ? parseFloat(String(propertyArea)) : null
 
-        // Factor de área: (Área_imóvel / Área_comp)^0.5 - 1  (elasticidade padrão 0.5)
+        // Fórmula da área: =IF(($E$13-H13)/$E$13<0,3;(H13/$E$13)^(1/25);(H13/$E$13)^(1/50))-1
+        // Quando a diferença relativa (propArea-compArea)/propArea < 0.3 → expoente 1/25
+        // Quando >= 0.3 (comp muito menor que prop) → expoente 1/50 (correcção mais suave)
         function calcAreaPct(compArea: any): number {
           if (!propArea || !compArea) return 0
           const ca = parseFloat(compArea)
-          if (!ca || ca === propArea) return 0
-          return (Math.pow(propArea / ca, 0.5) - 1)
+          if (!ca) return 0
+          const ratio = (propArea - ca) / propArea
+          const exp = ratio < 0.3 ? 1/25 : 1/50
+          return Math.pow(ca / propArea, exp) - 1
         }
 
         function calcHomog(c: any): number | null {
