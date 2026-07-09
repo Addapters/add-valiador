@@ -308,6 +308,18 @@ export async function generateAbancaReport(
         xml = xml.replace(/<v>#(DIV\/0!|REF!|N\/A|NAME\?|NULL!|NUM!|VALUE!)<\/v>/g, '')
         xml = xml.replace(/\st="e"/g, '')
 
+        // Passo 5 — Safety net: remover QUAISQUER referências shared restantes que o ExcelJS rejeita
+        // Cobre self-closing slaves (<f t="shared" si="N"/>) não apanhados pelo regex do passo 2
+        xml = xml.replace(/<f\b([^>]*)\s*\/>/g, (m, attrs) => {
+          if (!attrs.includes('t="shared"')) return m
+          return '' // slave sem fórmula → remover completamente
+        })
+        // Cobre slaves com tag explícita vazia (<f t="shared" si="N"></f>)
+        xml = xml.replace(/<f\b([^>]*)><\/f>/g, (m, attrs) => {
+          if (!attrs.includes('t="shared"')) return m
+          return ''
+        })
+
         zip.file(sf, xml)
       }
       return await zip.generateAsync({ type: 'arraybuffer' })
