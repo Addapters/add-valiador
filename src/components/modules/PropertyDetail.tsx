@@ -1704,13 +1704,15 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
 
         function calcHomog(c: any): number | null {
           if (!c.epm2) return null
-          let factor = 1
+          // Fórmula ABANCA (aditiva): base × (1 + soma de todos os ajustes)
+          // Igual ao Excel: =H15*(1+SUM(J24:J30))
+          let sumAdj = 0
           for (const row of HOMOG_ROWS) {
-            if (row.calc) { factor *= (1 + calcAreaPct(c.area_m2)); continue }
+            if (row.calc) { sumAdj += calcAreaPct(c.area_m2); continue }
             const val = c[row.key]
-            if (val && PCT[val] !== undefined) factor *= (1 + PCT[val])
+            if (val && PCT[val] !== undefined) sumAdj += PCT[val]
           }
-          return c.epm2 * factor
+          return c.epm2 * (1 + sumAdj)
         }
 
         async function saveHomog(compId: string, field: string, val: string) {
