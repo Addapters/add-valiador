@@ -943,7 +943,6 @@ export default function PropertyDetail() {
                   else save(patch)
                 }}/>
               <F label="Valor Total (€)"                 field="metodo_comp_valor_total" value={property.metodo_comp_valor_total} type="number" onSave={save}/>
-              <F label="Valor Comparativo Ajustado (€)"  field="valor_comparativo"       value={property.valor_comparativo}       type="number" onSave={save}/>
             </div>
           </div>
           <div className="mb-6">
