@@ -1640,13 +1640,13 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
       {selected.length > 0 && (() => {
         // Factores e mapeamento para percentagem
         const HOMOG_ROWS: { key: string; label: string; opts?: string[]; calc?: boolean }[] = [
-          { key: 'homog_localizacao',      label: 'LOCALIZAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'area',                   label: 'ÁREA',                 calc: true },
-          { key: 'homog_acabamentos',      label: 'ACAB. E EQUIPAMENTOS', opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_conservacao',      label: 'CONSERVAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_caract_gerais',    label: 'CARACT. GERAIS',       opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_classe_energetica',label: 'CLASSE ENERGÉTICA',    opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_tx_desconto',      label: 'TX DESCONTO | REVISÃO',opts: ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação'] },
+          { key: 'homog_localizacao',       label: 'LOCALIZAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_area',              label: 'ÁREA',                 calc: true },
+          { key: 'homog_acabamentos',       label: 'ACAB. E EQUIPAMENTOS', opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_conservacao',       label: 'CONSERVAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_caract_gerais',     label: 'CARACT. GERAIS',       opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_classe_energetica', label: 'CLASSE ENERGÉTICA',    opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+          { key: 'homog_tx_desconto',       label: 'TX DESCONTO | REVISÃO',opts: ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação'] },
         ]
         const PCT: Record<string,number> = {
           'Muito superior': -0.15, 'Superior': -0.10, 'Ligeiramente superior': -0.05,
@@ -1656,11 +1656,12 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
         }
         const propArea = propertyArea ? parseFloat(String(propertyArea)) : null
 
+        // Factor de área: (Área_imóvel / Área_comp)^0.5 - 1  (elasticidade padrão 0.5)
         function calcAreaPct(compArea: any): number {
           if (!propArea || !compArea) return 0
           const ca = parseFloat(compArea)
-          if (!ca) return 0
-          return (propArea - ca) / ca * 0.5  // factor de área padrão (elasticidade 0.5)
+          if (!ca || ca === propArea) return 0
+          return (Math.pow(propArea / ca, 0.5) - 1)
         }
 
         function calcHomog(c: any): number | null {
