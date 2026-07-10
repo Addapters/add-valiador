@@ -666,9 +666,10 @@ export async function generateAbancaReport(
   set('F321', fmtDate(p.empresa_data_validade)); set('F322', v(p.empresa_seguradora))
   set('R317', v(p.pac_nome));    set('R319', v(p.pac_cmvm))
   set('R320', v(p.pac_apolice)); set('R321', fmtDate(p.pac_data_validade)); set('R322', v(p.pac_seguradora))
-  set('AC317', v(p.perito_avaliador)); set('AC318', v(p.perito_ordem, 'Arq.'))
-  set('AC319', v(p.perito_cmvm));  set('AC320', v(p.nr_apolice))
-  set('AC321', fmtDate(p.data_validade_seguro)); set('AC322', v(p.seguradora))
+  // Perito Avaliador — coluna AC (merged AC-AI), linhas 278-283 (confirmadas pelo utilizador)
+  set('AC278', v(p.perito_avaliador)); set('AC279', v(p.perito_ordem, 'Arq.'))
+  set('AC280', v(p.perito_cmvm));  set('AC281', v(p.nr_apolice))
+  set('AC282', fmtDate(p.data_validade_seguro)); set('AC283', v(p.seguradora))
 
   // DOCUMENTOS (L235-L241 = esquerda, AC235-AC241 = direita)
   const docPairs: [any, string][] = [
@@ -1013,7 +1014,7 @@ export async function generateAbancaReport(
     const sigBytes = Uint8Array.from(atob(SIGNATURE_B64), c => c.charCodeAt(0))
     const sigId = wb.addImage({ buffer: sigBytes.buffer as ArrayBuffer, extension: 'png' })
     ws.addImage(sigId, {
-      tl: { col: 28, row: 323 },
+      tl: { col: 28, row: 283 },  // coluna AC, linha 284 (0-indexed) — abaixo do bloco do perito (278-283)
       ext: { width: 180, height: 65 }
     })
   } catch(e) { console.warn('Signature image failed:', e) }
