@@ -256,13 +256,32 @@ export default function Dashboard() {
   }), [recent, filterVisita, filterFotos, filterComps, filterVerificado, search])
 
   // ── Mutations ──────────────────────────────────────────────────────────────
+  // Actualização optimista: aplica o valor de imediato no cache local (sem
+  // esperar pela resposta do servidor nem refazer o fetch completo), para que
+  // o toggle Sim/Não não provoque salto/refresh visual na tabela. Só se algo
+  // correr mal é que reverte para o estado anterior.
+  const dashboardKey = ['dashboard-stats', role, name]
   const updateField = useMutation({
     mutationFn: async ({ id, field, value }: { id:string; field:string; value:any }) => {
       const { error } = await supabase.from('properties').update({ [field]: value }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['dashboard-stats'] }),
-    onError:   (e: any) => toast.error(e.message)
+    onMutate: async ({ id, field, value }) => {
+      await qc.cancelQueries({ queryKey: dashboardKey })
+      const previous = qc.getQueryData<any>(dashboardKey)
+      qc.setQueryData<any>(dashboardKey, (old: any) => {
+        if (!old) return old
+        const patch = (list: any[]) => list.map((p: any) => p.id === id ? { ...p, [field]: value } : p)
+        return { properties: patch(old.properties || []), recent: patch(old.recent || []) }
+      })
+      return { previous }
+    },
+    onError: (e: any, _vars, context: any) => {
+      if (context?.previous) qc.setQueryData(dashboardKey, context.previous)
+      toast.error(e.message)
+    },
+    // Ressincroniza com o servidor em segundo plano, sem bloquear nem "saltar" a UI
+    onSettled: () => qc.invalidateQueries({ queryKey: ['dashboard-stats'] })
   })
 
   const bulkUpdate = useMutation({
