@@ -929,7 +929,13 @@ export default function PropertyDetail() {
                   const area = parseFloat(patch.metodo_comp_area)
                   const vm2  = parseFloat(property.metodo_comp_valor_m2)
                   const updates: any = { ...patch }
-                  if (area && vm2) updates.metodo_comp_valor_total = Math.round(area * vm2)
+                  if (area && vm2) {
+                    const total = Math.round(area * vm2)
+                    // Valor de Mercado (Conclusão) segue sempre o Valor Total deste método
+                    updates.metodo_comp_valor_total = total
+                    updates.valor_mercado           = total
+                    updates.valor_mercado_atual      = total
+                  }
                   // Auto-preencher áreas dos outros métodos se ainda estiverem vazias
                   if (area) {
                     if (!property.renda_ef_area)  updates.renda_ef_area  = area
@@ -941,10 +947,21 @@ export default function PropertyDetail() {
                 onSave={patch => {
                   const vm2  = parseFloat(patch.metodo_comp_valor_m2)
                   const area = parseFloat(property.metodo_comp_area)
-                  if (vm2 && area) save({ ...patch, metodo_comp_valor_total: Math.round(vm2 * area) })
+                  if (vm2 && area) {
+                    const total = Math.round(vm2 * area)
+                    // Valor de Mercado (Conclusão) segue sempre o Valor Total deste método
+                    save({ ...patch, metodo_comp_valor_total: total, valor_mercado: total, valor_mercado_atual: total })
+                  } else {
+                    save(patch)
+                  }
+                }}/>
+              <F label="Valor Total (€)"                 field="metodo_comp_valor_total" value={property.metodo_comp_valor_total} type="number"
+                onSave={patch => {
+                  const total = parseFloat(patch.metodo_comp_valor_total)
+                  // Edição manual do Valor Total também sincroniza o Valor de Mercado
+                  if (!isNaN(total)) save({ ...patch, valor_mercado: total, valor_mercado_atual: total })
                   else save(patch)
                 }}/>
-              <F label="Valor Total (€)"                 field="metodo_comp_valor_total" value={property.metodo_comp_valor_total} type="number" onSave={save}/>
             </div>
           </div>
           <div className="mb-6">
@@ -1509,20 +1526,11 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
     return c.epm2 * (1 + sumAdj)
   }
 
-  // Sincroniza o Valor de Mercado (Conclusão) com o resultado do método comparativo:
-  // média homogeneizada dos comparáveis seleccionados × área, arredondado às centenas.
-  // Preenche valor_mercado E valor_mercado_atual automaticamente.
-  async function syncValorMercado(patchedId?: string, patch: any = {}) {
-    const updated = compsWithEpm2.map(cc => cc.id === patchedId ? { ...cc, ...patch } : cc)
-    const sel = updated.filter(cc => cc.selected)
-    const homogVals = sel.map(cc => calcHomog(cc)).filter((h): h is number => h !== null && isFinite(h))
-    if (!homogVals.length || !propArea) return
-    const avg = homogVals.reduce((s, h) => s + h, 0) / homogVals.length
-    const total = Math.round(avg * propArea / 100) * 100
-    await supabase.from('properties')
-      .update({ valor_mercado: total, valor_mercado_atual: total })
-      .eq('id', propertyId)
-  }
+  // NOTA: o Valor de Mercado (Conclusão) já não é calculado aqui a partir da
+  // homogeneização — segue sempre o Valor Total da secção Método Comparativo
+  // de Mercado (ver onSave dos campos metodo_comp_* em sec7), para nunca
+  // divergir do valor apresentado nessa secção. A homogeneização aqui serve
+  // apenas de apoio/análise para o perito decidir o Valor (€/m²) a inserir lá.
 
   async function updateComp(compId: string, patch: any) {
     await supabase.from('market_comps').update(patch).eq('id', compId)
@@ -1564,7 +1572,6 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
       toast('Este comparável foi identificado como outlier pelo Critério de Chauvenet.', { icon: '⚠️' })
     }
     await supabase.from('market_comps').update({ selected: !c.selected }).eq('id', c.id)
-    await syncValorMercado(c.id, { selected: !c.selected })
     onRefresh()
   }
 
@@ -1736,7 +1743,6 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
       {selected.length > 0 && (() => {
         async function saveHomog(compId: string, field: string, val: string) {
           await supabase.from('market_comps').update({ [field]: val || null }).eq('id', compId)
-          await syncValorMercado(compId, { [field]: val || null })
           onRefresh()
         }
 
