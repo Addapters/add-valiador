@@ -369,13 +369,29 @@ export default function Properties() {
     onError: (e: any) => toast.error(e.message)
   })
 
+  // Actualização optimista: aplica o valor de imediato no cache local (sem
+  // esperar pela resposta do servidor nem refazer o fetch completo), para que
+  // o toggle Sim/Não não provoque salto/refresh visual na tabela. Só se algo
+  // correr mal é que reverte para o estado anterior.
   const updateField = useMutation({
     mutationFn: async ({ id, field, value }: { id:string; field:string; value:any }) => {
       const { error } = await supabase.from('properties').update({ [field]: value }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey:['properties-all'] }),
-    onError: (e: any) => toast.error(e.message)
+    onMutate: async ({ id, field, value }) => {
+      await qc.cancelQueries({ queryKey:['properties-all'] })
+      const previous = qc.getQueryData<any[]>(['properties-all'])
+      qc.setQueryData<any[]>(['properties-all'], (old: any[] = []) =>
+        old.map(r => r.id === id ? { ...r, [field]: value } : r)
+      )
+      return { previous }
+    },
+    onError: (e: any, _vars, context: any) => {
+      if (context?.previous) qc.setQueryData(['properties-all'], context.previous)
+      toast.error(e.message)
+    },
+    // Ressincroniza com o servidor em segundo plano, sem bloquear nem "saltar" a UI
+    onSettled: () => qc.invalidateQueries({ queryKey:['properties-all'] })
   })
 
   const bulkUpdate = useMutation({
