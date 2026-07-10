@@ -65,10 +65,8 @@ function titleCase(val: any): string {
   }).join(' ')
 }
 
-// Traduz termos em espanhol para português europeu
-function traduzTipo(val: any): string {
-  if (!val) return ''
-  const map: Record<string, string> = {
+// Mapa de traduções ES→PT (nível do módulo, partilhado por traduzTipo e tr)
+const TRADUZ_MAP: Record<string, string> = {
     'DESCONOCIDO':                 'Desconhecido',
     'NO DISPONIBLE':               'Não disponível',
     'NO APLICA':                   'Não aplicável',
@@ -204,19 +202,20 @@ function traduzTipo(val: any): string {
     'RETASACIÓN':                  'Reavaliação',
     'VISTORIA':                    'Vistoria',
     'PORTABILIDAD':                'Portabilidade',
-  }
-  const upper = String(val).toUpperCase().trim()
-  const translated = map[upper]
-  // Se traduzido, devolve a tradução; se não, aplica titleCase ao valor original
+}
+
+// Traduz termos em espanhol; se não houver tradução, aplica titleCase
+function traduzTipo(val: any): string {
+  if (!val) return ''
+  const translated = TRADUZ_MAP[String(val).toUpperCase().trim()]
   return translated || titleCase(val)
 }
 
-  // Traduz e deixa tal como está — sem titleCase (usa exactamente o que está no portal)
+// Traduz termos em espanhol; se não houver tradução, devolve o valor ORIGINAL
+// exactamente como está na BD/portal — SEM titleCase, SEM uppercase
 function tr(val: any): string {
   if (!val) return ''
-  const upper = String(val).toUpperCase().trim()
-  const translated = traduzTipo(upper)
-  // Se traduzido, devolve a tradução; se não, devolve o valor original sem transformação
+  const translated = TRADUZ_MAP[String(val).toUpperCase().trim()]
   return translated || String(val).trim()
 }
 
@@ -337,6 +336,22 @@ export async function generateAbancaReport(
 
   const ws = wb.getWorksheet('RELATÓRIO - PT')
   if (!ws) throw new Error('Folha "RELATÓRIO - PT" não encontrada no modelo.')
+
+  // ── Remover fórmulas de referência simples (=+B19, =+I19, ...) que duplicam
+  // campos ao longo do documento (ex.: "Travessa" a aparecer em B39).
+  // Preserva apenas as fórmulas do cabeçalho: O3 (IF), V3 (=+F10), F8, F9 (EDATE).
+  const KEEP_FORMULAS = new Set(['O3', 'V3', 'F8', 'F9'])
+  const PURE_REF = /^\+?\$?[A-Z]{1,3}\$?\d{1,4}$/
+  ws.eachRow({ includeEmpty: false }, (row: any) => {
+    row.eachCell({ includeEmpty: false }, (cell: any) => {
+      const cv: any = cell.value
+      if (cv && typeof cv === 'object' && cv.formula !== undefined) {
+        if (KEEP_FORMULAS.has(cell.address)) return
+        const f = String(cv.formula).trim()
+        if (PURE_REF.test(f)) cell.value = null
+      }
+    })
+  })
 
   // Detecta se é template multi (4+ bens) ou terreno (capacidade construtiva) pela URL
   const isMulti   = templateUrl.includes('multiplos') || templateUrl.includes('multi')
@@ -731,7 +746,7 @@ export async function generateAbancaReport(
     return HOMOG_PCT_GENERIC[String(label ?? 'Semelhante').toUpperCase().trim()]
   }
   function pctTxDesconto(label: any): number | undefined {
-    return HOMOG_PCT_TX[String(label ?? 'Alinhado com Mercado').toUpperCase().trim()]
+    return HOMOG_PCT_TX[String(label ?? 'Sem Margem Negociação').toUpperCase().trim()]
   }
   // Ajuste de área — mesma fórmula do template (linha 25 do IV-IV), substituída por valor estático
   // já que as fórmulas são removidas do ficheiro final (ver cleanSharedFormulas)
@@ -766,6 +781,20 @@ export async function generateAbancaReport(
     // E13 — Área Privativa/Locável do imóvel em avaliação (ABP), usada como base da homogeneização de área
     const subjectArea = parseFloat(p.gross_area)
     if (subjectArea > 0) setIV('E13', subjectArea)
+
+    // PRÉ-PREENCHIMENTO: todos os critérios de homogeneização das 5 amostras
+    // ficam por defeito 'Semelhante' (0%) e a linha TX DESCONTO | REVISÃO fica
+    // 'Sem Margem Negociação' (0%). O loop dos comparáveis sobrescreve com os
+    // valores escolhidos na tab Comparáveis.
+    for (let di = 0; di < IV_COLS.length; di++) {
+      const dCol = IV_COLS[di], dPct = IV_PCT_COLS[di]
+      for (const r of [24, 26, 27, 28, 29]) {
+        setIV(`${dCol}${r}`, 'Semelhante')
+        setIV(`${dPct}${r}`, 0)
+      }
+      setIV(`${dCol}30`, 'Sem Margem Negociação')
+      setIV(`${dPct}30`, 0)
+    }
 
     // Guarda o índice homogeneizado (linha 31) de cada amostra para a análise estatística seguinte
 
@@ -810,7 +839,7 @@ export async function generateAbancaReport(
       setIV(`${col}27`, v(c.homog_conservacao, 'Semelhante'));        setIV(`${pctCol}27`, pctConsv)
       setIV(`${col}28`, v(c.homog_caract_gerais, 'Semelhante'));      setIV(`${pctCol}28`, pctCarac)
       setIV(`${col}29`, v(c.homog_classe_energetica, 'Semelhante')); setIV(`${pctCol}29`, pctClass)
-      setIV(`${col}30`, v(c.homog_tx_desconto, 'Alinhado com Mercado')); setIV(`${pctCol}30`, pctTx)
+      setIV(`${col}30`, v(c.homog_tx_desconto, 'Sem Margem Negociação')); setIV(`${pctCol}30`, pctTx)
 
       // ÍNDICE DE VENDA HOMOGENEIZADO (linha 31) = índice base × (1 + soma dos 7 ajustes)
       if (baseIndex !== null) {
