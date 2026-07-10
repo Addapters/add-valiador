@@ -1464,6 +1464,66 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
     return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + ' €'
   }
 
+  // ── Homogeneização (nível do componente, partilhado pela tabela e pelo sync) ──
+  const HOMOG_ROWS: { key: string; label: string; opts?: string[]; calc?: boolean }[] = [
+    { key: 'homog_localizacao',       label: 'LOCALIZAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+    { key: 'homog_area',              label: 'ÁREA',                 calc: true },
+    { key: 'homog_acabamentos',       label: 'ACAB. E EQUIPAMENTOS', opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+    { key: 'homog_conservacao',       label: 'CONSERVAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+    { key: 'homog_caract_gerais',     label: 'CARACT. GERAIS',       opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+    { key: 'homog_classe_energetica', label: 'CLASSE ENERGÉTICA',    opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
+    { key: 'homog_tx_desconto',       label: 'TX DESCONTO | REVISÃO',opts: ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação'] },
+  ]
+  const PCT: Record<string,number> = {
+    'Muito superior': -0.15, 'Superior': -0.10, 'Ligeiramente superior': -0.05,
+    'Semelhante': 0, 'Ligeiramente inferior': 0.05, 'Inferior': 0.10, 'Muito inferior': 0.15,
+    'Especulativo': -0.20, 'Fácilmente negociável': -0.15, 'Ligeiramente negociável': -0.10,
+    'Alinhado com Mercado': -0.05, 'Sem Margem Negociação': 0,
+  }
+  const propArea = propertyArea ? parseFloat(String(propertyArea)) : null
+
+  // Default de pré-preenchimento: 'Semelhante' para todos os critérios,
+  // 'Sem Margem Negociação' para a TX DESCONTO | REVISÃO
+  const defaultHomog = (key: string) =>
+    key === 'homog_tx_desconto' ? 'Sem Margem Negociação' : 'Semelhante'
+
+  // Fórmula da área: =IF(($E$13-H13)/$E$13<0,3;(H13/$E$13)^(1/25);(H13/$E$13)^(1/50))-1
+  function calcAreaPct(compArea: any): number {
+    if (!propArea || !compArea) return 0
+    const ca = parseFloat(compArea)
+    if (!ca) return 0
+    const ratio = (propArea - ca) / propArea
+    const exp = ratio < 0.3 ? 1/25 : 1/50
+    return Math.pow(ca / propArea, exp) - 1
+  }
+
+  function calcHomog(c: any): number | null {
+    if (!c.epm2) return null
+    // Fórmula ABANCA (aditiva): base × (1 + soma de todos os ajustes) = H15*(1+SUM(J24:J30))
+    let sumAdj = 0
+    for (const row of HOMOG_ROWS) {
+      if (row.calc) { sumAdj += calcAreaPct(c.area_m2); continue }
+      const val = c[row.key] || defaultHomog(row.key)
+      if (val && PCT[val] !== undefined) sumAdj += PCT[val]
+    }
+    return c.epm2 * (1 + sumAdj)
+  }
+
+  // Sincroniza o Valor de Mercado (Conclusão) com o resultado do método comparativo:
+  // média homogeneizada dos comparáveis seleccionados × área, arredondado às centenas.
+  // Preenche valor_mercado E valor_mercado_atual automaticamente.
+  async function syncValorMercado(patchedId?: string, patch: any = {}) {
+    const updated = compsWithEpm2.map(cc => cc.id === patchedId ? { ...cc, ...patch } : cc)
+    const sel = updated.filter(cc => cc.selected)
+    const homogVals = sel.map(cc => calcHomog(cc)).filter((h): h is number => h !== null && isFinite(h))
+    if (!homogVals.length || !propArea) return
+    const avg = homogVals.reduce((s, h) => s + h, 0) / homogVals.length
+    const total = Math.round(avg * propArea / 100) * 100
+    await supabase.from('properties')
+      .update({ valor_mercado: total, valor_mercado_atual: total })
+      .eq('id', propertyId)
+  }
+
   async function updateComp(compId: string, patch: any) {
     await supabase.from('market_comps').update(patch).eq('id', compId)
     onRefresh()
@@ -1503,7 +1563,9 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
     if (!c.selected && c.chauvenet_rejected) {
       toast('Este comparável foi identificado como outlier pelo Critério de Chauvenet.', { icon: '⚠️' })
     }
-    await updateComp(c.id, { selected: !c.selected })
+    await supabase.from('market_comps').update({ selected: !c.selected }).eq('id', c.id)
+    await syncValorMercado(c.id, { selected: !c.selected })
+    onRefresh()
   }
 
   return (
@@ -1672,56 +1734,9 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
 
       {/* 5 ── Tabela de Homogeneização */}
       {selected.length > 0 && (() => {
-        // Factores e mapeamento para percentagem
-        const HOMOG_ROWS: { key: string; label: string; opts?: string[]; calc?: boolean }[] = [
-          { key: 'homog_localizacao',       label: 'LOCALIZAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_area',              label: 'ÁREA',                 calc: true },
-          { key: 'homog_acabamentos',       label: 'ACAB. E EQUIPAMENTOS', opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_conservacao',       label: 'CONSERVAÇÃO',          opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_caract_gerais',     label: 'CARACT. GERAIS',       opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_classe_energetica', label: 'CLASSE ENERGÉTICA',    opts: ['Muito superior','Superior','Ligeiramente superior','Semelhante','Ligeiramente inferior','Inferior','Muito inferior'] },
-          { key: 'homog_tx_desconto',       label: 'TX DESCONTO | REVISÃO',opts: ['Especulativo','Fácilmente negociável','Ligeiramente negociável','Alinhado com Mercado','Sem Margem Negociação'] },
-        ]
-        const PCT: Record<string,number> = {
-          'Muito superior': -0.15, 'Superior': -0.10, 'Ligeiramente superior': -0.05,
-          'Semelhante': 0, 'Ligeiramente inferior': 0.05, 'Inferior': 0.10, 'Muito inferior': 0.15,
-          'Especulativo': -0.20, 'Fácilmente negociável': -0.15, 'Ligeiramente negociável': -0.10,
-          'Alinhado com Mercado': -0.05, 'Sem Margem Negociação': 0,
-        }
-        const propArea = propertyArea ? parseFloat(String(propertyArea)) : null
-
-        // Fórmula da área: =IF(($E$13-H13)/$E$13<0,3;(H13/$E$13)^(1/25);(H13/$E$13)^(1/50))-1
-        // Quando a diferença relativa (propArea-compArea)/propArea < 0.3 → expoente 1/25
-        // Quando >= 0.3 (comp muito menor que prop) → expoente 1/50 (correcção mais suave)
-        function calcAreaPct(compArea: any): number {
-          if (!propArea || !compArea) return 0
-          const ca = parseFloat(compArea)
-          if (!ca) return 0
-          const ratio = (propArea - ca) / propArea
-          const exp = ratio < 0.3 ? 1/25 : 1/50
-          return Math.pow(ca / propArea, exp) - 1
-        }
-
-        // Default de pré-preenchimento: 'Semelhante' para todos os critérios,
-        // 'Sem Margem Negociação' para a TX DESCONTO | REVISÃO
-        const defaultHomog = (key: string) =>
-          key === 'homog_tx_desconto' ? 'Sem Margem Negociação' : 'Semelhante'
-
-        function calcHomog(c: any): number | null {
-          if (!c.epm2) return null
-          // Fórmula ABANCA (aditiva): base × (1 + soma de todos os ajustes)
-          // Igual ao Excel: =H15*(1+SUM(J24:J30))
-          let sumAdj = 0
-          for (const row of HOMOG_ROWS) {
-            if (row.calc) { sumAdj += calcAreaPct(c.area_m2); continue }
-            const val = c[row.key] || defaultHomog(row.key)
-            if (val && PCT[val] !== undefined) sumAdj += PCT[val]
-          }
-          return c.epm2 * (1 + sumAdj)
-        }
-
         async function saveHomog(compId: string, field: string, val: string) {
           await supabase.from('market_comps').update({ [field]: val || null }).eq('id', compId)
+          await syncValorMercado(compId, { [field]: val || null })
           onRefresh()
         }
 
