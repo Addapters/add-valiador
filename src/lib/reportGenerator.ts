@@ -357,6 +357,22 @@ export async function generateAbancaReport(
   const isMulti   = templateUrl.includes('multiplos') || templateUrl.includes('multi')
   const isTerreno = templateUrl.toLowerCase().includes('terreno')
 
+  // Fórmulas '=IF(+B20="","",B20)' nas linhas do 2º bem da coluna B mostram
+  // valores em cache obsoletos no relatório gerado — eliminadas por pedido.
+  // (Se existir 2º/3º bem, o fillBlock escreve o Id por cima destas células.)
+  if (!isMulti && !isTerreno) {
+    const CLEAR_IF_CELLS = [
+      'B39', 'B45', 'B51', 'B63', 'B87', 'B93', 'B99',
+      'B153', 'B158', 'B173', 'B178', 'B184', 'B190',
+      'B213', 'B225', 'B266', 'B286', 'B292',
+    ]
+    for (const ref of CLEAR_IF_CELLS) {
+      const cell = ws.getCell(ref)
+      const cv: any = cell.value
+      if (cv && typeof cv === 'object' && cv.formula !== undefined) cell.value = null
+    }
+  }
+
   // Todos os imóveis a preencher (terreno é sempre 1 bem, sem irmãos)
   const maxProps = isMulti ? 18 : 3
   const allProps = [property, ...siblings].slice(0, maxProps)
@@ -466,6 +482,8 @@ export async function generateAbancaReport(
       set(`J${86 + off}`, v(prop.nr_pisos, 1))
       set(`L${86 + off}`, tr(v(prop.qualidade_construcao, 'Média')))
       set(`P${86 + off}`, tr(v(prop.orientacao_solar, 'Não influi no valor')))
+      set(`U${86 + off}`,  v(prop.categorizacao))       // Categorização (merge U:AC)
+      set(`AD${86 + off}`, v(prop.tipo_reparacao))      // Tipo de reparação (merge AD:AI)
       set(`D${92 + off}`, v(prop.nr_certificado_energ))
       set(`J${92 + off}`, v(prop.classe_energetica))
       set(`N${92 + off}`, fmtDate(prop.data_emissao_cert))
@@ -597,16 +615,28 @@ export async function generateAbancaReport(
     return Math.round(((1 - c) * (1 - d)) / Math.pow(1 + i, t) * 10000) / 10000
   }
 
-  // 1. CABEÇALHO
-  // O3=IF(F8,"",F8), V3=+F10, F9=EDATE(F8,6) são fórmulas preservadas no template — NÃO escrever.
-  // F8=+V304/V746/V315 também é fórmula — em vez de escrever F8 directamente, escrevemos
-  // na célula de data de conclusão que alimenta F8 (na secção de certificação mais abaixo).
-  // 1. IDENTIFICAÇÃO — células de input (não são fórmulas)
+  // 1. CABEÇALHO / IDENTIFICAÇÃO
+  // F8/F9/O3/V3 têm fórmulas no template, mas os viewers mostram o resultado em
+  // cache (obsoleto/vazio) — escrevemos os valores da plataforma por cima.
   const reportRef = v(p.external_ref, v(p.nr_relatorio, v(p.ref, '')))
-  set('F10', reportRef)  // alimenta V3=+F10 se o template tiver essa fórmula
+  set('F10', reportRef)
+  if (reportRef) set('V3', reportRef)                                  // Relatório nº (cabeçalho)
+  const dataRel = fmtDate(p.data_relatorio)
+  if (dataRel) { set('F8', dataRel); set('O3', dataRel) }              // Data do Relatório
+  const dataValRel = fmtDate(p.data_validade_relatorio)
+  if (dataValRel) set('F9', dataValRel)                                // Relatório válido até
   set('X9',  v(p.tipo_servico, 'Avaliação'))
   set('X10', v(p.finalidade, 'Adjudicado sem visita interior'))
   if (!isTerreno) set('D101', v(p.banco))
+
+  if (!isTerreno && !isMulti) {
+    // 6. Áreas — Observações sobre áreas (label B109 → texto B110)
+    set('B110', v(p.observacoes_areas))
+    // 8. Justificação das taxas de atualização/remuneração/capitalização (label B143 → texto B144)
+    set('B144', v(p.justificacao_metodo))
+    // 10. Obras de beneficiação — Descrição das obras a realizar (label B205 → texto B206)
+    set('B206', v(p.obras_descricao))
+  }
 
   if (isTerreno) {
     fillTerreno(p)
@@ -675,7 +705,7 @@ export async function generateAbancaReport(
   set('R309', v(p.pac_apolice)); set('R310', fmtDate(p.pac_data_validade)); set('R311', v(p.pac_seguradora))
   // Perito Avaliador (AC306-AC311)
   set('AC306', v(p.perito_avaliador)); set('AC307', v(p.perito_ordem, 'Arq.'))
-  set('AC308', v(p.perito_cmvm));  set('AC309', v(p.nr_apolice))
+  set('AC308', v(p.perito_cmvm));  set('AC309', v(p.nr_apolice, '0084.10.25297'))
   set('AC310', fmtDate(p.data_validade_seguro)); set('AC311', v(p.seguradora))
 
   // DOCUMENTOS (L235-L241 = esquerda, AC235-AC241 = direita)
