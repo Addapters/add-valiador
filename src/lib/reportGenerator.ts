@@ -993,19 +993,41 @@ export async function generateAbancaReport(
     }
   }
 
-  // ── Custo de Construção — fórmulas automáticas (linhas 148-153, input 140-145)
-  const costRows = [
-    { c: 148, i: 140 }, { c: 149, i: 141 }, { c: 150, i: 142 },
-    { c: 151, i: 143 }, { c: 152, i: 144 }, { c: 153, i: 145 },
-  ]
-  for (const { c, i } of costRows) {
-    setFormula(`K${c}`, `H${c}*H${i}`)
-    setFormula(`N${c}`, `H${c}*L${i}`)
-    setFormula(`Q${c}`, `N${c}*P${i}`)
-    setFormula(`T${c}`, `N${c}*S${i}`)
-    setFormula(`X${c}`, `K${c}+N${c}+Q${c}+T${c}`)
-    setFormula(`AB${c}`, `W${i}*(N${c}+Q${c}+T${c})`)
-    setFormula(`AC${c}`, `X${c}-AB${c}`)
+  // ── 9. MÉTODO DO CUSTO DE CONSTRUÇÃO — Estado Terminado ─────────────────────
+  // Valores ESTÁTICOS lidos da BD (campos custo_* preenchidos na plataforma,
+  // com auto-cálculo no PropertyDetail). Fórmulas com result:0 mostravam 0 no
+  // viewer online, e as células de input nunca eram preenchidas — por isso a
+  // secção saía vazia. Linha de input: 140. Linha calculada: 148.
+  if (!isTerreno) {
+    const cNum = (x: any) => { const n = parseFloat(x); return isNaN(n) ? null : n }
+    const ctm2  = cNum(p.custo_terreno_m2)
+    const ccm2  = cNum(p.custo_construcao_m2)
+    const cipct = cNum(p.custos_indiretos_pct)
+    const mppct = cNum(p.margem_promotor_pct)
+    const dpct  = cNum(p.depreciacao_pct)
+    const cArea = cNum(p.custo_area)
+    const ctTot = cNum(p.custo_terreno_total)
+    const ccTot = cNum(p.custo_construcao_total)
+    const bruto = cNum(p.custo_repos_bruto)
+    const depr  = cNum(p.depreciacao_valor)
+    const liq   = cNum(p.custo_repos_liquido)
+
+    // Linha de input (140): custos unitários e percentagens (Excel espera fracção)
+    if (ctm2  !== null) set('H140', ctm2)
+    if (ccm2  !== null) set('L140', ccm2)
+    if (cipct !== null) set('P140', cipct / 100)
+    if (mppct !== null) set('S140', mppct / 100)
+    if (dpct  !== null) set('W140', dpct / 100)
+
+    // Linha calculada (148): totais em € vindos da BD
+    if (cArea !== null) set('H148', cArea)
+    if (ctTot !== null) set('K148', ctTot)
+    if (ccTot !== null) set('N148', ccTot)
+    if (ccTot !== null && cipct !== null) set('Q148', Math.round(ccTot * cipct / 100))
+    if (ccTot !== null && mppct !== null) set('T148', Math.round(ccTot * mppct / 100))
+    if (bruto !== null) set('X148', bruto)
+    if (depr  !== null) set('AB148', depr)
+    if (liq   !== null) set('AC148', liq)
   }
 
   // ── Assinatura do Perito (coluna AC, linha 324)
