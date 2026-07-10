@@ -1702,6 +1702,11 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
           return Math.pow(ca / propArea, exp) - 1
         }
 
+        // Default de pré-preenchimento: 'Semelhante' para todos os critérios,
+        // 'Sem Margem Negociação' para a TX DESCONTO | REVISÃO
+        const defaultHomog = (key: string) =>
+          key === 'homog_tx_desconto' ? 'Sem Margem Negociação' : 'Semelhante'
+
         function calcHomog(c: any): number | null {
           if (!c.epm2) return null
           // Fórmula ABANCA (aditiva): base × (1 + soma de todos os ajustes)
@@ -1709,7 +1714,7 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
           let sumAdj = 0
           for (const row of HOMOG_ROWS) {
             if (row.calc) { sumAdj += calcAreaPct(c.area_m2); continue }
-            const val = c[row.key]
+            const val = c[row.key] || defaultHomog(row.key)
             if (val && PCT[val] !== undefined) sumAdj += PCT[val]
           }
           return c.epm2 * (1 + sumAdj)
@@ -1752,7 +1757,7 @@ function CompsSection({ propertyId, comps, onRefresh, propertyArea }: {
                             </td>
                           )
                         }
-                        const val = c[row.key] || ''
+                        const val = c[row.key] || defaultHomog(row.key)
                         const pct = PCT[val]
                         return (
                           <td key={c.id} className="px-2 py-1 text-center">
