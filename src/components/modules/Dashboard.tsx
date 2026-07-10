@@ -139,7 +139,7 @@ export default function Dashboard() {
   const [bulkPerito,     setBulkPerito]     = useState('')
   const [showBulkPerito, setShowBulkPerito] = useState(false)
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['dashboard-stats', role, name],
     queryFn: async () => {
       let statsQ = supabase.from('properties').select('visit_status, billing_status, fee_amount, verificado')
@@ -479,7 +479,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {(isLoading || isFetching) ? (
+          {isLoading ? (
             <p className="text-sm text-gray-400 py-4 text-center">A carregar…</p>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
