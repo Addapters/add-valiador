@@ -266,7 +266,7 @@ export default function Properties() {
     .filter(p => p.role === 'perito' && p.name)
     .map(p => p.name) as string[]
 
-  const { data: rows = [], isLoading, isFetching } = useQuery({
+  const { data: rows = [], isLoading } = useQuery({
     queryKey: ['properties-all'],
     queryFn: async () => {
       const { data } = await supabase
@@ -579,7 +579,7 @@ export default function Properties() {
       )}
 
       <div className="p-6 space-y-4">
-        {(isLoading || isFetching) ? <p className="text-sm text-gray-400">A carregar…</p>
+        {isLoading ? <p className="text-sm text-gray-400">A carregar…</p>
           : grouped.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <EmptyState message="Nenhum imóvel encontrado."/>
