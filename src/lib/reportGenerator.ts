@@ -430,31 +430,54 @@ export async function generateAbancaReport(
     if (prop.longitude) set(`D${coordRow + off}`, prop.longitude)
     if (prop.latitude)  set(`G${coordRow + off}`, prop.latitude)
 
-    // Campos de descrição por bem (apenas no multi, usando índices 3-8 das MULTI_BASE_ROWS)
+    // Campos de descrição por bem (rows 38-98) — usa off para cada imóvel
+    if (!isMulti) {
+      set(`AF${91 + off}`, v(prop.external_ref))   // Relatório nº
+      set(`D${38 + off}`,  tr(v(prop.property_type)))
+      set(`K${38 + off}`,  tr(v(prop.property_subtype)))
+      set(`U${38 + off}`,  tr(v(prop.use_type)))
+      set(`AD${38 + off}`, tr(v(prop.use_subtype)))
+      set(`D${44 + off}`,  tr(v(prop.estado_construcao, v(prop.property_state))))
+      set(`O${44 + off}`,  tr(v(prop.destino)))
+      set(`V${44 + off}`,  tr(v(prop.estado_conservacao)))
+      set(`AC${44 + off}`, tr(v(prop.estado_ocupacao)))
+      set(`D${50 + off}`,  tr(v(prop.composicao_imovel, v(prop.typology))))
+      set(`D${56 + off}`,  v(prop.id_registo_predial))
+      set(`D${62 + off}`,  v(prop.id_registo_matricial))
+      set(`G${62 + off}`,  v(prop.fracao))
+      set(`D${68 + off}`,  tr(v(prop.tipo_predio)))
+      if (prop.nr_quartos)         set(`D${86 + off}`, Number(prop.nr_quartos))
+      if (prop.nr_inst_sanitarias) set(`G${86 + off}`, Number(prop.nr_inst_sanitarias))
+      set(`J${86 + off}`, v(prop.nr_pisos, 1))
+      set(`L${86 + off}`, tr(v(prop.qualidade_construcao, 'Média')))
+      set(`P${86 + off}`, tr(v(prop.orientacao_solar, 'Não influi no valor')))
+      set(`D${92 + off}`, v(prop.nr_certificado_energ))
+      set(`J${92 + off}`, v(prop.classe_energetica))
+      set(`N${92 + off}`, fmtDate(prop.data_emissao_cert))
+      set(`R${92 + off}`, fmtDate(prop.data_validade_cert))
+      set(`M${98 + off}`, v(prop.year_built))
+      set(`D${98 + off}`, v(prop.ano_licenca_utilizacao))
+    }
+    // Multi: campos de descrição por bem usando índices da MULTI_BASE_ROWS
     if (isMulti && MULTI_BASE_ROWS.length > 8) {
-      const descRow = MULTI_BASE_ROWS[3] // Tipo/Subtipo/Uso — B89
+      const descRow = MULTI_BASE_ROWS[3]
       set(`D${descRow + off}`,   tr(v(prop.property_type)))
       set(`K${descRow + off}`,   tr(v(prop.property_subtype)))
       set(`U${descRow + off}`,   tr(v(prop.use_type)))
       set(`AD${descRow + off}`,  tr(v(prop.use_subtype)))
-
-      const estadoRow = MULTI_BASE_ROWS[4] // Estado construção — B112
+      const estadoRow = MULTI_BASE_ROWS[4]
       set(`D${estadoRow + off}`,  tr(v(prop.estado_construcao, v(prop.property_state))))
       set(`O${estadoRow + off}`,  tr(v(prop.destino)))
       set(`V${estadoRow + off}`,  tr(v(prop.estado_conservacao)))
       set(`AC${estadoRow + off}`, tr(v(prop.estado_ocupacao)))
-
-      const compRow = MULTI_BASE_ROWS[5] // Composição — B135
+      const compRow = MULTI_BASE_ROWS[5]
       set(`D${compRow + off}`,   tr(v(prop.composicao_imovel, v(prop.typology))))
-
-      const regRow = MULTI_BASE_ROWS[6]  // Registo predial — B158
+      const regRow = MULTI_BASE_ROWS[6]
       set(`D${regRow + off}`,    v(prop.id_registo_predial))
-
-      const matricRow = MULTI_BASE_ROWS[7] // Artigo matricial — B181
+      const matricRow = MULTI_BASE_ROWS[7]
       set(`D${matricRow + off}`, v(prop.id_registo_matricial))
       set(`G${matricRow + off}`, v(prop.fracao))
-
-      const tipPredRow = MULTI_BASE_ROWS[8] // Tipo prédio — B204
+      const tipPredRow = MULTI_BASE_ROWS[8]
       set(`D${tipPredRow + off}`, tr(v(prop.tipo_predio)))
     }
   }
@@ -539,117 +562,15 @@ export async function generateAbancaReport(
     set('Q98',  fmtDate(prop.data_conclusao_obras))
     set('W98',  tr(v(prop.obra_parada)))
 
-    // 6. ÁREAS
+    // 6. ÁREAS (terreno)
     const areaVal = prop.area_considerada || prop.area_m2 || prop.gross_area
     set('D105', fmtArea(areaVal))
     set('L105', fmtArea(prop.land_area))
     set('Q105', fmtArea(prop.gross_area))
     set('T105', fmtArea(prop.area_annex_m2))
-
-    // 7. MÉTODO COMPARATIVO DE MERCADO
-    set('D116', v(prop.metodo_comp_descricao))
-    // Área: usa metodo_comp_area (preenchido pelo utilizador na tab Métodos), fallback gross_area
-    const area116 = parseFloat(prop.metodo_comp_area || prop.gross_area || prop.area_m2)
-    if (area116 > 0) set('T116', area116)
-    const valorM2_116 = parseFloat(prop.metodo_comp_valor_m2)
-    if (valorM2_116 > 0) {
-      set('Y116', valorM2_116)   // Y116 (algumas versões do template têm merge em Y)
-      set('Z116', valorM2_116)   // Z116 = cabeçalho 'Valor (€/m2)' no template inspeccionado
-      const totalComp = area116 > 0 ? Math.round(valorM2_116 * area116 / 100) * 100 : null
-      if (totalComp) {
-        set('AD116', totalComp)  // AD116 em alguns templates
-        set('AE116', totalComp)  // AE116 = cabeçalho 'Valor total' no template inspeccionado
-      }
-    }
-
-    // Valor de Renda Efetiva
-    set('D137', v(prop.renda_ef_descricao))
-    set('P137', fmtArea(prop.renda_ef_area))
-    if (prop.renda_ef_valor_m2) set('T137', Number(prop.renda_ef_valor_m2))
-    if (prop.renda_ef_mensal)   set('X137', Number(prop.renda_ef_mensal))
-    if (prop.renda_ef_taxa)     set('AB137', Number(prop.renda_ef_taxa))
-    if (prop.renda_ef_total)    set('AE137', Number(prop.renda_ef_total))
-
-    // Valor de Renda Potencial
-    set('D144', v(prop.renda_pot_descricao))
-    set('P144', fmtArea(prop.renda_pot_area))
-    if (prop.renda_pot_valor_m2) set('T144', Number(prop.renda_pot_valor_m2))
-    if (prop.renda_pot_mensal)   set('X144', Number(prop.renda_pot_mensal))
-    if (prop.renda_pot_taxa)     set('AB144', Number(prop.renda_pot_taxa))
-    if (prop.renda_pot_total)    set('AE144', Number(prop.renda_pot_total))
-    set('B149', v(prop.justificacao_metodo))
-
-    // NOTA: secções de Custo Terminado/Hipótese Terminado/DCF/Residual (linhas ~157-240)
-    // dependem fortemente de fórmulas internas do template que são removidas por
-    // cleanSharedFormulas(); ficam por preencher nesta primeira versão — confirmar com
-    // o utilizador antes de mapear, para não escrever valores incorrectos.
-
-    // 16. CONCLUSÃO DA AVALIAÇÃO
-    if (prop.valor_mercado)            set('D276', Number(prop.valor_mercado))
-    if (prop.valor_venda_rapida)       set('J276', Number(prop.valor_venda_rapida))
-    if (prop.valor_seguro)             set('R276', Number(prop.valor_seguro))
-    if (prop.pct_obra)                 set('Y276', Number(prop.pct_obra))
-    if (prop.valor_mercado_atual)      set('D283', Number(prop.valor_mercado_atual))
-    if (prop.valor_venda_rapida_atual) set('J283', Number(prop.valor_venda_rapida_atual))
-    if (prop.valor_seguro_atual)       set('R283', Number(prop.valor_seguro_atual))
-    if (prop.pct_obra_atual)           set('Y283', Number(prop.pct_obra_atual))
-
-    // 17. MÉTODOS DE AVALIAÇÃO — justificação
-    set('M296', v(prop.justificacao_metodo))
-
-    // 18. CERTIFICAÇÃO E ASSINATURA
-    set('K315',  fmtDate(prop.data_pedido_relatorio || prop.data_pedido))
-    set('O315',  fmtDate(prop.data_visita || prop.visit_date))
-    set('V315',  fmtDate(prop.data_conclusao || prop.data_relatorio))
-    set('AC315', fmtDate(prop.prev_valuation_date))
-
-    // Empresa de avaliação
-    set('F317', v(prop.empresa_nome))
-    set('F318', v(prop.empresa_nif))
-    set('F319', v(prop.empresa_cmvm))
-    set('F320', v(prop.empresa_apolice))
-    set('F321', fmtDate(prop.empresa_data_validade))
-    set('F322', v(prop.empresa_seguradora))
-
-    // Perito Avaliador Certificado
-    set('R317', v(prop.pac_nome))
-    set('R319', v(prop.pac_cmvm))
-    set('R320', v(prop.pac_apolice))
-    set('R321', fmtDate(prop.pac_data_validade))
-    set('R322', v(prop.pac_seguradora))
-
-    // Perito Avaliador
-    set('AC317', v(prop.perito_avaliador))
-    set('AC319', v(prop.perito_cmvm))
-    set('AC320', v(prop.nr_apolice))
-    set('AC321', fmtDate(prop.data_validade_seguro))
-    set('AC318', v(prop.perito_ordem, 'Arq.'))
-
-    // DOCUMENTOS (L235-L241 = esquerda, AC235-AC241 = direita)
-    const docPairs: [any, string][] = [
-      [(prop as any).doc_caderneta_predial,           'L235'],
-      [(prop as any).doc_certid_o_da_crp,             'L236'],
-      [(prop as any).doc_contrato_de_arrendamento,    'L237'],
-      [(prop as any)['doc_alvar__de_loteamento'],      'L238'],
-      [(prop as any).doc_planta_de_loteamento,        'L239'],
-      [(prop as any).doc_licen_a_de_constru__o_obras, 'L240'],
-      [(prop as any).doc_licen_a_de_utiliza__o,       'L241'],
-      [(prop as any).doc_or_amento_de_obras,          'AC235'],
-      [(prop as any).doc_mem_ria_descritiva,          'AC236'],
-      [(prop as any).doc_ficha_t_cnica_habita__o,     'AC237'],
-      [(prop as any).doc_projeto_aprovado,            'AC238'],
-      [(prop as any).doc_projeto_n_o_aprovado,        'AC239'],
-      [(prop as any).doc_certificado_energ_tico,      'AC240'],
-      [(prop as any).doc_outro,                       'AC241'],
-    ]
-    for (const [dbVal, ref] of docPairs) {
-      set(ref, v(dbVal, 'Não entregue'))
-    }
-
-    set('AC322', v(prop.seguradora))
   }
 
-  // ─── VALORES DERIVADOS DE FÓRMULAS (confirmados nos 4 relatórios fechados reais) ─────────
+  // ─── VALORES DERIVADOS DE FÓRMULAS ─────────────────────────────────────────────────────────
   //
   // HELPER: adiciona N meses a uma data ISO (substitui EDATE do Excel)
   function addMonths(isoDate: string, months: number): Date {
@@ -666,58 +587,102 @@ export async function generateAbancaReport(
   // F8=+V304/V746/V315 também é fórmula — em vez de escrever F8 directamente, escrevemos
   // na célula de data de conclusão que alimenta F8 (na secção de certificação mais abaixo).
   // 1. IDENTIFICAÇÃO — células de input (não são fórmulas)
-  const reportRef = v(p.nr_relatorio, v(p.external_ref, v(p.ref, '')))
-  set('F10', reportRef)  // Relatório N.º — alimenta V3=+F10 (fórmula preservada)
+  const reportRef = v(p.external_ref, v(p.nr_relatorio, v(p.ref, '')))
+  set('F10', reportRef)  // alimenta V3=+F10 se o template tiver essa fórmula
   set('X9',  v(p.tipo_servico, 'Avaliação'))
   set('X10', v(p.finalidade, 'Adjudicado sem visita interior'))
   if (!isTerreno) set('D101', v(p.banco))
 
-  // Id e IdRel — removido mapeamento automático (não preencher estas células)
-
   if (isTerreno) {
-    // Terreno: sempre 1 bem, layout próprio (ver fillTerreno)
     fillTerreno(p)
   } else {
-    // Preenche blocos por imóvel (1, 2 ou 3 no standard; 1-18 no multi)
     allProps.forEach((prop, idx) => fillBlock(idx, prop))
   }
 
-  // 3. DESCRIÇÃO DO IMÓVEL — apenas no template standard (no multi colidem com linhas dos bens;
-  // no terreno já é preenchido dentro de fillTerreno)
-  if (!isMulti && !isTerreno) {
-    set('D38',  tr(v(p.property_type)))
-    set('K38',  tr(v(p.property_subtype)))
-    set('U38',  tr(v(p.use_type)))
-    set('AD38', tr(v(p.use_subtype)))
-    set('D44',  tr(v(p.estado_construcao, v(p.property_state))))
-    set('O44',  tr(v(p.destino)))
-    set('V44',  tr(v(p.estado_conservacao)))
-    set('AC44', tr(v(p.estado_ocupacao)))
-    set('D50',  tr(v(p.composicao_imovel, v(p.typology))))
-    set('D56',  v(p.id_registo_predial))
-    set('D62',  v(p.id_registo_matricial))
-    set('G62',  v(p.fracao))
-    set('D68',  tr(v(p.tipo_predio)))
+  // ── SECÇÕES GLOBAIS (correm para todos os templates — standard, multi e terreno) ────────────
 
-    // 4. ENQUADRAMENTO NO MERCADO LOCAL
+  // 7. MÉTODO COMPARATIVO DE MERCADO (tab principal)
+  set('D116', v(p.metodo_comp_descricao))
+  const area116 = parseFloat(p.metodo_comp_area || p.gross_area || p.area_m2)
+  if (area116 > 0) set('T116', area116)
+  const valorM2_116 = parseFloat(p.metodo_comp_valor_m2)
+  if (valorM2_116 > 0) {
+    set('Y116', valorM2_116)
+    set('Z116', valorM2_116)
+    const totalComp = area116 > 0 ? Math.round(valorM2_116 * area116 / 100) * 100 : null
+    if (totalComp) { set('AD116', totalComp); set('AE116', totalComp) }
+  }
+
+  // Valor de Renda Efetiva
+  set('D137', v(p.renda_ef_descricao))
+  set('P137', fmtArea(p.renda_ef_area))
+  if (p.renda_ef_valor_m2) set('T137', Number(p.renda_ef_valor_m2))
+  if (p.renda_ef_mensal)   set('X137', Number(p.renda_ef_mensal))
+  if (p.renda_ef_taxa)     set('AB137', Number(p.renda_ef_taxa))
+  if (p.renda_ef_total)    set('AE137', Number(p.renda_ef_total))
+
+  // Valor de Renda Potencial
+  set('D144', v(p.renda_pot_descricao))
+  set('P144', fmtArea(p.renda_pot_area))
+  if (p.renda_pot_valor_m2) set('T144', Number(p.renda_pot_valor_m2))
+  if (p.renda_pot_mensal)   set('X144', Number(p.renda_pot_mensal))
+  if (p.renda_pot_taxa)     set('AB144', Number(p.renda_pot_taxa))
+  if (p.renda_pot_total)    set('AE144', Number(p.renda_pot_total))
+  set('B149', v(p.justificacao_metodo))
+
+  // 16. CONCLUSÃO
+  if (p.valor_mercado)            set('D276', Number(p.valor_mercado))
+  if (p.valor_venda_rapida)       set('J276', Number(p.valor_venda_rapida))
+  if (p.valor_seguro)             set('R276', Number(p.valor_seguro))
+  if (p.pct_obra)                 set('Y276', Number(p.pct_obra))
+  if (p.valor_mercado_atual)      set('D283', Number(p.valor_mercado_atual))
+  if (p.valor_venda_rapida_atual) set('J283', Number(p.valor_venda_rapida_atual))
+  if (p.valor_seguro_atual)       set('R283', Number(p.valor_seguro_atual))
+  if (p.pct_obra_atual)           set('Y283', Number(p.pct_obra_atual))
+  set('M296', v(p.justificacao_metodo))
+
+  // 18. CERTIFICAÇÃO E ASSINATURA
+  set('K315',  fmtDate(p.data_pedido_relatorio || p.data_pedido))
+  set('O315',  fmtDate(p.data_visita || p.visit_date))
+  set('V315',  fmtDate(p.data_conclusao || p.data_relatorio))
+  set('AC315', fmtDate(p.prev_valuation_date))
+  set('F317', v(p.empresa_nome));  set('F318', v(p.empresa_nif))
+  set('F319', v(p.empresa_cmvm)); set('F320', v(p.empresa_apolice))
+  set('F321', fmtDate(p.empresa_data_validade)); set('F322', v(p.empresa_seguradora))
+  set('R317', v(p.pac_nome));    set('R319', v(p.pac_cmvm))
+  set('R320', v(p.pac_apolice)); set('R321', fmtDate(p.pac_data_validade)); set('R322', v(p.pac_seguradora))
+  set('AC317', v(p.perito_avaliador)); set('AC318', v(p.perito_ordem, 'Arq.'))
+  set('AC319', v(p.perito_cmvm));  set('AC320', v(p.nr_apolice))
+  set('AC321', fmtDate(p.data_validade_seguro)); set('AC322', v(p.seguradora))
+
+  // DOCUMENTOS (L235-L241 = esquerda, AC235-AC241 = direita)
+  const docPairs: [any, string][] = [
+    [(p as any).doc_caderneta_predial,           'L235'],
+    [(p as any).doc_certid_o_da_crp,             'L236'],
+    [(p as any).doc_contrato_de_arrendamento,    'L237'],
+    [(p as any)['doc_alvar__de_loteamento'],      'L238'],
+    [(p as any).doc_planta_de_loteamento,        'L239'],
+    [(p as any).doc_licen_a_de_constru__o_obras, 'L240'],
+    [(p as any).doc_licen_a_de_utiliza__o,       'L241'],
+    [(p as any).doc_or_amento_de_obras,          'AC235'],
+    [(p as any).doc_mem_ria_descritiva,          'AC236'],
+    [(p as any).doc_ficha_t_cnica_habita__o,     'AC237'],
+    [(p as any).doc_projeto_aprovado,            'AC238'],
+    [(p as any).doc_projeto_n_o_aprovado,        'AC239'],
+    [(p as any).doc_certificado_energ_tico,      'AC240'],
+    [(p as any).doc_outro,                       'AC241'],
+  ]
+  for (const [dbVal, ref] of docPairs) {
+    set(ref, v(dbVal, 'Não entregue'))
+  }
+
+  // 3. ENQUADRAMENTO NO MERCADO LOCAL (global — não varia por bem)
+  if (!isMulti && !isTerreno) {
     set('J75', tr(v(p.caract_mercado)))
     set('J78', tr(v(p.tipo_expectativa_mercado)))
     set('J79', tr(v(p.ocupacao_laboral)))
     set('J80', v(p.populacao_concelho))
     set('J81', tr(v(p.evolucao_mercado)))
-
-    // 5. CARACTERÍSTICAS DA CONSTRUÇÃO
-    if (p.nr_quartos)         set('D86', Number(p.nr_quartos))
-    if (p.nr_inst_sanitarias) set('G86', Number(p.nr_inst_sanitarias))
-    set('J86', v(p.nr_pisos, 1))
-    set('L86', tr(v(p.qualidade_construcao, 'Média')))
-    set('P86', tr(v(p.orientacao_solar, 'Não influi no valor')))
-    set('D92', v(p.nr_certificado_energ))
-    set('J92', v(p.classe_energetica))
-    set('N92', fmtDate(p.data_emissao_cert))
-    set('R92', fmtDate(p.data_validade_cert))
-    set('M98', v(p.year_built))
-    set('D98', v(p.ano_licenca_utilizacao))
 
     // 6. ÁREAS — por cada imóvel (offset idx)
     // Standard: headers na linha 104, dados em 105+idx (confirmar no template VRF24jun26)
@@ -998,10 +963,6 @@ export async function generateAbancaReport(
     }
   }
 
-  // Descarregar ficheiro + guardar no Supabase Storage
-  const buf  = await wb.xlsx.writeBuffer()
-
-
   // ── Custo de Construção — fórmulas automáticas (linhas 148-153, input 140-145)
   const costRows = [
     { c: 148, i: 140 }, { c: 149, i: 141 }, { c: 150, i: 142 },
@@ -1017,10 +978,8 @@ export async function generateAbancaReport(
     setFormula(`AC${c}`, `X${c}-AB${c}`)
   }
 
-
-  const SIGNATURE_B64 = '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'
-
   // ── Assinatura do Perito (coluna AC, linha 324)
+  const SIGNATURE_B64 = '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'
   try {
     const sigBytes = Uint8Array.from(atob(SIGNATURE_B64), c => c.charCodeAt(0))
     const sigId = wb.addImage({ buffer: sigBytes.buffer as ArrayBuffer, extension: 'png' })
@@ -1029,6 +988,9 @@ export async function generateAbancaReport(
       ext: { width: 180, height: 65 }
     })
   } catch(e) { console.warn('Signature image failed:', e) }
+
+  // Descarregar ficheiro + guardar no Supabase Storage
+  const buf  = await wb.xlsx.writeBuffer()
 
   // ── Fix logo Garen ─────────────────────────────────────────────────────────
   // ExcelJS re-codifica imagens ao salvar, corrompendo o logo Garen.
