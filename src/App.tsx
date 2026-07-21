@@ -19,7 +19,6 @@ import AdminPeritos   from '@/components/modules/admin/AdminPeritos'
 
 // Perito
 import PeritoProfile  from '@/components/modules/perito/PeritoProfile'
-import PeritoMessages from '@/components/modules/perito/PeritoMessages'
 
 // Cliente
 import ClienteDashboard  from '@/components/modules/cliente/ClienteDashboard'
@@ -78,10 +77,9 @@ function AppRoutes() {
           <Route path="market"         element={<MarketSearch />} />
         </Route>
 
-        {/* Perito — perfil e mensagens com o Admin */}
+        {/* Perito — perfil (inclui mensagens com o Admin como separador) */}
         <Route element={<RoleGate allow={['perito']} />}>
-          <Route path="perfil"    element={<PeritoProfile />} />
-          <Route path="mensagens" element={<PeritoMessages />} />
+          <Route path="perfil" element={<PeritoProfile />} />
         </Route>
 
         {/* Admin — pedidos de clientes e mensagens com peritos */}

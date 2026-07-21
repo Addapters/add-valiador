@@ -83,3 +83,34 @@ export function KpiCard({ label, value, sub, color='default' }: { label:string; 
 export function EmptyState({ message }: { message: string }) {
   return <div className="flex flex-col items-center justify-center py-16 text-gray-400"><p className="text-sm">{message}</p></div>
 }
+
+// Saudação inicial usada no topo dos dashboards de todos os papéis (admin,
+// perito, cliente) — dá contexto imediato de quem está autenticado.
+export function WelcomeBanner({ name, subtitle }: { name: string | null; subtitle?: string }) {
+  const hour = new Date().getHours()
+  const saudacao = hour < 12 ? 'Bom dia' : hour < 20 ? 'Boa tarde' : 'Boa noite'
+  const hoje = new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white px-6 py-5 flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <p className="text-xs uppercase tracking-wider text-white/70">{hoje}</p>
+        <h1 className="text-xl font-semibold mt-0.5">{saudacao}, {name || ''} 👋</h1>
+        {subtitle && <p className="text-sm text-white/80 mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+  )
+}
+
+// Banner de alerta reutilizável (urgências, mensagens novas, etc.)
+export function AlertBanner({ variant, children }: { variant: 'red'|'amber'|'blue'; children: ReactNode }) {
+  const styles = {
+    red:   'bg-red-50 border-red-200 text-red-700',
+    amber: 'bg-amber-50 border-amber-200 text-amber-700',
+    blue:  'bg-blue-50 border-blue-200 text-blue-700',
+  }[variant]
+  return (
+    <div className={`rounded-xl border px-4 py-3 text-sm flex items-center gap-2 ${styles}`}>
+      {children}
+    </div>
+  )
+}

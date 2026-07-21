@@ -25,16 +25,11 @@ const NAV_ADMIN: NavItem[] = [
 
 const NAV_PERITO: NavItem[] = [
   { label: 'Dashboard',   to: '/dashboard',  icon: LayoutDashboard },
-  { label: 'Clientes',    to: '/clients',    icon: Users },
-  { label: 'Projetos',    to: '/portfolios', icon: Briefcase },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
   { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
   { label: 'Mapa',        to: '/map',        icon: Map },
-  { section: 'Financeiro' },
-  { label: 'Faturação',   to: '/billing',    icon: Receipt },
   { section: 'Conta' },
   { label: 'O meu perfil', to: '/perfil',     icon: UserCircle },
-  { label: 'Mensagens',    to: '/mensagens',  icon: MessageSquare },
 ]
 
 const NAV_CLIENTE: NavItem[] = [

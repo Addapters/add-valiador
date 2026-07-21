@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { PageHeader, KpiCard, VisitBadge, BillingBadge } from '@/components/ui'
+import { PageHeader, KpiCard, VisitBadge, BillingBadge, WelcomeBanner, AlertBanner } from '@/components/ui'
+import DeadlineCalendar from '@/components/DeadlineCalendar'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 // Converte texto em uppercase (datatape espanhol) para titleCase
@@ -21,7 +22,7 @@ function toDisplayDash(val: any): string {
 }
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
-import { CheckSquare, Square, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { CheckSquare, Square, Pencil, Check, X, Trash2, AlertTriangle, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
@@ -122,7 +123,7 @@ function MotivoBadge({ value, color, label, onSave }: {
 }
 
 export default function Dashboard() {
-  const { role, name } = useAuth()
+  const { role, name, user } = useAuth()
   const qc = useQueryClient()
 
   // Filters
@@ -283,6 +284,53 @@ export default function Dashboard() {
     return [...map.values()].sort((a, b) => b.total - a.total)
   }, [recent, peritos, role])
 
+  // Evolução por projecto — % de imóveis concluídos em cada portfólio, para
+  // dar uma leitura visual rápida de como cada projecto está a avançar.
+  const projectProgress = useMemo(() => {
+    const map = new Map<string, { label: string; total: number; done: number }>()
+    recent.forEach((p: any) => {
+      const pf = p.portfolios
+      const pid = pf?.id || 'sem-projecto'
+      const label = pf?.clients?.name && pf?.name ? `${pf.clients.name} | ${pf.name}` : (pf?.name || 'Sem projecto')
+      const entry = map.get(pid) || { label, total: 0, done: 0 }
+      entry.total += 1
+      if (p.visit_status === 'report_done') entry.done += 1
+      map.set(pid, entry)
+    })
+    return [...map.values()]
+      .map(e => ({ ...e, pct: e.total > 0 ? Math.round((e.done / e.total) * 100) : 0 }))
+      .sort((a, b) => a.pct - b.pct)
+      .slice(0, 6)
+  }, [recent])
+
+  // Datas relevantes para o calendário — prazo de entrega de cada projecto
+  // que ainda tenha imóveis por concluir.
+  const calendarItems = useMemo(() => {
+    const map = new Map<string, string>()
+    recent.forEach((p: any) => {
+      const pf = p.portfolios
+      if (!pf?.id || !pf?.prazo_entrega) return
+      if (p.visit_status === 'report_done') return
+      const label = pf.clients?.name ? `${pf.clients.name} | ${pf.name}` : pf.name
+      map.set(pf.id, JSON.stringify({ date: pf.prazo_entrega, label }))
+    })
+    return [...map.values()].map(v => JSON.parse(v))
+  }, [recent])
+
+  // Mensagens novas — mostra um alerta no dashboard quando há conversas por ler.
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['dashboard-unread-messages', role, user?.id],
+    queryFn: async () => {
+      if (!user) return 0
+      let q = supabase.from('messages').select('id', { count: 'exact', head: true }).neq('remetente_id', user.id).is('lida_at', null)
+      if (role === 'perito') q = q.eq('perito_id', user.id)
+      const { count } = await q
+      return count || 0
+    },
+    enabled: !!user,
+    refetchInterval: 30000,
+  })
+
   // Filtered rows
   const filtered = useMemo(() => recent.filter((p: any) => {
     if (filterVisita     && p.visit_status !== filterVisita) return false
@@ -387,6 +435,30 @@ export default function Dashboard() {
       />
       <div className="p-6 space-y-6">
 
+        {/* Bem-vindo */}
+        <WelcomeBanner name={name} subtitle={role === 'perito' ? 'Aqui tens um resumo do teu trabalho' : 'Aqui tens um resumo do portfólio'} />
+
+        {/* Alertas: urgências de prazo e mensagens novas */}
+        {(prazosAtraso > 0 || unreadCount > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {prazosAtraso > 0 && (
+              <AlertBanner variant="red">
+                <AlertTriangle size={16} className="flex-shrink-0" />
+                <span><strong>{prazosAtraso}</strong> {prazosAtraso === 1 ? 'projecto está' : 'projectos estão'} com o prazo de entrega em atraso.</span>
+              </AlertBanner>
+            )}
+            {unreadCount > 0 && (
+              <AlertBanner variant="blue">
+                <MessageCircle size={16} className="flex-shrink-0" />
+                <span>
+                  Tens <strong>{unreadCount}</strong> {unreadCount === 1 ? 'mensagem nova' : 'mensagens novas'}.{' '}
+                  <Link to={role === 'admin' ? '/admin/mensagens' : '/perfil?tab=mensagens'} className="underline">Ver conversa</Link>
+                </span>
+              </AlertBanner>
+            )}
+          </div>
+        )}
+
         {/* KPIs */}
         <div className="grid grid-cols-4 gap-4">
           <KpiCard label="Em trabalho"     value={emTrabalho} sub="imóveis" />
@@ -396,6 +468,31 @@ export default function Dashboard() {
             color={prazosSemana > 0 ? 'amber' : 'default'} />
           <KpiCard label="Prazos em atraso" value={prazosAtraso} sub="projectos"
             color={prazosAtraso > 0 ? 'red' : 'default'} />
+        </div>
+
+        {/* Evolução dos projectos + calendário de prazos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="card">
+            <h2 className="text-sm font-semibold text-gray-800 mb-3">Evolução dos projectos</h2>
+            {projectProgress.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">Sem imóveis associados a projectos.</p>
+            ) : (
+              <div className="space-y-3">
+                {projectProgress.map(pp => (
+                  <div key={pp.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700 font-medium truncate max-w-[70%]">{pp.label}</span>
+                      <span className="text-gray-400">{pp.done} / {pp.total}</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${pp.pct === 100 ? 'bg-emerald-400' : pp.pct === 0 ? 'bg-gray-300' : 'bg-brand-400'}`} style={{ width: `${pp.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DeadlineCalendar items={calendarItems} />
         </div>
 
         {/* Visão geral dos peritos (apenas admin) */}
@@ -448,20 +545,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Progress + tabela de imóveis (perito vê a sua própria tabela aqui; admin gere isto em Imóveis) */}
-        {role !== 'admin' && (
-        <div className="card">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600 font-medium">Progresso do portfólio</span>
-            <span className="text-gray-500">{verificados} / {total} verificados</span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-brand-400 rounded-full transition-all" style={{ width: `${pctVerificados}%` }} />
-          </div>
-        </div>
-        )}
-
-        {/* Table card */}
+        {/* Table card — tabela de imóveis (perito vê a sua própria tabela aqui; admin gere isto em Imóveis) */}
         {role !== 'admin' && (
         <div className="card">
           <div className="flex items-center justify-between mb-3">
