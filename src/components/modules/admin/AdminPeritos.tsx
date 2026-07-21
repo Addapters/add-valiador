@@ -82,24 +82,25 @@ function SignatureCell({ peritoId, path, onUploaded }: { peritoId: string; path:
   )
 }
 
-// ── Modal de criação de novo utilizador ─────────────────────────────────────
+// ── Modal de criação de novo perito ─────────────────────────────────────────
+// Esta área só cria contas de Perito Avaliador — contas de Cliente criam-se
+// na tab Clientes, associadas à respectiva entidade.
 function NewUserModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [role, setRole] = useState('perito')
   const [saving, setSaving] = useState(false)
 
   async function create() {
     if (!email.trim() || !password.trim() || !name.trim()) { toast.error('Preenche todos os campos'); return }
     setSaving(true)
     const { error } = await supabase.rpc('admin_create_user', {
-      p_email: email.trim(), p_password: password, p_name: name.trim(), p_role: role,
+      p_email: email.trim(), p_password: password, p_name: name.trim(), p_role: 'perito',
     })
     setSaving(false)
     if (error) { toast.error(error.message); return }
-    toast.success('Utilizador criado')
+    toast.success('Perito criado')
     qc.invalidateQueries({ queryKey: ['admin-peritos'] })
     onClose()
   }
@@ -108,7 +109,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="card w-full max-w-sm">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-800">Novo utilizador</h2>
+          <h2 className="text-sm font-semibold text-gray-800">Novo perito avaliador</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <div className="space-y-3">
@@ -124,16 +125,8 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
             <label className="label">Password provisória</label>
             <input className="input text-sm" type="text" value={password} onChange={e => setPassword(e.target.value)} />
           </div>
-          <div>
-            <label className="label">Papel</label>
-            <select className="input text-sm" value={role} onChange={e => setRole(e.target.value)}>
-              <option value="perito">Perito avaliador</option>
-              <option value="cliente">Cliente</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </div>
           <button className="btn btn-primary text-sm w-full" disabled={saving} onClick={create}>
-            {saving ? 'A criar…' : 'Criar utilizador'}
+            {saving ? 'A criar…' : 'Criar perito'}
           </button>
         </div>
       </div>
@@ -200,7 +193,7 @@ export default function AdminPeritos() {
         subtitle="Dados profissionais, assinaturas e projectos alocados"
         actions={
           <button className="btn btn-primary flex items-center gap-1.5 text-sm" onClick={() => setShowNewUser(true)}>
-            <Plus size={14} /> Novo utilizador
+            <Plus size={14} /> Novo perito
           </button>
         }
       />

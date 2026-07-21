@@ -2,16 +2,76 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, EmptyState } from '@/components/ui'
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronRight, UserPlus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const empty = { name: '', nif: '', email: '', phone: '', address: '', notes: '' }
+
+// ── Modal de criação de acesso (login) para um cliente — só aqui é possível
+// criar contas com o papel "cliente", já associadas à entidade certa.
+function NewClientUserModal({ client, onClose }: { client: { id: string; name: string }; onClose: () => void }) {
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [saving, setSaving]     = useState(false)
+
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%'
+    let p = ''
+    for (let i = 0; i < 12; i++) p += chars[Math.floor(Math.random() * chars.length)]
+    setPassword(p)
+  }
+
+  async function create() {
+    if (!email.trim() || !password.trim() || !name.trim()) { toast.error('Preenche todos os campos'); return }
+    setSaving(true)
+    const { error } = await supabase.rpc('admin_create_user', {
+      p_email: email.trim(), p_password: password, p_name: name.trim(), p_role: 'cliente', p_client_id: client.id,
+    })
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(`Acesso criado para ${client.name}`)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="card w-full max-w-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-800">Novo acesso — {client.name}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="label">Nome do contacto</label>
+            <input className="input text-sm" value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input className="input text-sm" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Password provisória</label>
+            <div className="flex gap-1.5">
+              <input className="input text-sm" type="text" value={password} onChange={e => setPassword(e.target.value)} />
+              <button className="btn text-xs whitespace-nowrap" onClick={generatePassword}>Gerar</button>
+            </div>
+          </div>
+          <button className="btn btn-primary text-sm w-full" disabled={saving} onClick={create}>
+            {saving ? 'A criar…' : 'Criar acesso'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Clients() {
   const qc = useQueryClient()
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm]       = useState({ ...empty })
+  const [newUserFor, setNewUserFor] = useState<{ id: string; name: string } | null>(null)
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients'],
@@ -96,6 +156,10 @@ export default function Clients() {
                       Ver projetos <ChevronRight size={11}/>
                     </a>
                   </div>
+                  <button className="btn text-xs flex items-center gap-1.5 justify-center"
+                    onClick={() => setNewUserFor({ id: c.id, name: c.name })}>
+                    <UserPlus size={12}/> Criar acesso de cliente
+                  </button>
                 </div>
               ))}
             </div>
@@ -125,6 +189,8 @@ export default function Clients() {
           </div>
         </div>
       )}
+
+      {newUserFor && <NewClientUserModal client={newUserFor} onClose={() => setNewUserFor(null)} />}
     </div>
   )
 }
