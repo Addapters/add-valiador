@@ -12,6 +12,9 @@ const ESTADO_LABELS: Record<string,string> = {
 const ESTADO_VARIANT: Record<string, 'gray'|'blue'|'green'|'red'|'amber'> = {
   pendente: 'amber', em_analise: 'blue', atribuido: 'green', rejeitado: 'red', concluido: 'gray',
 }
+const TIPO_LABELS: Record<string,string> = {
+  ad_hoc: 'Imóvel Avulso', carteira: 'Carteira', outro: 'Outro',
+}
 
 export default function ClienteRequests() {
   const { clientId, user } = useAuth()
@@ -52,7 +55,7 @@ export default function ClienteRequests() {
 
   return (
     <div>
-      <PageHeader title="Os meus pedidos" subtitle="Carteiras completas ou pedidos ad-hoc"
+      <PageHeader title="Os meus pedidos"
         actions={<button className="btn btn-primary text-sm" onClick={() => setShowForm(v => !v)}>{showForm ? 'Cancelar' : 'Novo pedido'}</button>}
       />
       <div className="p-6 space-y-4">
@@ -61,8 +64,9 @@ export default function ClienteRequests() {
             <div>
               <label className="label">Tipo de pedido</label>
               <select className="input text-sm" value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
-                <option value="ad_hoc">Ad-hoc (imóvel avulso)</option>
-                <option value="carteira">Carteira completa</option>
+                <option value="ad_hoc">Imóvel Avulso</option>
+                <option value="carteira">Carteira</option>
+                <option value="outro">Outro</option>
               </select>
             </div>
             <div>
@@ -88,7 +92,7 @@ export default function ClienteRequests() {
             {requests.map((r: any) => (
               <div key={r.id} className="card">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-gray-800 text-sm">{r.titulo || (r.tipo === 'carteira' ? 'Carteira completa' : 'Pedido ad-hoc')}</span>
+                  <span className="font-medium text-gray-800 text-sm">{r.titulo || TIPO_LABELS[r.tipo] || r.tipo}</span>
                   <Badge variant={ESTADO_VARIANT[r.estado] || 'gray'}>{ESTADO_LABELS[r.estado] || r.estado}</Badge>
                 </div>
                 {r.descricao && <p className="text-sm text-gray-600 mt-2">{r.descricao}</p>}

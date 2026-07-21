@@ -20,7 +20,7 @@ const ESTADO_VARIANT: Record<string, 'gray'|'blue'|'green'|'red'|'amber'> = {
   rejeitado:  'red',
   concluido:  'gray',
 }
-const TIPO_LABELS: Record<string,string> = { carteira: 'Carteira completa', ad_hoc: 'Ad-hoc' }
+const TIPO_LABELS: Record<string,string> = { ad_hoc: 'Imóvel Avulso', carteira: 'Carteira', outro: 'Outro' }
 
 export default function AdminRequests() {
   const qc = useQueryClient()

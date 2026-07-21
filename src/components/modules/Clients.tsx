@@ -5,7 +5,11 @@ import { PageHeader, EmptyState } from '@/components/ui'
 import { Plus, Pencil, Trash2, ChevronRight, UserPlus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const empty = { name: '', nif: '', email: '', phone: '', address: '', notes: '' }
+const empty = {
+  name: '', nif: '', email: '', phone: '', address: '', notes: '',
+  contact_name: '', contact_role: '', contact_email: '', contact_phone: '',
+  billing_nif: '', billing_email: '', billing_address: '', billing_notes: '',
+}
 
 // ── Modal de criação de acesso (login) para um cliente — só aqui é possível
 // criar contas com o papel "cliente", já associadas à entidade certa.
@@ -114,7 +118,9 @@ export default function Clients() {
   function openCreate() { setEditing(null); setForm({ ...empty }); setModal(true) }
   function openEdit(c: any) {
     setEditing(c)
-    setForm({ name: c.name||'', nif: c.nif||'', email: c.email||'', phone: c.phone||'', address: c.address||'', notes: c.notes||'' })
+    const next = { ...empty }
+    Object.keys(empty).forEach(k => { (next as any)[k] = c[k] || '' })
+    setForm(next)
     setModal(true)
   }
 
@@ -167,9 +173,11 @@ export default function Clients() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4 overflow-y-auto py-8">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
             <h2 className="text-base font-semibold mb-5">{editing ? 'Editar cliente' : 'Novo cliente'}</h2>
+
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Dados gerais</p>
             <div className="space-y-3">
               {([['name','Nome *','text'],['nif','NIF','text'],['email','Email','email'],
                  ['phone','Telefone','text'],['address','Morada','text'],['notes','Notas','text']] as any[]).map(([key,label,type]: any) => (
@@ -180,6 +188,33 @@ export default function Clients() {
                 </div>
               ))}
             </div>
+
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mt-5 mb-2">
+              Pessoa de contacto <span className="normal-case text-gray-300 font-normal">(o próprio cliente também pode preencher no seu perfil)</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {([['contact_name','Nome do contacto','text'],['contact_role','Cargo/Função','text'],
+                 ['contact_email','Email do contacto','email'],['contact_phone','Telefone do contacto','text']] as any[]).map(([key,label,type]: any) => (
+                <div key={key}>
+                  <label className="label">{label}</label>
+                  <input type={type} className="input" value={(form as any)[key]}
+                    onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mt-5 mb-2">Faturação</p>
+            <div className="grid grid-cols-2 gap-3">
+              {([['billing_nif','NIF de faturação','text'],['billing_email','Email para faturas','email'],
+                 ['billing_address','Morada de faturação','text'],['billing_notes','Notas de faturação','text']] as any[]).map(([key,label,type]: any) => (
+                <div key={key}>
+                  <label className="label">{label}</label>
+                  <input type={type} className="input" value={(form as any)[key]}
+                    onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                </div>
+              ))}
+            </div>
+
             <div className="flex justify-end gap-2 mt-6">
               <button className="btn" onClick={() => { setModal(false); setEditing(null) }}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => upsert.mutate(form)} disabled={!form.name || upsert.isPending}>
