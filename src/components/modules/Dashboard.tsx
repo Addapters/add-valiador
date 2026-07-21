@@ -146,7 +146,7 @@ export default function Dashboard() {
       if (role === 'perito' && name) statsQ = statsQ.eq('perito_avaliador', name)
 
       let tableQ = supabase.from('properties')
-        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, para_verificacao, verificado, pendente_motivo, anulado_motivo, portfolio_id, portfolios(id, name, status, clients(name))')
+        .select('id, ref, external_ref, id_bien, address, municipality, property_type, typology, visit_status, billing_status, fee_amount, perito_avaliador, updated_at, tem_fotos, tem_comparaveis, para_verificacao, verificado, pendente_motivo, anulado_motivo, portfolio_id, portfolios(id, name, status, prazo_entrega, clients(name))')
         .order('portfolio_id').order('external_ref', { ascending: true })
       if (role === 'perito' && name) tableQ = tableQ.eq('perito_avaliador', name)
 
@@ -220,11 +220,29 @@ export default function Dashboard() {
   const visited    = props.filter(p => p.visit_status !== 'pending').length
   const verificados = props.filter(p => p.verificado).length
   const reportOk   = props.filter(p => p.visit_status === 'report_done').length
-  const toReceive = props
-    .filter(p => ['awaiting_po','po_received','invoice_pending','invoice_issued'].includes(p.billing_status))
-    .reduce((s: number, p: any) => s + (p.fee_amount || 0), 0)
+  const emTrabalho = total - reportOk
   const pct = total > 0 ? Math.round((visited / total) * 100) : 0
   const pctVerificados = total > 0 ? Math.round((verificados / total) * 100) : 0
+
+  // Prazos: por projecto (portfolios.prazo_entrega), só conta projectos que
+  // ainda têm pelo menos um imóvel por concluir.
+  const { prazosSemana, prazosAtraso, proximoPrazo } = useMemo(() => {
+    const hoje = new Date(); hoje.setHours(0,0,0,0)
+    const em7dias = new Date(hoje); em7dias.setDate(em7dias.getDate() + 7)
+    const porPortfolio = new Map<string, { prazo: string; nome: string; algumPendente: boolean }>()
+    recent.forEach((p: any) => {
+      const pf = p.portfolios
+      if (!pf?.id || !pf?.prazo_entrega) return
+      const entry = porPortfolio.get(pf.id) || { prazo: pf.prazo_entrega, nome: pf.name, algumPendente: false }
+      if (p.visit_status !== 'report_done') entry.algumPendente = true
+      porPortfolio.set(pf.id, entry)
+    })
+    const pendentes = [...porPortfolio.values()].filter(x => x.algumPendente)
+    const semana = pendentes.filter(x => { const d = new Date(x.prazo); return d >= hoje && d <= em7dias }).length
+    const atraso = pendentes.filter(x => new Date(x.prazo) < hoje).length
+    const proximo = pendentes.sort((a,b) => a.prazo.localeCompare(b.prazo))[0]
+    return { prazosSemana: semana, prazosAtraso: atraso, proximoPrazo: proximo }
+  }, [recent])
 
   // Lista de peritos vem da tabela profiles (utilizadores reais)
   const { data: profilesData = [] } = useQuery({
@@ -344,10 +362,13 @@ export default function Dashboard() {
 
         {/* KPIs */}
         <div className="grid grid-cols-4 gap-4">
-          <KpiCard label="Total portfólio"    value={total}                     sub="imóveis" />
-          <KpiCard label="Visitados"          value={`${pct}%`}                 sub={`${visited} de ${total}`} color="green" />
-          <KpiCard label="Reports concluídos" value={reportOk}                  sub="imóveis" color="green" />
-          <KpiCard label="A receber"          value={formatCurrency(toReceive)} sub="PO + faturas" color={toReceive > 0 ? 'amber' : 'default'} />
+          <KpiCard label="Em trabalho"     value={emTrabalho} sub="imóveis" />
+          <KpiCard label="Concluídos"      value={reportOk}   sub={`de ${total}`} color="green" />
+          <KpiCard label="Prazos esta semana" value={prazosSemana}
+            sub={proximoPrazo ? `Próximo: ${formatDate(proximoPrazo.prazo)} · ${proximoPrazo.nome}` : 'sem prazos definidos'}
+            color={prazosSemana > 0 ? 'amber' : 'default'} />
+          <KpiCard label="Prazos em atraso" value={prazosAtraso} sub="projectos"
+            color={prazosAtraso > 0 ? 'red' : 'default'} />
         </div>
 
         {/* Progress */}

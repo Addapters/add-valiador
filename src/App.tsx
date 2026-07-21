@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
 import Layout         from '@/components/layout/Layout'
 import Login          from '@/components/modules/Login'
@@ -12,27 +12,33 @@ import Billing        from '@/components/modules/Billing'
 import MarketSearch   from '@/components/modules/MarketSearch'
 import PropertyCreate from '@/components/modules/PropertyCreate'
 
-function ProtectedRoutes() {
-  const { user, loading } = useAuth()
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <p className="text-sm text-gray-400">A carregar…</p>
-    </div>
-  )
-  if (!user) return <Navigate to="/login" replace />
-  return (
-    <Route path="/" element={<Layout />}>
-      <Route index element={<Navigate to="/dashboard" replace />} />
-      <Route path="dashboard"      element={<Dashboard />} />
-      <Route path="clients"        element={<Clients />} />
-      <Route path="portfolios"     element={<Portfolios />} />
-      <Route path="properties"     element={<Properties />} />
-      <Route path="properties/:id" element={<PropertyDetail />} />
-      <Route path="map"            element={<PropertyMap />} />
-      <Route path="billing"        element={<Billing />} />
-      <Route path="market"         element={<MarketSearch />} />
-    </Route>
-  )
+// Admin
+import AdminRequests  from '@/components/modules/admin/AdminRequests'
+import AdminMessages  from '@/components/modules/admin/AdminMessages'
+
+// Perito
+import PeritoProfile  from '@/components/modules/perito/PeritoProfile'
+import PeritoMessages from '@/components/modules/perito/PeritoMessages'
+
+// Cliente
+import ClienteDashboard  from '@/components/modules/cliente/ClienteDashboard'
+import ClienteRequests   from '@/components/modules/cliente/ClienteRequests'
+import ClienteProperties from '@/components/modules/cliente/ClienteProperties'
+import ClienteDocuments  from '@/components/modules/cliente/ClienteDocuments'
+import ClienteProfile    from '@/components/modules/cliente/ClienteProfile'
+
+// Rota inicial consoante o papel de quem faz login
+function homeFor(role: string | null) {
+  if (role === 'cliente') return '/cliente/dashboard'
+  return '/dashboard'
+}
+
+// Bloqueia o acesso a um grupo de rotas a quem não tem o papel certo,
+// redireccionando para a página inicial do seu próprio papel.
+function RoleGate({ allow }: { allow: string[] }) {
+  const { role } = useAuth()
+  if (role && !allow.includes(role)) return <Navigate to={homeFor(role)} replace />
+  return <Outlet />
 }
 
 export default function App() {
@@ -44,7 +50,7 @@ export default function App() {
 }
 
 function AppRoutes() {
-  const { user, loading } = useAuth()
+  const { user, role, loading } = useAuth()
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -54,18 +60,43 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/login" element={user ? <Navigate to={homeFor(role)} replace /> : <Login />} />
       <Route path="/" element={user ? <Layout /> : <Navigate to="/login" replace />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard"      element={<Dashboard />} />
-        <Route path="clients"        element={<Clients />} />
-        <Route path="portfolios"     element={<Portfolios />} />
-        <Route path="properties"      element={<Properties />} />
-        <Route path="properties/new" element={<PropertyCreate />} />
-        <Route path="properties/:id" element={<PropertyDetail />} />
-        <Route path="map"            element={<PropertyMap />} />
-        <Route path="billing"        element={<Billing />} />
-        <Route path="market"         element={<MarketSearch />} />
+        <Route index element={<Navigate to={homeFor(role)} replace />} />
+
+        {/* Admin + Perito — ferramentas internas de gestão de imóveis */}
+        <Route element={<RoleGate allow={['admin','perito']} />}>
+          <Route path="dashboard"      element={<Dashboard />} />
+          <Route path="clients"        element={<Clients />} />
+          <Route path="portfolios"     element={<Portfolios />} />
+          <Route path="properties"     element={<Properties />} />
+          <Route path="properties/new" element={<PropertyCreate />} />
+          <Route path="properties/:id" element={<PropertyDetail />} />
+          <Route path="map"            element={<PropertyMap />} />
+          <Route path="billing"        element={<Billing />} />
+          <Route path="market"         element={<MarketSearch />} />
+        </Route>
+
+        {/* Perito — perfil e mensagens com o Admin */}
+        <Route element={<RoleGate allow={['perito']} />}>
+          <Route path="perfil"    element={<PeritoProfile />} />
+          <Route path="mensagens" element={<PeritoMessages />} />
+        </Route>
+
+        {/* Admin — pedidos de clientes e mensagens com peritos */}
+        <Route element={<RoleGate allow={['admin']} />}>
+          <Route path="admin/pedidos"   element={<AdminRequests />} />
+          <Route path="admin/mensagens" element={<AdminMessages />} />
+        </Route>
+
+        {/* Cliente — área dedicada */}
+        <Route element={<RoleGate allow={['cliente']} />}>
+          <Route path="cliente/dashboard"  element={<ClienteDashboard />} />
+          <Route path="cliente/pedidos"    element={<ClienteRequests />} />
+          <Route path="cliente/imoveis"    element={<ClienteProperties />} />
+          <Route path="cliente/documentos" element={<ClienteDocuments />} />
+          <Route path="cliente/perfil"     element={<ClienteProfile />} />
+        </Route>
       </Route>
     </Routes>
   )
