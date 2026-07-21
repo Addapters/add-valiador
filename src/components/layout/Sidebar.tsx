@@ -14,7 +14,7 @@ const NAV_ADMIN: NavItem[] = [
   { label: 'Projetos',    to: '/portfolios', icon: Briefcase },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
   { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
-  { label: 'Mapa',        to: '/map',        icon: Map },
+  { label: 'Mapa',        to: '/map',        icon: Map,         sub: true },
   { section: 'Pedidos' },
   { label: 'Pedidos de clientes', to: '/admin/pedidos', icon: Inbox },
   { section: 'Peritos' },
@@ -29,10 +29,10 @@ const NAV_PERITO: NavItem[] = [
   { label: 'Dashboard',   to: '/dashboard',  icon: LayoutDashboard },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
   { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
-  { label: 'Mapa',        to: '/map',        icon: Map },
+  { label: 'Mapa',        to: '/map',        icon: Map,         sub: true },
+  { label: 'Mensagens',   to: '/mensagens',  icon: MessageSquare, sub: true, badge: 'messages' },
   { section: 'Conta' },
   { label: 'O meu perfil', to: '/perfil',     icon: UserCircle },
-  { label: 'Mensagens',   to: '/perfil?tab=mensagens', icon: MessageSquare, badge: 'messages' },
 ]
 
 const NAV_CLIENTE: NavItem[] = [

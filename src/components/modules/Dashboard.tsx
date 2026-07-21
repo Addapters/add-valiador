@@ -452,7 +452,7 @@ export default function Dashboard() {
                 <MessageCircle size={16} className="flex-shrink-0" />
                 <span>
                   Tens <strong>{unreadCount}</strong> {unreadCount === 1 ? 'mensagem nova' : 'mensagens novas'}.{' '}
-                  <Link to={role === 'admin' ? '/admin/mensagens' : '/perfil?tab=mensagens'} className="underline">Ver conversa</Link>
+                  <Link to={role === 'admin' ? '/admin/mensagens' : '/mensagens'} className="underline">Ver conversa</Link>
                 </span>
               </AlertBanner>
             )}

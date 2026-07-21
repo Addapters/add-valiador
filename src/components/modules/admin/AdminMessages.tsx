@@ -61,7 +61,12 @@ export default function AdminMessages() {
       const { error } = await supabase.from('messages').update({ lida_at: new Date().toISOString() }).in('id', ids)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-messages'] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-messages'] })
+      // Limpa de imediato os indicadores de "mensagem nova" na sidebar e no dashboard.
+      qc.invalidateQueries({ queryKey: ['sidebar-unread-messages'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-unread-messages'] })
+    }
   })
 
   useEffect(() => {
