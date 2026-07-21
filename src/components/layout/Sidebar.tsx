@@ -30,9 +30,9 @@ const NAV_PERITO: NavItem[] = [
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
   { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
   { label: 'Mapa',        to: '/map',        icon: Map,         sub: true },
-  { label: 'Mensagens',   to: '/mensagens',  icon: MessageSquare, sub: true, badge: 'messages' },
   { section: 'Conta' },
   { label: 'O meu perfil', to: '/perfil',     icon: UserCircle },
+  { label: 'Mensagens',   to: '/mensagens',  icon: MessageSquare, sub: true, badge: 'messages' },
 ]
 
 const NAV_CLIENTE: NavItem[] = [
