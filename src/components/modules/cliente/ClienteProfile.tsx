@@ -101,9 +101,11 @@ export default function ClienteProfile() {
             <div>
               <h2 className="text-sm font-semibold text-gray-800">Dados da entidade</h2>
               <p className="text-sm text-gray-600 mt-0.5">{client?.name || '—'}</p>
-              <p className="text-xs text-gray-400">
-                {[client?.nif && `NIF ${client.nif}`, client?.email, client?.phone, client?.address].filter(Boolean).join(' · ') || 'Sem dados gerais — geridos pelo Admin'}
-              </p>
+              {[client?.nif && `NIF ${client.nif}`, client?.email, client?.phone, client?.address].filter(Boolean).length > 0 && (
+                <p className="text-xs text-gray-400">
+                  {[client?.nif && `NIF ${client.nif}`, client?.email, client?.phone, client?.address].filter(Boolean).join(' · ')}
+                </p>
+              )}
             </div>
             {!editing ? (
               <button className="btn text-xs flex items-center gap-1.5 flex-shrink-0" onClick={() => setEditing(true)}>
