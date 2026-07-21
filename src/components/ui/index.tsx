@@ -94,7 +94,7 @@ export function WelcomeBanner({ name, subtitle }: { name: string | null; subtitl
     <div className="rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white px-6 py-5 flex items-center justify-between flex-wrap gap-2">
       <div>
         <p className="text-xs uppercase tracking-wider text-white/70">{hoje}</p>
-        <h1 className="text-xl font-semibold mt-0.5">{saudacao}, {name || ''} 👋</h1>
+        <h1 className="text-xl font-semibold mt-0.5">{saudacao}, {name || ''}</h1>
         {subtitle && <p className="text-sm text-white/80 mt-0.5">{subtitle}</p>}
       </div>
     </div>

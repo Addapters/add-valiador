@@ -5,23 +5,34 @@ import { supabase } from '@/lib/supabase'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useAuth } from '@/lib/AuthContext'
 import { formatDate } from '@/lib/utils'
-import { Upload, Pencil, X } from 'lucide-react'
+import { Upload, Pencil, X, Check, Phone, CreditCard, Landmark, BadgeCheck, FileText, CalendarDays, Shield, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const FIELDS: { key: string; label: string; type?: string }[] = [
-  { key: 'name',                  label: 'Nome' },
-  { key: 'telefone',              label: 'Telefone' },
-  { key: 'nif',                   label: 'NIF' },
-  { key: 'cedula_profissional',   label: 'Nº de cédula profissional' },
-  { key: 'numero_cmvm',           label: 'N.º CMVM' },
-  { key: 'seguro_rc_apolice',     label: 'Apólice N.º (seguro resp. civil)' },
-  { key: 'seguro_rc_validade',    label: 'Data de validade do seguro', type: 'date' },
-  { key: 'seguradora',            label: 'Seguradora' },
-  { key: 'zonas_atuacao',         label: 'Zonas de actuação' },
-  { key: 'iban',                  label: 'IBAN para pagamentos' },
-]
+// Campos editáveis, agrupados como no separador visual (contacto vs. dados
+// profissionais). "name" é tratado à parte, no cabeçalho do perfil.
+const CONTACT_FIELDS = [
+  { key: 'telefone', label: 'Telefone', icon: Phone },
+  { key: 'nif',      label: 'NIF',      icon: CreditCard },
+  { key: 'iban',     label: 'IBAN',     icon: Landmark },
+] as const
+
+const PROFESSIONAL_FIELDS = [
+  { key: 'numero_cmvm',        label: 'N.º CMVM',                    icon: BadgeCheck },
+  { key: 'seguro_rc_apolice',  label: 'Apólice de seguro (resp. civil)', icon: FileText },
+  { key: 'seguro_rc_validade', label: 'Validade do seguro', type: 'date', icon: CalendarDays },
+  { key: 'seguradora',         label: 'Seguradora',                  icon: Shield },
+  { key: 'zonas_atuacao',      label: 'Zonas de actuação',            icon: MapPin },
+] as const
+
+const ALL_FIELDS = [{ key: 'name', label: 'Nome' }, ...CONTACT_FIELDS, ...PROFESSIONAL_FIELDS]
 
 const SIGNATURE_BUCKET = 'perito-assinaturas'
+
+function initials(name: string | null | undefined) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase()
+}
 
 // ── Separador "Dados profissionais" ─────────────────────────────────────────
 function DadosProfissionais() {
@@ -47,7 +58,7 @@ function DadosProfissionais() {
   useEffect(() => {
     if (profile) {
       const initial: Record<string, string> = {}
-      FIELDS.forEach(f => { initial[f.key] = profile[f.key] || '' })
+      ALL_FIELDS.forEach(f => { initial[f.key] = profile[f.key] || '' })
       setForm(initial)
     }
   }, [profile])
@@ -78,7 +89,7 @@ function DadosProfissionais() {
     mutationFn: async () => {
       if (!user) return
       const patch: Record<string, any> = {}
-      FIELDS.forEach(f => { patch[f.key] = form[f.key] || null })
+      ALL_FIELDS.forEach(f => { patch[f.key] = form[f.key] || null })
       const { error } = await supabase.from('profiles').update(patch).eq('id', user.id)
       if (error) throw error
     },
@@ -90,7 +101,7 @@ function DadosProfissionais() {
   function cancelEdit() {
     if (profile) {
       const initial: Record<string, string> = {}
-      FIELDS.forEach(f => { initial[f.key] = profile[f.key] || '' })
+      ALL_FIELDS.forEach(f => { initial[f.key] = profile[f.key] || '' })
       setForm(initial)
     }
     setEditing(false)
@@ -98,54 +109,97 @@ function DadosProfissionais() {
 
   if (isLoading) return <p className="text-sm text-gray-400 py-4 text-center">A carregar…</p>
 
+  // Uma linha de informação: ícone + label + valor (ou input, em modo edição)
+  function InfoRow({ field }: { field: { key: string; label: string; type?: string; icon: any } }) {
+    const Icon = field.icon
+    const value = profile?.[field.key]
+    return (
+      <div className="flex items-start gap-3 py-2">
+        <Icon size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] text-gray-400">{field.label}</p>
+          {editing ? (
+            <input className="input text-sm mt-1" type={field.type || 'text'}
+              value={form[field.key] || ''}
+              onChange={e => setForm(v => ({ ...v, [field.key]: e.target.value }))} />
+          ) : (
+            <p className={value ? 'text-sm text-gray-800 truncate' : 'text-sm text-gray-300'}>
+              {value ? (field.type === 'date' ? formatDate(value) : value) : '—'}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="card max-w-2xl">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-800">Dados profissionais</h2>
-        {!editing ? (
-          <button className="btn text-xs flex items-center gap-1.5" onClick={() => setEditing(true)}>
-            <Pencil size={12} /> Editar
-          </button>
-        ) : (
-          <div className="flex gap-1.5">
-            <button className="btn text-xs" onClick={cancelEdit}><X size={12} /> Cancelar</button>
-            <button className="btn btn-primary text-xs" disabled={saving} onClick={() => { setSaving(true); save.mutate() }}>
-              Guardar
-            </button>
+    <div className="max-w-3xl space-y-4">
+      {/* Cabeçalho: avatar (iniciais), nome e acções */}
+      <div className="card">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xl font-semibold flex-shrink-0">
+              {initials(profile?.name)}
+            </div>
+            <div className="min-w-0">
+              {editing ? (
+                <input className="input text-sm font-semibold w-56" value={form.name || ''}
+                  onChange={e => setForm(v => ({ ...v, name: e.target.value }))} placeholder="Nome" />
+              ) : (
+                <h2 className="text-lg font-semibold text-gray-900 truncate">{profile?.name || '—'}</h2>
+              )}
+              <p className="text-sm text-gray-500">Perito Avaliador</p>
+              {profile?.zonas_atuacao && !editing && (
+                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><MapPin size={11} /> {profile.zonas_atuacao}</p>
+              )}
+            </div>
           </div>
-        )}
+          {!editing ? (
+            <button className="btn text-xs flex items-center gap-1.5 flex-shrink-0" onClick={() => setEditing(true)}>
+              <Pencil size={12} /> Editar perfil
+            </button>
+          ) : (
+            <div className="flex gap-1.5 flex-shrink-0">
+              <button className="btn text-xs" onClick={cancelEdit}><X size={12} /> Cancelar</button>
+              <button className="btn btn-primary text-xs" disabled={saving} onClick={() => { setSaving(true); save.mutate() }}>
+                <Check size={12} /> Guardar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-3">
-        {FIELDS.map(f => (
-          <div key={f.key} className="grid grid-cols-2 gap-3 items-center">
-            <span className="text-xs text-gray-500">{f.label}</span>
-            {editing ? (
-              <input className="input text-sm" type={f.type || 'text'}
-                value={form[f.key] || ''}
-                onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))} />
-            ) : (
-              <span className={profile?.[f.key] ? 'text-sm text-gray-800' : 'text-sm text-gray-300'}>
-                {profile?.[f.key] ? (f.type === 'date' ? formatDate(profile[f.key]) : profile[f.key]) : '—'}
-              </span>
-            )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Informação de contacto</p>
+          <div className="divide-y divide-gray-50">
+            {CONTACT_FIELDS.map(f => <InfoRow key={f.key} field={f} />)}
           </div>
-        ))}
+        </div>
+        <div className="card">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Dados profissionais</p>
+          <div className="divide-y divide-gray-50">
+            {PROFESSIONAL_FIELDS.map(f => <InfoRow key={f.key} field={f} />)}
+          </div>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-3 items-center pt-2 border-t border-gray-100">
-          <span className="text-xs text-gray-500">Assinatura</span>
-          <div className="flex items-center gap-3">
-            {signedUrl ? (
-              <img src={signedUrl} alt="Assinatura" className="h-10 max-w-[140px] object-contain bg-white border border-gray-200 rounded" />
-            ) : (
-              <span className="text-xs text-gray-400">Sem assinatura carregada.</span>
-            )}
-            <label className="btn text-xs flex items-center gap-1.5 cursor-pointer">
-              <Upload size={11} /> {uploading ? 'A carregar…' : 'Carregar'}
-              <input type="file" accept="image/*" className="hidden" disabled={uploading}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleSignatureUpload(f); e.target.value = '' }} />
-            </label>
-          </div>
+      <div className="card">
+        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-3">Assinatura</p>
+        <p className="text-xs text-gray-400 mb-3">Imagem usada para assinar os relatórios gerados na plataforma.</p>
+        <div className="flex items-center gap-4">
+          {signedUrl ? (
+            <img src={signedUrl} alt="Assinatura" className="h-14 max-w-[180px] object-contain bg-white border border-gray-200 rounded-lg px-3" />
+          ) : (
+            <div className="h-14 w-44 flex items-center justify-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg">
+              Sem assinatura
+            </div>
+          )}
+          <label className="btn text-xs flex items-center gap-1.5 cursor-pointer">
+            <Upload size={11} /> {uploading ? 'A carregar…' : 'Carregar imagem'}
+            <input type="file" accept="image/*" className="hidden" disabled={uploading}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleSignatureUpload(f); e.target.value = '' }} />
+          </label>
         </div>
       </div>
     </div>
@@ -196,7 +250,7 @@ function MensagensComAdmin() {
   }, [messages.length])
 
   return (
-    <div className="card flex flex-col p-0 overflow-hidden max-w-2xl" style={{ height: 'calc(100vh - 320px)', minHeight: 360 }}>
+    <div className="card flex flex-col p-0 overflow-hidden max-w-3xl" style={{ height: 'calc(100vh - 320px)', minHeight: 360 }}>
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 ? (
           <EmptyState message="Ainda não há mensagens. Escreve à equipa se tiveres dúvidas." />

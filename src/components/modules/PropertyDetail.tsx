@@ -8,6 +8,7 @@ import { generateAbancaReport } from '@/lib/reportGenerator'
 import { useDropzone } from 'react-dropzone'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { geocodeAddress } from '@/lib/geocode'
+import { useAuth } from '@/lib/AuthContext'
 import toast from 'react-hot-toast'
 
 declare global { interface Window { L: any } }
@@ -356,6 +357,7 @@ const SLOTS = [1,2,3,4,5,6,7,8]
 
 export default function PropertyDetail() {
   const { id } = useParams()
+  const { role } = useAuth()
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('sec1')
   const [uploading, setUploading] = useState(false)
@@ -728,7 +730,7 @@ export default function PropertyDetail() {
 
         {/* Tabs — scroll horizontal */}
         <div className="flex gap-0 mt-3 overflow-x-auto pb-px border-b border-gray-100">
-          {TABS.map(t => (
+          {TABS.filter(t => role === 'admin' || t !== 'sec14').map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px
                 ${tab===t ? 'border-brand-400 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
@@ -1217,8 +1219,8 @@ export default function PropertyDetail() {
           )}
         </> )}
 
-        {/* SEC 14 ── Faturação */}
-        {tab==='sec14' && (<>
+        {/* SEC 14 ── Faturação (não disponível para o perito) */}
+        {tab==='sec14' && role === 'admin' && (<>
           <Section title="Estado Financeiro">
             <div>
               <label className="label">Estado de Faturação</label>

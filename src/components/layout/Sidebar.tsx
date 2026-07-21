@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 import { LayoutDashboard, Building2, Briefcase, Map, Receipt, TrendingUp, Users, LogOut, Menu, X, Calculator, Inbox, MessageSquare, UserCircle, FileText, BadgeCheck } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { useCalculator } from '@/components/Calculator'
 
-type NavItem = { label: string; to: string; icon: any; sub?: boolean } | { section: string }
+type NavItem = { label: string; to: string; icon: any; sub?: boolean; badge?: 'messages' } | { section: string }
 
 const NAV_ADMIN: NavItem[] = [
   { label: 'Dashboard',   to: '/dashboard',  icon: LayoutDashboard },
@@ -18,7 +20,7 @@ const NAV_ADMIN: NavItem[] = [
   { section: 'Peritos' },
   { label: 'Gestão de peritos', to: '/admin/peritos', icon: BadgeCheck },
   { section: 'Comunicação' },
-  { label: 'Mensagens',   to: '/admin/mensagens', icon: MessageSquare },
+  { label: 'Mensagens',   to: '/admin/mensagens', icon: MessageSquare, badge: 'messages' },
   { section: 'Financeiro' },
   { label: 'Faturação',   to: '/billing',    icon: Receipt },
 ]
@@ -30,6 +32,7 @@ const NAV_PERITO: NavItem[] = [
   { label: 'Mapa',        to: '/map',        icon: Map },
   { section: 'Conta' },
   { label: 'O meu perfil', to: '/perfil',     icon: UserCircle },
+  { label: 'Mensagens',   to: '/perfil?tab=mensagens', icon: MessageSquare, badge: 'messages' },
 ]
 
 const NAV_CLIENTE: NavItem[] = [
@@ -48,9 +51,24 @@ function navForRole(role: string | null): NavItem[] {
 }
 
 function NavItems({ onClose }: { onClose?: () => void }) {
-  const { name, role, signOut } = useAuth()
+  const { name, role, user, signOut } = useAuth()
   const { toggle, open: calcOpen, el: calcEl } = useCalculator()
   const nav = navForRole(role)
+
+  // Mensagens novas — mostra o número de conversas por ler junto ao item Mensagens.
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['sidebar-unread-messages', role, user?.id],
+    queryFn: async () => {
+      if (!user || role === 'cliente') return 0
+      let q = supabase.from('messages').select('id', { count: 'exact', head: true }).neq('remetente_id', user.id).is('lida_at', null)
+      if (role === 'perito') q = q.eq('perito_id', user.id)
+      const { count } = await q
+      return count || 0
+    },
+    enabled: !!user && role !== 'cliente',
+    refetchInterval: 30000,
+  })
+
   return (
     <>
       <nav className="flex-1 overflow-y-auto py-3 px-2">
@@ -59,6 +77,7 @@ function NavItems({ onClose }: { onClose?: () => void }) {
             <p key={i} className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{item.section}</p>
           )
           const Icon = item.icon!
+          const showBadge = item.badge === 'messages' && unreadCount > 0
           return (
             <NavLink key={item.to} to={item.to!} end={item.to!.endsWith('/dashboard')}
               onClick={onClose}
@@ -67,7 +86,13 @@ function NavItems({ onClose }: { onClose?: () => void }) {
                  ${item.sub ? 'ml-4 pl-2.5 pr-3 py-2 text-[13px]' : 'px-3 py-2.5'}
                  ${isActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`
               }>
-              <Icon size={item.sub ? 14 : 16}/>{item.label}
+              <Icon size={item.sub ? 14 : 16}/>
+              <span className="flex-1">{item.label}</span>
+              {showBadge && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold bg-blue-500 text-white">
+                  {unreadCount}
+                </span>
+              )}
             </NavLink>
           )
         })}

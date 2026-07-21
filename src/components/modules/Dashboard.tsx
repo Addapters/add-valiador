@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, KpiCard, VisitBadge, BillingBadge, WelcomeBanner, AlertBanner } from '@/components/ui'
 import DeadlineCalendar from '@/components/DeadlineCalendar'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 
 // Converte texto em uppercase (datatape espanhol) para titleCase
 function toDisplayDash(val: any): string {
@@ -604,14 +604,6 @@ export default function Dashboard() {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <select className="input text-xs py-1 w-36" value={bulkBilling} onChange={e => setBulkBilling(e.target.value)}>
-                  <option value="">Alterar faturação…</option>
-                  {Object.entries(BILLING_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-                {bulkBilling && <button className="btn btn-primary text-xs py-1" onClick={() => bulkUpdate.mutate({ field:'billing_status', value:bulkBilling })}>OK</button>}
-              </div>
-
-              <div className="flex items-center gap-1.5">
                 <select className="input text-xs py-1 w-40" onChange={e => {
                   if (e.target.value) bulkUpdate.mutate({ field:'tem_fotos', value: e.target.value==='sim' })
                 }}>
@@ -745,10 +737,6 @@ export default function Dashboard() {
                               <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('verificado')} title="Filtrar verificados">
                                 Verificado <span className={`text-[10px] ${colFilter['verificado']==='sim'?'text-emerald-500':colFilter['verificado']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['verificado']==='sim'?'✓':colFilter['verificado']==='nao'?'✗':'⇅'}</span>
                               </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('fee_amount')}>
-                                Honorário <span className="text-[10px] text-gray-300">{sortCol==='fee_amount'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
-                              </th>
-                              <th>Hon. Addapters</th>
                               <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('pendente_motivo')} title="Filtrar pendentes">
                                 Pendente <span className={`text-[10px] ${colFilter['pendente_motivo']==='sim'?'text-amber-500':colFilter['pendente_motivo']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['pendente_motivo']==='sim'?'✓':colFilter['pendente_motivo']==='nao'?'✗':'⇅'}</span>
                               </th>
@@ -804,8 +792,6 @@ export default function Dashboard() {
                                     color="bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
                                     onClick={() => updateField.mutate({ id:p.id, field:'verificado', value:!p.verificado })}/>
                                 </td>
-                                <td className="text-gray-600 whitespace-nowrap">{p.fee_amount ? formatCurrency(p.fee_amount) : '—'}</td>
-                                <td className="text-emerald-700 font-medium whitespace-nowrap">{p.fee_amount ? formatCurrency(Math.round(p.fee_amount * 0.6)) : '—'}</td>
                                 <td className="px-1">
                                   <MotivoBadge value={p.pendente_motivo} label="Pendente"
                                     color="bg-amber-100 text-amber-700"
