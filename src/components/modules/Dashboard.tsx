@@ -256,6 +256,33 @@ export default function Dashboard() {
     .filter(p => p.role === 'perito' && p.name)
     .map(p => p.name) as string[]
 
+  // Visão geral por perito (apenas admin) — quantos imóveis tem cada perito,
+  // quantos já concluiu e o estado dos prazos dos projectos onde trabalha.
+  const peritosOverview = useMemo(() => {
+    if (role !== 'admin') return []
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    type Entry = { nome: string; total: number; concluidos: number; emAtraso: number; proximoPrazo: string | null }
+    const map = new Map<string, Entry>()
+    peritos.forEach(nome => map.set(nome, { nome, total: 0, concluidos: 0, emAtraso: 0, proximoPrazo: null }))
+    recent.forEach((p: any) => {
+      const nome = p.perito_avaliador
+      if (!nome) return
+      const entry = map.get(nome) || { nome, total: 0, concluidos: 0, emAtraso: 0, proximoPrazo: null }
+      entry.total += 1
+      if (p.visit_status === 'report_done') {
+        entry.concluidos += 1
+      } else {
+        const prazo = p.portfolios?.prazo_entrega
+        if (prazo) {
+          if (new Date(prazo) < hoje) entry.emAtraso += 1
+          if (!entry.proximoPrazo || prazo < entry.proximoPrazo) entry.proximoPrazo = prazo
+        }
+      }
+      map.set(nome, entry)
+    })
+    return [...map.values()].sort((a, b) => b.total - a.total)
+  }, [recent, peritos, role])
+
   // Filtered rows
   const filtered = useMemo(() => recent.filter((p: any) => {
     if (filterVisita     && p.visit_status !== filterVisita) return false
@@ -371,7 +398,58 @@ export default function Dashboard() {
             color={prazosAtraso > 0 ? 'red' : 'default'} />
         </div>
 
-        {/* Progress */}
+        {/* Visão geral dos peritos (apenas admin) */}
+        {role === 'admin' && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-800">Peritos avaliadores</h2>
+              <Link to="/admin/peritos" className="text-xs text-brand-600 hover:underline">Gestão de peritos →</Link>
+            </div>
+            {peritosOverview.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">Ainda não há peritos registados.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table-base">
+                  <thead>
+                    <tr>
+                      <th>Perito</th>
+                      <th>Alocados</th>
+                      <th>Concluídos</th>
+                      <th>Em trabalho</th>
+                      <th>Em atraso</th>
+                      <th>Próximo prazo</th>
+                      <th>Progresso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {peritosOverview.map(pv => {
+                      const emTrabalhoPv = pv.total - pv.concluidos
+                      const pctPv = pv.total > 0 ? Math.round((pv.concluidos / pv.total) * 100) : 0
+                      return (
+                        <tr key={pv.nome}>
+                          <td className="font-medium text-gray-700 whitespace-nowrap">{pv.nome}</td>
+                          <td>{pv.total}</td>
+                          <td className="text-emerald-600 font-medium">{pv.concluidos}</td>
+                          <td>{emTrabalhoPv}</td>
+                          <td className={pv.emAtraso > 0 ? 'text-red-600 font-medium' : 'text-gray-400'}>{pv.emAtraso || '—'}</td>
+                          <td className="text-gray-500 whitespace-nowrap">{pv.proximoPrazo ? formatDate(pv.proximoPrazo) : '—'}</td>
+                          <td className="min-w-[120px]">
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-brand-400 rounded-full transition-all" style={{ width: `${pctPv}%` }} />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Progress + tabela de imóveis (perito vê a sua própria tabela aqui; admin gere isto em Imóveis) */}
+        {role !== 'admin' && (
         <div className="card">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-600 font-medium">Progresso do portfólio</span>
@@ -381,8 +459,10 @@ export default function Dashboard() {
             <div className="h-full bg-brand-400 rounded-full transition-all" style={{ width: `${pctVerificados}%` }} />
           </div>
         </div>
+        )}
 
         {/* Table card */}
+        {role !== 'admin' && (
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-800">
@@ -477,21 +557,6 @@ export default function Dashboard() {
                 </select>
               </div>
 
-              {role === 'admin' && (
-                <div className="flex items-center gap-1.5">
-                  {!showBulkPerito
-                    ? <button className="btn text-xs py-1" onClick={() => setShowBulkPerito(true)}>Alterar perito…</button>
-                    : <>
-                        <input className="input text-xs py-1 w-40" placeholder="Nome do perito"
-                          value={bulkPerito} onChange={e => setBulkPerito(e.target.value)} list="peritos-bulk-dash"/>
-                        <datalist id="peritos-bulk-dash">{peritos.map(p => <option key={p} value={p}/>)}</datalist>
-                        <button className="btn btn-primary text-xs py-1" onClick={() => bulkUpdate.mutate({ field:'perito_avaliador', value:bulkPerito })}>OK</button>
-                        <button className="btn text-xs py-1" onClick={() => { setShowBulkPerito(false); setBulkPerito('') }}>✕</button>
-                      </>
-                  }
-                </div>
-              )}
-
               <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 ml-auto"
                 onClick={() => { if (confirm(`Eliminar ${selected.size} imóveis permanentemente?`)) bulkDelete.mutate() }}>
                 <Trash2 size={12}/> Eliminar {selected.size}
@@ -583,7 +648,6 @@ export default function Dashboard() {
                               <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('property_type')}>
                                 Tipo <span className="text-[10px] text-gray-300">{sortCol==='property_type'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
                               </th>
-                              {role === 'admin' && <th>Perito</th>}
                               <th>Visita</th>
                               <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('tem_fotos')} title="Filtrar fotos">
                                 Fotos <span className={`text-[10px] ${colFilter['tem_fotos']==='sim'?'text-emerald-500':colFilter['tem_fotos']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['tem_fotos']==='sim'?'✓':colFilter['tem_fotos']==='nao'?'✗':'⇅'}</span>
@@ -628,12 +692,6 @@ export default function Dashboard() {
                                 <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>
                                 <td className="text-gray-600 max-w-[160px] truncate">{toDisplayDash(p.municipality || p.address) || '—'}</td>
                                 <td className="text-gray-600 whitespace-nowrap">{toDisplayDash([p.property_type, p.typology].filter(Boolean).join(' ')) || '—'}</td>
-                                {role === 'admin' && (
-                                  <td>
-                                    <InlineEdit value={p.perito_avaliador}
-                                      onSave={val => updateField.mutate({ id:p.id, field:'perito_avaliador', value:val||null })}/>
-                                  </td>
-                                )}
                                 <td>
                                   <InlineSelect
                                     value={p.visit_status}
@@ -687,6 +745,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )

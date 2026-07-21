@@ -205,6 +205,16 @@ function persistFilters(f: PropertyFilters) {
   try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(f)) } catch {}
 }
 
+// Projecto seleccionado (vista individualizada) — persiste entre sessões para
+// que, ao voltar à página, continue a ver o mesmo projecto em foco.
+const PROJECT_KEY = 'addvaliador_props_project'
+function loadProjectFilter(): string {
+  try { return sessionStorage.getItem(PROJECT_KEY) || 'all' } catch { return 'all' }
+}
+function persistProjectFilter(v: string) {
+  try { sessionStorage.setItem(PROJECT_KEY, v) } catch {}
+}
+
 export default function Properties() {
   const qc = useQueryClient()
   const [filters,     setFiltersRaw] = useState<PropertyFilters>(loadFilters)
@@ -215,6 +225,8 @@ export default function Properties() {
     setVisibleColsRaw(cols)
   }
   const [collapsed,   setCollapsed]   = useState<Record<string,boolean>>({})
+  const [projectFilter, setProjectFilterRaw] = useState<string>(loadProjectFilter)
+  function setProjectFilter(v: string) { persistProjectFilter(v); setProjectFilterRaw(v) }
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
   const [bulkVisit,   setBulkVisit]   = useState('')
   const [bulkBilling, setBulkBilling] = useState('')
@@ -294,6 +306,22 @@ export default function Properties() {
     }
   })
 
+  // Lista de projectos disponíveis (independente dos filtros activos), para
+  // permitir escolher "ver este projecto sozinho" mesmo com outros filtros aplicados.
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; count: number }>()
+    rows.forEach((r: any) => {
+      const id = r.portfolios?.id || 'sem-portfolio'
+      const clientName = r.portfolios?.clients?.name
+      const portfolioName = r.portfolios?.name
+      const label = clientName && portfolioName ? `${clientName} | ${portfolioName}` : (portfolioName || clientName || 'Sem projeto')
+      const entry = map.get(id) || { id, label, count: 0 }
+      entry.count += 1
+      map.set(id, entry)
+    })
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt'))
+  }, [rows])
+
   const districts = useMemo(() => [...new Set(rows.map((r: any) => r.district).filter(Boolean))].sort(), [rows])
   const parishes  = useMemo(() => {
     const base = filters.districtFilter.length ? rows.filter((r: any) => filters.districtFilter.includes(r.district)) : rows
@@ -302,6 +330,7 @@ export default function Properties() {
 
 
   const filtered = useMemo(() => rows.filter((r: any) => {
+    if (projectFilter !== 'all' && (r.portfolios?.id || 'sem-portfolio') !== projectFilter) return false
     if (filters.visitFilter   && r.visit_status     !== filters.visitFilter)   return false
     if (filters.billingFilter && r.billing_status   !== filters.billingFilter) return false
     if (filters.districtFilter.length && !filters.districtFilter.includes(r.district)) return false
@@ -314,7 +343,7 @@ export default function Properties() {
         .some(v => v?.toLowerCase().includes(s))
     }
     return true
-  }), [rows, filters])
+  }), [rows, filters, projectFilter])
 
   const grouped = useMemo(() => {
     // Aplicar filtros rápidos por coluna
@@ -522,6 +551,23 @@ export default function Properties() {
           <ColumnPicker visible={visibleCols} onChange={setVisibleCols}/>
         </>}
       />
+
+      {projectOptions.length > 1 && (
+        <div className="bg-white border-b border-gray-100 px-6 py-2.5 flex flex-wrap gap-1.5 items-center overflow-x-auto">
+          <button
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${projectFilter==='all' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            onClick={() => setProjectFilter('all')}>
+            Todos os projectos <span className="opacity-80">({rows.length})</span>
+          </button>
+          {projectOptions.map(opt => (
+            <button key={opt.id}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${projectFilter===opt.id ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              onClick={() => setProjectFilter(opt.id)}>
+              {opt.label} <span className="opacity-80">({opt.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="bg-white border-b border-gray-100 px-6 py-3 flex flex-wrap gap-2 items-center">
         <input className="input max-w-[180px]" placeholder="Ref, morada, perito…" value={filters.search} onChange={e => updateFilters({ search: e.target.value })}/>

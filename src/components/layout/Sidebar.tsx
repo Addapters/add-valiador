@@ -1,25 +1,26 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Building2, Briefcase, Map, Receipt, TrendingUp, Users, LogOut, Menu, X, Calculator, Inbox, MessageSquare, UserCircle, FileText } from 'lucide-react'
+import { LayoutDashboard, Building2, Briefcase, Map, Receipt, TrendingUp, Users, LogOut, Menu, X, Calculator, Inbox, MessageSquare, UserCircle, FileText, BadgeCheck } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { useCalculator } from '@/components/Calculator'
 
-type NavItem = { label: string; to: string; icon: any } | { section: string }
+type NavItem = { label: string; to: string; icon: any; sub?: boolean } | { section: string }
 
 const NAV_ADMIN: NavItem[] = [
   { label: 'Dashboard',   to: '/dashboard',  icon: LayoutDashboard },
   { label: 'Clientes',    to: '/clients',    icon: Users },
   { label: 'Projetos',    to: '/portfolios', icon: Briefcase },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
+  { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
   { label: 'Mapa',        to: '/map',        icon: Map },
   { section: 'Pedidos' },
   { label: 'Pedidos de clientes', to: '/admin/pedidos', icon: Inbox },
+  { section: 'Peritos' },
+  { label: 'Gestão de peritos', to: '/admin/peritos', icon: BadgeCheck },
   { section: 'Comunicação' },
   { label: 'Mensagens',   to: '/admin/mensagens', icon: MessageSquare },
   { section: 'Financeiro' },
   { label: 'Faturação',   to: '/billing',    icon: Receipt },
-  { section: 'Mercado' },
-  { label: 'Prospeção',   to: '/market',     icon: TrendingUp },
 ]
 
 const NAV_PERITO: NavItem[] = [
@@ -27,11 +28,10 @@ const NAV_PERITO: NavItem[] = [
   { label: 'Clientes',    to: '/clients',    icon: Users },
   { label: 'Projetos',    to: '/portfolios', icon: Briefcase },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
+  { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
   { label: 'Mapa',        to: '/map',        icon: Map },
   { section: 'Financeiro' },
   { label: 'Faturação',   to: '/billing',    icon: Receipt },
-  { section: 'Mercado' },
-  { label: 'Prospeção',   to: '/market',     icon: TrendingUp },
   { section: 'Conta' },
   { label: 'O meu perfil', to: '/perfil',     icon: UserCircle },
   { label: 'Mensagens',    to: '/mensagens',  icon: MessageSquare },
@@ -68,10 +68,11 @@ function NavItems({ onClose }: { onClose?: () => void }) {
             <NavLink key={item.to} to={item.to!} end={item.to!.endsWith('/dashboard')}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm mb-0.5 transition-colors
+                `flex items-center gap-2.5 rounded-lg text-sm mb-0.5 transition-colors
+                 ${item.sub ? 'ml-4 pl-2.5 pr-3 py-2 text-[13px]' : 'px-3 py-2.5'}
                  ${isActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`
               }>
-              <Icon size={16}/>{item.label}
+              <Icon size={item.sub ? 14 : 16}/>{item.label}
             </NavLink>
           )
         })}

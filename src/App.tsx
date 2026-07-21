@@ -15,6 +15,7 @@ import PropertyCreate from '@/components/modules/PropertyCreate'
 // Admin
 import AdminRequests  from '@/components/modules/admin/AdminRequests'
 import AdminMessages  from '@/components/modules/admin/AdminMessages'
+import AdminPeritos   from '@/components/modules/admin/AdminPeritos'
 
 // Perito
 import PeritoProfile  from '@/components/modules/perito/PeritoProfile'
@@ -87,6 +88,7 @@ function AppRoutes() {
         <Route element={<RoleGate allow={['admin']} />}>
           <Route path="admin/pedidos"   element={<AdminRequests />} />
           <Route path="admin/mensagens" element={<AdminMessages />} />
+          <Route path="admin/peritos"   element={<AdminPeritos />} />
         </Route>
 
         {/* Cliente — área dedicada */}

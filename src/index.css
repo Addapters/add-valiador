@@ -40,6 +40,12 @@
            focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
            placeholder:text-gray-400;
   }
+  select.input {
+    @apply pr-9 appearance-none bg-no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 0.85rem center;
+    background-size: 0.65rem;
+  }
   .label {
     @apply block text-xs font-medium text-gray-500 mb-1;
   }
