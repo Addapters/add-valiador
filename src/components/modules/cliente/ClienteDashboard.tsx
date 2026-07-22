@@ -141,7 +141,6 @@ export default function ClienteDashboard() {
 
           {/* Coluna 1 — cartões de projecto */}
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-800">Os meus projectos</h2>
             {isLoading ? (
               <div className="card"><p className="text-sm text-gray-400 py-4 text-center">A carregar…</p></div>
             ) : portfolios.length === 0 ? (
