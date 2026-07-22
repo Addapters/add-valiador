@@ -255,11 +255,12 @@ export default function Dashboard() {
     return [...map.entries()].sort(([,a],[,b]) => a.label.localeCompare(b.label))
   }, [recent, sortCol, sortDir, colFilter])
 
-  // KPIs
+  // KPIs — "concluído" = coluna Verificado a Sim (o critério real usado em
+  // Imóveis/Projetos), não o estado da visita.
   const total      = props.length
   const visited    = props.filter(p => p.visit_status !== 'pending').length
   const verificados = props.filter(p => p.verificado).length
-  const reportOk   = props.filter(p => p.visit_status === 'report_done').length
+  const reportOk   = verificados
   const emTrabalho = total - reportOk
   const pct = total > 0 ? Math.round((visited / total) * 100) : 0
   const pctVerificados = total > 0 ? Math.round((verificados / total) * 100) : 0
@@ -274,7 +275,7 @@ export default function Dashboard() {
       const pf = p.portfolios
       if (!pf?.id || !pf?.prazo_entrega) return
       const entry = porPortfolio.get(pf.id) || { prazo: pf.prazo_entrega, nome: pf.name, algumPendente: false }
-      if (p.visit_status !== 'report_done') entry.algumPendente = true
+      if (!p.verificado) entry.algumPendente = true
       porPortfolio.set(pf.id, entry)
     })
     const pendentes = [...porPortfolio.values()].filter(x => x.algumPendente)
@@ -309,7 +310,7 @@ export default function Dashboard() {
       if (!nome) return
       const entry = map.get(nome) || { nome, total: 0, concluidos: 0, emAtraso: 0, proximoPrazo: null }
       entry.total += 1
-      if (p.visit_status === 'report_done') {
+      if (p.verificado) {
         entry.concluidos += 1
       } else {
         const prazo = p.portfolios?.prazo_entrega
@@ -333,7 +334,7 @@ export default function Dashboard() {
       const label = pf?.clients?.name && pf?.name ? `${pf.clients.name} | ${pf.name}` : (pf?.name || 'Sem projecto')
       const entry = map.get(pid) || { pid, label, total: 0, done: 0 }
       entry.total += 1
-      if (p.visit_status === 'report_done') entry.done += 1
+      if (p.verificado) entry.done += 1
       map.set(pid, entry)
     })
     return [...map.values()]
@@ -349,7 +350,7 @@ export default function Dashboard() {
     recent.forEach((p: any) => {
       const pf = p.portfolios
       if (!pf?.id || !pf?.prazo_entrega) return
-      if (p.visit_status === 'report_done') return
+      if (p.verificado) return
       const label = pf.clients?.name ? `${pf.clients.name} | ${pf.name}` : pf.name
       map.set(pf.id, JSON.stringify({ date: pf.prazo_entrega, label }))
     })
@@ -358,10 +359,12 @@ export default function Dashboard() {
 
   // Lista de tarefas — imóveis ainda por concluir, ordenados por urgência
   // (prazo do respectivo projecto), para uma leitura rápida do que falta fazer.
-  const tasksList = useMemo(() => {
+  // `tasksPending` guarda a lista completa (para o total no cabeçalho);
+  // `tasksList` é só os primeiros 8, para exibição compacta.
+  const tasksPending = useMemo(() => {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
     return recent
-      .filter((p: any) => p.visit_status !== 'report_done')
+      .filter((p: any) => !p.verificado)
       .map((p: any) => {
         const prazo = p.portfolios?.prazo_entrega || null
         const atraso = prazo ? new Date(prazo) < hoje : false
@@ -372,8 +375,8 @@ export default function Dashboard() {
         if (a._prazo && b._prazo) return a._prazo.localeCompare(b._prazo)
         return a._prazo ? -1 : b._prazo ? 1 : 0
       })
-      .slice(0, 8)
   }, [recent])
+  const tasksList = useMemo(() => tasksPending.slice(0, 8), [tasksPending])
 
   // Mensagens novas — mostra um alerta no dashboard quando há conversas por ler.
   const { data: unreadCount = 0 } = useQuery({
@@ -551,7 +554,7 @@ export default function Dashboard() {
           {/* Coluna 2 — lista de tarefas (imóveis por concluir) */}
           <div className="card p-0 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800">Tarefas <span className="text-gray-400 font-normal">({tasksList.length})</span></h2>
+              <h2 className="text-sm font-semibold text-gray-800">Tarefas <span className="text-gray-400 font-normal">({tasksPending.length})</span></h2>
               <Link to="/properties" className="text-xs text-brand-600 hover:underline flex items-center">Ver todas <ChevronRight size={12}/></Link>
             </div>
             {tasksList.length === 0 ? (
@@ -560,8 +563,8 @@ export default function Dashboard() {
               <div className="divide-y divide-gray-50">
                 {tasksList.map((p: any) => (
                   <div key={p.id} className="flex items-center gap-2.5 px-4 py-2.5">
-                    <button onClick={() => updateField.mutate({ id: p.id, field: 'visit_status', value: 'report_done' })}
-                      className="text-gray-300 hover:text-brand-400 flex-shrink-0" title="Marcar como concluído">
+                    <button onClick={() => updateField.mutate({ id: p.id, field: 'verificado', value: true })}
+                      className="text-gray-300 hover:text-brand-400 flex-shrink-0" title="Marcar como concluído (verificado)">
                       <Square size={15}/>
                     </button>
                     <div className="min-w-0 flex-1">

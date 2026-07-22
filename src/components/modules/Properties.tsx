@@ -356,7 +356,7 @@ export default function Properties() {
       const label = clientName && portfolioName ? `${clientName} | ${portfolioName}` : (portfolioName || clientName || 'Sem projeto')
       const entry = map.get(id) || { id, label, count: 0, done: 0 }
       entry.count += 1
-      if (r.visit_status === 'report_done') entry.done += 1
+      if (r.verificado) entry.done += 1
       map.set(id, entry)
     })
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt'))
@@ -603,7 +603,7 @@ export default function Properties() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             <ProjectCard
               label="Todos os projectos"
-              done={rows.filter((r: any) => r.visit_status === 'report_done').length}
+              done={rows.filter((r: any) => r.verificado).length}
               total={rows.length}
               active={projectFilter === 'all'}
               onClick={() => setProjectFilter('all')}

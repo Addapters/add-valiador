@@ -50,7 +50,7 @@ export default function ClienteDashboard() {
       if (!clientId) return []
       const { data, error } = await supabase
         .from('portfolios')
-        .select('id, name, status, prazo_entrega, properties(id, external_ref, address, visit_status)')
+        .select('id, name, status, prazo_entrega, properties(id, external_ref, address, visit_status, verificado)')
         .eq('client_id', clientId)
         .order('name')
       if (error) throw error
@@ -67,8 +67,8 @@ export default function ClienteDashboard() {
     portfolios.forEach((pf: any) => {
       const imoveis = pf.properties || []
       totalImoveis += imoveis.length
-      const todosConcluidos = imoveis.length > 0 && imoveis.every((p: any) => p.visit_status === 'report_done')
-      concluidos += imoveis.filter((p: any) => p.visit_status === 'report_done').length
+      const todosConcluidos = imoveis.length > 0 && imoveis.every((p: any) => p.verificado)
+      concluidos += imoveis.filter((p: any) => p.verificado).length
       if (pf.prazo_entrega && !todosConcluidos) {
         const d = new Date(pf.prazo_entrega)
         if (d < hoje) prazosAtraso++
@@ -80,19 +80,21 @@ export default function ClienteDashboard() {
 
   const projectProgress = useMemo(() => portfolios.map((pf: any) => {
     const imoveis = pf.properties || []
-    const done = imoveis.filter((p: any) => p.visit_status === 'report_done').length
+    const done = imoveis.filter((p: any) => p.verificado).length
     const total = imoveis.length
     const pct = total ? Math.round((done / total) * 100) : 0
     return { label: pf.name, done, total, pct, prazo: pf.prazo_entrega }
   }), [portfolios])
 
   // Imóveis ainda por concluir, ordenados por prazo (do projecto) mais próximo primeiro.
-  const tasksList = useMemo(() => {
+  // `tasksPending` guarda a lista completa (para o total no cabeçalho);
+  // `tasksList` é só os primeiros 8, para exibição compacta.
+  const tasksPending = useMemo(() => {
     const hoje = new Date(); hoje.setHours(0,0,0,0)
     const rows: any[] = []
     portfolios.forEach((pf: any) => {
       (pf.properties || []).forEach((p: any) => {
-        if (p.visit_status !== 'report_done') {
+        if (!p.verificado) {
           const atraso = pf.prazo_entrega ? new Date(pf.prazo_entrega) < hoje : false
           rows.push({ ...p, _projecto: pf.name, _prazo: pf.prazo_entrega, _atraso: atraso })
         }
@@ -104,13 +106,14 @@ export default function ClienteDashboard() {
       if (!b._prazo) return -1
       return new Date(a._prazo).getTime() - new Date(b._prazo).getTime()
     })
-    return rows.slice(0, 8)
+    return rows
   }, [portfolios])
+  const tasksList = useMemo(() => tasksPending.slice(0, 8), [tasksPending])
 
   const calendarItems = useMemo(() => portfolios
     .filter((pf: any) => {
       const imoveis = pf.properties || []
-      const todosConcluidos = imoveis.length > 0 && imoveis.every((p: any) => p.visit_status === 'report_done')
+      const todosConcluidos = imoveis.length > 0 && imoveis.every((p: any) => p.verificado)
       return pf.prazo_entrega && !todosConcluidos
     })
     .map((pf: any) => ({ date: pf.prazo_entrega, label: pf.name })),
@@ -153,7 +156,7 @@ export default function ClienteDashboard() {
           {/* Coluna 2 — imóveis por concluir */}
           <div className="card p-0 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800">Por concluir <span className="text-gray-400 font-normal">({tasksList.length})</span></h2>
+              <h2 className="text-sm font-semibold text-gray-800">Por concluir <span className="text-gray-400 font-normal">({tasksPending.length})</span></h2>
             </div>
             {tasksList.length === 0 ? (
               <p className="text-sm text-gray-400 py-8 text-center">Sem imóveis por concluir. 🎉</p>
