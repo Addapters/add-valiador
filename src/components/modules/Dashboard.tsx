@@ -528,8 +528,8 @@ export default function Dashboard() {
             color={prazosAtraso > 0 ? 'red' : 'default'} />
         </div>
 
-        {/* Projectos · Tarefas · Calendário e mensagens */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_300px] gap-4 items-start">
+        {/* Projectos · Tarefas · Mensagens · Calendário */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
 
           {/* Coluna 1 — cartões de projecto */}
           <div className="card p-0 overflow-hidden">
@@ -580,16 +580,15 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Coluna 3 — calendário de prazos e mensagens */}
-          <div className="space-y-4">
-            <DeadlineCalendar items={calendarItems} />
-            <div className="card">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                  <MessageCircle size={14} className="text-brand-500"/> Mensagens
-                </h2>
-                {unreadCount > 0 && <span className="badge badge-blue">{unreadCount} novas</span>}
-              </div>
+          {/* Coluna 3 — mensagens */}
+          <div className="card p-0 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                <MessageCircle size={14} className="text-brand-500"/> Mensagens
+              </h2>
+              {unreadCount > 0 && <span className="badge badge-blue">{unreadCount}</span>}
+            </div>
+            <div className="p-4">
               <p className="text-xs text-gray-400 mb-3">
                 {unreadCount > 0 ? `Tens ${unreadCount} ${unreadCount === 1 ? 'mensagem por ler' : 'mensagens por ler'}.` : 'Sem mensagens novas.'}
               </p>
@@ -598,6 +597,9 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+
+          {/* Coluna 4 — calendário de prazos */}
+          <DeadlineCalendar items={calendarItems} />
         </div>
 
         {/* Visão geral dos peritos (apenas admin) */}
