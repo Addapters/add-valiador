@@ -31,6 +31,37 @@ function toDisplayProps(val: any): string {
   return s
 }
 
+function initialsForProject(label: string) {
+  const parts = label.replace(/\|/g, ' ').trim().split(/\s+/)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase()
+}
+
+// ── Cartão de projecto — clicável, filtra a listagem abaixo para esse projecto ──
+function ProjectCard({ label, done, total, active, onClick }: { label: string; done: number; total: number; active: boolean; onClick: () => void }) {
+  const pct = total ? Math.round((done / total) * 100) : 0
+  const isDone = pct === 100
+  return (
+    <button onClick={onClick} className={`card w-full text-left transition-shadow hover:shadow-md ${active ? 'ring-2 ring-brand-400' : ''}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {initialsForProject(label)}
+          </div>
+          <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+        </div>
+        <span className={`badge flex-shrink-0 ${isDone ? 'badge-green' : 'badge-blue'}`}>{isDone ? 'Concluído' : 'Em progresso'}</span>
+      </div>
+      <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <span>Imóveis concluídos</span>
+        <span>{done} / {total}</span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-400' : 'bg-brand-400'}`} style={{ width: `${pct}%` }} />
+      </div>
+    </button>
+  )
+}
+
 function MultiSelect({ label, options, selected, onChange }: { label:string; options:string[]; selected:string[]; onChange:(v:string[])=>void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -317,14 +348,15 @@ export default function Properties() {
   // Lista de projectos disponíveis (independente dos filtros activos), para
   // permitir escolher "ver este projecto sozinho" mesmo com outros filtros aplicados.
   const projectOptions = useMemo(() => {
-    const map = new Map<string, { id: string; label: string; count: number }>()
+    const map = new Map<string, { id: string; label: string; count: number; done: number }>()
     rows.forEach((r: any) => {
       const id = r.portfolios?.id || 'sem-portfolio'
       const clientName = r.portfolios?.clients?.name
       const portfolioName = r.portfolios?.name
       const label = clientName && portfolioName ? `${clientName} | ${portfolioName}` : (portfolioName || clientName || 'Sem projeto')
-      const entry = map.get(id) || { id, label, count: 0 }
+      const entry = map.get(id) || { id, label, count: 0, done: 0 }
       entry.count += 1
+      if (r.visit_status === 'report_done') entry.done += 1
       map.set(id, entry)
     })
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt'))
@@ -567,19 +599,25 @@ export default function Properties() {
       />
 
       {projectOptions.length > 1 && (
-        <div className="bg-white border-b border-gray-100 px-6 py-2.5 flex flex-wrap gap-1.5 items-center overflow-x-auto">
-          <button
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${projectFilter==='all' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            onClick={() => setProjectFilter('all')}>
-            Todos os projectos <span className="opacity-80">({rows.length})</span>
-          </button>
-          {projectOptions.map(opt => (
-            <button key={opt.id}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${projectFilter===opt.id ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              onClick={() => setProjectFilter(opt.id)}>
-              {opt.label} <span className="opacity-80">({opt.count})</span>
-            </button>
-          ))}
+        <div className="bg-white border-b border-gray-100 px-6 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <ProjectCard
+              label="Todos os projectos"
+              done={rows.filter((r: any) => r.visit_status === 'report_done').length}
+              total={rows.length}
+              active={projectFilter === 'all'}
+              onClick={() => setProjectFilter('all')}
+            />
+            {projectOptions.map(opt => (
+              <ProjectCard key={opt.id}
+                label={opt.label}
+                done={opt.done}
+                total={opt.count}
+                active={projectFilter === opt.id}
+                onClick={() => setProjectFilter(opt.id)}
+              />
+            ))}
+          </div>
         </div>
       )}
 

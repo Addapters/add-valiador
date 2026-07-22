@@ -55,19 +55,17 @@ export default function DeadlineCalendar({ items }: { items: DeadlineItem[] }) {
 
   return (
     <div className="card">
+      <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5 mb-2">
+        <CalendarDays size={15} className="text-brand-500" /> Calendário de prazos
+      </h2>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-          <CalendarDays size={15} className="text-brand-500" /> Calendário de prazos
-        </h2>
-        <div className="flex items-center gap-1">
-          <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth()-1, 1))}>
-            <ChevronLeft size={14} />
-          </button>
-          <span className="text-xs font-medium text-gray-600 w-24 text-center">{MONTHS[cursor.getMonth()]} {cursor.getFullYear()}</span>
-          <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth()+1, 1))}>
-            <ChevronRight size={14} />
-          </button>
-        </div>
+        <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth()-1, 1))}>
+          <ChevronLeft size={14} />
+        </button>
+        <span className="text-xs font-medium text-gray-600 text-center">{MONTHS[cursor.getMonth()]} {cursor.getFullYear()}</span>
+        <button className="p-1 rounded hover:bg-gray-100 text-gray-400" onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth()+1, 1))}>
+          <ChevronRight size={14} />
+        </button>
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-400 mb-1">

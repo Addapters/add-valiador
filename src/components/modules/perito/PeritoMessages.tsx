@@ -40,10 +40,13 @@ export default function PeritoMessages() {
       if (error) throw error
     },
     onSuccess: () => {
-      // Limpa de imediato os indicadores de "mensagem nova" na sidebar e no dashboard.
+      // Actualiza a própria conversa e limpa de imediato os indicadores de
+      // "mensagem nova" na sidebar e no dashboard.
+      qc.invalidateQueries({ queryKey: ['perito-messages'] })
       qc.invalidateQueries({ queryKey: ['sidebar-unread-messages'] })
       qc.invalidateQueries({ queryKey: ['dashboard-unread-messages'] })
-    }
+    },
+    onError: (e: any) => toast.error(e.message)
   })
 
   useEffect(() => {

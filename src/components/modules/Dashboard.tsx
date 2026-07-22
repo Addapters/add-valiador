@@ -20,7 +20,7 @@ function toDisplayDash(val: any): string {
   }
   return s
 }
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
 import { CheckSquare, Square, Pencil, Check, X, Trash2, AlertTriangle, MessageCircle, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -34,11 +34,12 @@ function initialsFor(label: string) {
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase()
 }
 
-// ── Cartão de projecto (estilo painel de gestão) ────────────────────────────
-function ProjectCard({ label, done, total, pct }: { label: string; done: number; total: number; pct: number }) {
+// ── Cartão de projecto (estilo painel de gestão) — clicável, reencaminha
+// para os imóveis atribuídos a esse projecto ───────────────────────────────
+function ProjectCard({ pid, label, done, total, pct, onNavigate }: { pid: string; label: string; done: number; total: number; pct: number; onNavigate: (pid: string) => void }) {
   const isDone = pct === 100
   return (
-    <div className="card">
+    <button onClick={() => onNavigate(pid)} className="card w-full text-left hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -55,7 +56,7 @@ function ProjectCard({ label, done, total, pct }: { label: string; done: number;
       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-400' : 'bg-brand-400'}`} style={{ width: `${pct}%` }} />
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -156,6 +157,13 @@ function MotivoBadge({ value, color, label, onSave }: {
 export default function Dashboard() {
   const { role, name, user } = useAuth()
   const qc = useQueryClient()
+  const navigate = useNavigate()
+
+  // Reencaminha para a página Imóveis já filtrada por este projecto.
+  function goToProject(pid: string) {
+    try { sessionStorage.setItem('addvaliador_props_project', pid) } catch {}
+    navigate('/properties')
+  }
 
   // Filters
   const [filterVisita,     setFilterVisita]     = useState('')
@@ -318,12 +326,12 @@ export default function Dashboard() {
   // Evolução por projecto — % de imóveis concluídos em cada portfólio, para
   // dar uma leitura visual rápida de como cada projecto está a avançar.
   const projectProgress = useMemo(() => {
-    const map = new Map<string, { label: string; total: number; done: number }>()
+    const map = new Map<string, { pid: string; label: string; total: number; done: number }>()
     recent.forEach((p: any) => {
       const pf = p.portfolios
       const pid = pf?.id || 'sem-projecto'
       const label = pf?.clients?.name && pf?.name ? `${pf.clients.name} | ${pf.name}` : (pf?.name || 'Sem projecto')
-      const entry = map.get(pid) || { label, total: 0, done: 0 }
+      const entry = map.get(pid) || { pid, label, total: 0, done: 0 }
       entry.total += 1
       if (p.visit_status === 'report_done') entry.done += 1
       map.set(pid, entry)
@@ -524,16 +532,20 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_300px] gap-4 items-start">
 
           {/* Coluna 1 — cartões de projecto */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="card p-0 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-800">Projectos</h2>
-              <Link to="/portfolios" className="text-xs text-brand-600 hover:underline flex items-center">Ver todos <ChevronRight size={12}/></Link>
+              <Link to="/properties"
+                onClick={() => { try { sessionStorage.setItem('addvaliador_props_project', 'all') } catch {} }}
+                className="text-xs text-brand-600 hover:underline flex items-center">Ver todos <ChevronRight size={12}/></Link>
             </div>
-            {projectProgress.length === 0 ? (
-              <div className="card"><p className="text-sm text-gray-400 py-4 text-center">Sem imóveis associados a projectos.</p></div>
-            ) : (
-              projectProgress.map(pp => <ProjectCard key={pp.label} {...pp} />)
-            )}
+            <div className="p-4 space-y-3">
+              {projectProgress.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4 text-center">Sem imóveis associados a projectos.</p>
+              ) : (
+                projectProgress.map(pp => <ProjectCard key={pp.pid} {...pp} onNavigate={goToProject} />)
+              )}
+            </div>
           </div>
 
           {/* Coluna 2 — lista de tarefas (imóveis por concluir) */}
@@ -543,7 +555,7 @@ export default function Dashboard() {
               <Link to="/properties" className="text-xs text-brand-600 hover:underline flex items-center">Ver todas <ChevronRight size={12}/></Link>
             </div>
             {tasksList.length === 0 ? (
-              <p className="text-sm text-gray-400 py-8 text-center">Sem tarefas pendentes. 🎉</p>
+              <p className="text-sm text-gray-400 py-8 text-center">Sem tarefas pendentes.</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {tasksList.map((p: any) => (
@@ -638,277 +650,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Table card — tabela de imóveis (perito vê a sua própria tabela aqui; admin gere isto em Imóveis) */}
-        {role !== 'admin' && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-800">
-              {role === 'perito' ? 'Imóveis atribuídos' : 'Últimos processos'}
-              <span className="ml-1.5 text-gray-400 font-normal">({filtered.length})</span>
-            </h2>
-            <Link to="/properties" className="text-xs text-brand-600 hover:underline">Gestão completa →</Link>
-          </div>
-
-          {/* Compact filter bar */}
-          <div className="flex flex-wrap gap-2 mb-3 items-center">
-            <input
-              className="input text-sm w-40"
-              placeholder="Ref. ou localização…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <select className="input text-sm w-36" value={filterVisita} onChange={e => setFilterVisita(e.target.value)}>
-              <option value="">Visita: todas</option>
-              {Object.entries(VISIT_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <select className="input text-sm w-36" value={filterFotos} onChange={e => setFilterFotos(e.target.value)}>
-              <option value="">Fotos: todas</option>
-              <option value="sim">Com fotos</option>
-              <option value="nao">Sem fotos</option>
-            </select>
-            <select className="input text-sm w-40" value={filterComps} onChange={e => setFilterComps(e.target.value)}>
-              <option value="">Comparáveis: todos</option>
-              <option value="sim">Com comparáveis</option>
-              <option value="nao">Sem comparáveis</option>
-            </select>
-            <select className="input text-sm w-40" value={filterVerificado} onChange={e => setFilterVerificado(e.target.value)}>
-              <option value="">Verificado: todos</option>
-              <option value="sim">Verificado</option>
-              <option value="nao">Por verificar</option>
-            </select>
-            {hasFilters && (
-              <button className="btn text-xs" onClick={() => {
-                setFilterVisita(''); setFilterFotos(''); setFilterComps(''); setFilterVerificado(''); setSearch(''); setColFilter({})
-              }}>Limpar</button>
-            )}
-          </div>
-
-          {/* Bulk action bar */}
-          {selected.size > 0 && (
-            <div className="fixed top-0 left-[220px] right-0 z-40 bg-brand-100 border-b border-brand-200 px-6 py-3 flex items-center gap-3 flex-wrap shadow-md">
-              <span className="text-sm font-medium text-brand-700">{selected.size} seleccionados</span>
-
-              <div className="flex items-center gap-1.5">
-                <select className="input text-xs py-1 w-36" value={bulkVisit} onChange={e => setBulkVisit(e.target.value)}>
-                  <option value="">Alterar visita…</option>
-                  {Object.entries(VISIT_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-                {bulkVisit && <button className="btn btn-primary text-xs py-1" onClick={() => bulkUpdate.mutate({ field:'visit_status', value:bulkVisit })}>OK</button>}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <select className="input text-xs py-1 w-40" onChange={e => {
-                  if (e.target.value) bulkUpdate.mutate({ field:'tem_fotos', value: e.target.value==='sim' })
-                }}>
-                  <option value="">Alterar fotos…</option>
-                  <option value="sim">Com fotos</option>
-                  <option value="nao">Sem fotos</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <select className="input text-xs py-1 w-44" onChange={e => {
-                  if (e.target.value) bulkUpdate.mutate({ field:'tem_comparaveis', value: e.target.value==='sim' })
-                }}>
-                  <option value="">Alterar comparáveis…</option>
-                  <option value="sim">Com comparáveis</option>
-                  <option value="nao">Sem comparáveis</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <select className="input text-xs py-1 w-40" onChange={e => {
-                  if (e.target.value) bulkUpdate.mutate({ field:'verificado', value: e.target.value==='sim' })
-                }}>
-                  <option value="">Alterar verificado…</option>
-                  <option value="sim">Verificado</option>
-                  <option value="nao">Por verificar</option>
-                </select>
-              </div>
-
-              <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 ml-auto"
-                onClick={() => { if (confirm(`Eliminar ${selected.size} imóveis permanentemente?`)) bulkDelete.mutate() }}>
-                <Trash2 size={12}/> Eliminar {selected.size}
-              </button>
-              <button className="btn text-xs" onClick={() => setSelected(new Set())}>Cancelar</button>
-            </div>
-          )}
-
-          {isLoading ? (
-            <p className="text-sm text-gray-400 py-4 text-center">A carregar…</p>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <p className="text-sm text-gray-400">Nenhum imóvel encontrado para esta selecção.</p>
-              {hasFilters && (
-                <button className="btn text-xs" onClick={() => {
-                  setFilterVisita(''); setFilterFotos(''); setFilterComps(''); setFilterVerificado(''); setSearch(''); setColFilter({})
-                }}>
-                  ✕ Limpar todos os filtros
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {groupedByPortfolio
-                .filter(([, { items }]) => items.some(p => filtered.includes(p)))
-                .map(([pid, { label, items, status }]) => {
-                  const groupItems = items.filter(p => filtered.includes(p))
-                  if (groupItems.length === 0) return null
-                  const isClosed = status === 'closed'
-                  return (
-                    <div key={pid}>
-                      <div
-                        className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2 cursor-pointer select-none hover:bg-gray-100"
-                        onClick={() => toggleGroup(pid)}>
-                        <button
-                          className="text-gray-400 hover:text-brand-500"
-                          title="Seleccionar imóveis deste grupo"
-                          onClick={e => {
-                            e.stopPropagation()
-                            const ids = groupItems.map((p: any) => p.id)
-                            const allSel = ids.every((id: string) => selected.has(id))
-                            setSelected(prev => {
-                              const next = new Set(prev)
-                              ids.forEach((id: string) => allSel ? next.delete(id) : next.add(id))
-                              return next
-                            })
-                          }}>
-                          {groupItems.every((p: any) => selected.has(p.id)) && groupItems.length > 0
-                            ? <CheckSquare size={13} className="text-brand-400"/>
-                            : <Square size={13}/>}
-                        </button>
-                        <span className={`text-gray-400 transition-transform ${collapsedGroups.has(pid) ? '' : 'rotate-90'}`}>▶</span>
-                        <span className={`text-sm font-semibold ${isClosed ? 'line-through text-gray-400' : 'text-gray-700'}`}>{label}</span>
-                        {isClosed && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Encerrado</span>}
-                        <span className="ml-2 text-xs text-gray-400">{groupItems.length} imóveis</span>
-                      </div>
-                      {!collapsedGroups.has(pid) && (
-                      <div className="overflow-x-auto">
-                        <table className="table-base">
-                          <thead>
-                            <tr>
-                              <th className="w-8">
-                                <button
-                                  onClick={() => {
-                                    const ids = groupItems.map((p: any) => p.id)
-                                    const allSel = ids.every((id: string) => selected.has(id))
-                                    setSelected(prev => {
-                                      const next = new Set(prev)
-                                      ids.forEach((id: string) => allSel ? next.delete(id) : next.add(id))
-                                      return next
-                                    })
-                                  }}
-                                  className="text-gray-400 hover:text-brand-500"
-                                  title="Seleccionar este grupo">
-                                  {groupItems.every((p: any) => selected.has(p.id)) && groupItems.length > 0
-                                    ? <CheckSquare size={13} className="text-brand-400"/>
-                                    : <Square size={13}/>}
-                                </button>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('external_ref')}>
-                                Ref. Externa <span className="text-[10px] text-gray-300">{sortCol==='external_ref'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('id_bien')}>
-                                ID Bem <span className="text-[10px] text-gray-300">{sortCol==='id_bien'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('municipality')}>
-                                Localização <span className="text-[10px] text-gray-300">{sortCol==='municipality'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('property_type')}>
-                                Tipo <span className="text-[10px] text-gray-300">{sortCol==='property_type'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
-                              </th>
-                              <th>Visita</th>
-                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('tem_fotos')} title="Filtrar fotos">
-                                Fotos <span className={`text-[10px] ${colFilter['tem_fotos']==='sim'?'text-emerald-500':colFilter['tem_fotos']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['tem_fotos']==='sim'?'✓':colFilter['tem_fotos']==='nao'?'✗':'⇅'}</span>
-                              </th>
-                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('tem_comparaveis')} title="Filtrar comparáveis">
-                                Comparáveis <span className={`text-[10px] ${colFilter['tem_comparaveis']==='sim'?'text-emerald-500':colFilter['tem_comparaveis']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['tem_comparaveis']==='sim'?'✓':colFilter['tem_comparaveis']==='nao'?'✗':'⇅'}</span>
-                              </th>
-                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('para_verificacao')} title="Filtrar para verificação">
-                                Para Verificação <span className={`text-[10px] ${colFilter['para_verificacao']==='sim'?'text-amber-500':colFilter['para_verificacao']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['para_verificacao']==='sim'?'✓':colFilter['para_verificacao']==='nao'?'✗':'⇅'}</span>
-                              </th>
-                              <th className="text-center cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('verificado')} title="Filtrar verificados">
-                                Verificado <span className={`text-[10px] ${colFilter['verificado']==='sim'?'text-emerald-500':colFilter['verificado']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['verificado']==='sim'?'✓':colFilter['verificado']==='nao'?'✗':'⇅'}</span>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('pendente_motivo')} title="Filtrar pendentes">
-                                Pendente <span className={`text-[10px] ${colFilter['pendente_motivo']==='sim'?'text-amber-500':colFilter['pendente_motivo']==='nao'?'text-red-400':'text-gray-300'}`}>{colFilter['pendente_motivo']==='sim'?'✓':colFilter['pendente_motivo']==='nao'?'✗':'⇅'}</span>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbCycleFilter('anulado_motivo')} title="Filtrar anulados">
-                                Anulado <span className={`text-[10px] ${colFilter['anulado_motivo']==='sim'?'text-red-500':colFilter['anulado_motivo']==='nao'?'text-emerald-400':'text-gray-300'}`}>{colFilter['anulado_motivo']==='sim'?'✓':colFilter['anulado_motivo']==='nao'?'✗':'⇅'}</span>
-                              </th>
-                              <th className="cursor-pointer hover:bg-gray-100 select-none" onClick={() => dbToggleSort('updated_at')}>
-                                Actualizado <span className="text-[10px] text-gray-300">{sortCol==='updated_at'?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {groupItems.map((p: any, idx: number) => (
-                              <tr key={p.id} className={`${p.verificado ? 'bg-green-50 hover:bg-green-100' : selected.has(p.id) ? 'bg-brand-50' : idx%2===0 ? 'bg-white' : 'bg-gray-50/30'} ${isClosed ? 'opacity-60' : ''}`}>
-                                <td>
-                                  <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-brand-500">
-                                    {selected.has(p.id) ? <CheckSquare size={13} className="text-brand-400"/> : <Square size={13}/>}
-                                  </button>
-                                </td>
-                                <td>
-                                  <Link to={`/properties/${p.id}`} className={`text-brand-600 hover:underline font-medium whitespace-nowrap ${isClosed ? 'line-through' : ''}`}>
-                                    {p.external_ref || '—'}
-                                  </Link>
-                                </td>
-                                <td className="text-gray-500 text-xs font-mono whitespace-nowrap">{p.id_bien || '—'}</td>
-                                <td className="text-gray-600 max-w-[160px] truncate">{toDisplayDash(p.municipality || p.address) || '—'}</td>
-                                <td className="text-gray-600 whitespace-nowrap">{toDisplayDash([p.property_type, p.typology].filter(Boolean).join(' ')) || '—'}</td>
-                                <td>
-                                  <InlineSelect
-                                    value={p.visit_status}
-                                    options={VISIT_LABELS}
-                                    renderValue={v => <VisitBadge status={v} />}
-                                    onChange={val => updateField.mutate({ id:p.id, field:'visit_status', value:val })}
-                                  />
-                                </td>
-                                <td className="text-center">
-                                  <BoolBadge value={!!p.tem_fotos} trueLabel="Sim" falseLabel="Não"
-                                    color="bg-blue-100 text-blue-600 hover:bg-blue-200"
-                                    onClick={() => updateField.mutate({ id:p.id, field:'tem_fotos', value:!p.tem_fotos })}/>
-                                </td>
-                                <td className="text-center">
-                                  <BoolBadge value={!!p.tem_comparaveis} trueLabel="Sim" falseLabel="Não"
-                                    color="bg-purple-100 text-purple-600 hover:bg-purple-200"
-                                    onClick={() => updateField.mutate({ id:p.id, field:'tem_comparaveis', value:!p.tem_comparaveis })}/>
-                                </td>
-                                <td className="text-center">
-                                  <BoolBadge value={!!p.para_verificacao} trueLabel="Sim" falseLabel="Não"
-                                    color="bg-amber-100 text-amber-700 hover:bg-amber-200"
-                                    onClick={() => updateField.mutate({ id:p.id, field:'para_verificacao', value:!p.para_verificacao })}/>
-                                </td>
-                                <td className="text-center">
-                                  <BoolBadge value={!!p.verificado} trueLabel="Sim" falseLabel="Não"
-                                    color="bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
-                                    onClick={() => updateField.mutate({ id:p.id, field:'verificado', value:!p.verificado })}/>
-                                </td>
-                                <td className="px-1">
-                                  <MotivoBadge value={p.pendente_motivo} label="Pendente"
-                                    color="bg-amber-100 text-amber-700"
-                                    onSave={v => updateField.mutate({ id:p.id, field:'pendente_motivo', value:v })}/>
-                                </td>
-                                <td className="px-1">
-                                  <MotivoBadge value={p.anulado_motivo} label="Anulado"
-                                    color="bg-red-100 text-red-600"
-                                    onSave={v => updateField.mutate({ id:p.id, field:'anulado_motivo', value:v })}/>
-                                </td>
-                                <td className="text-gray-400 whitespace-nowrap">{formatDate(p.updated_at)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      )}
-                    </div>
-                  )
-                })}
-            </div>
-          )}
-        </div>
-        )}
       </div>
     </div>
   )
