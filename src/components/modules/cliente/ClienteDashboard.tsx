@@ -1,11 +1,45 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { PageHeader, KpiCard, Badge, EmptyState, WelcomeBanner, AlertBanner } from '@/components/ui'
+import { PageHeader, KpiCard, EmptyState, WelcomeBanner, AlertBanner } from '@/components/ui'
 import DeadlineCalendar from '@/components/DeadlineCalendar'
 import { useAuth } from '@/lib/AuthContext'
 import { formatDate } from '@/lib/utils'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+
+function initialsFor(label: string) {
+  const parts = label.replace(/\|/g, ' ').trim().split(/\s+/)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase()
+}
+
+// ── Cartão de projecto (mesmo estilo usado no dashboard de admin/perito) ────
+function ProjectCard({ label, done, total, pct, prazo }: { label: string; done: number; total: number; pct: number; prazo?: string | null }) {
+  const isDone = pct === 100
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {initialsFor(label)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+            {prazo && <p className="text-[11px] text-gray-400">Prazo: {formatDate(prazo)}</p>}
+          </div>
+        </div>
+        <span className={`badge flex-shrink-0 ${isDone ? 'badge-green' : 'badge-blue'}`}>{isDone ? 'Concluído' : 'Em progresso'}</span>
+      </div>
+      <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <span>Imóveis concluídos</span>
+        <span>{done} / {total}</span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-400' : 'bg-brand-400'}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
 
 export default function ClienteDashboard() {
   const { name, clientId } = useAuth()
@@ -16,7 +50,7 @@ export default function ClienteDashboard() {
       if (!clientId) return []
       const { data, error } = await supabase
         .from('portfolios')
-        .select('id, name, status, prazo_entrega, properties(id, visit_status)')
+        .select('id, name, status, prazo_entrega, properties(id, external_ref, address, visit_status)')
         .eq('client_id', clientId)
         .order('name')
       if (error) throw error
@@ -42,6 +76,35 @@ export default function ClienteDashboard() {
       }
     })
     return { totalImoveis, concluidos, prazosSemana, prazosAtraso }
+  }, [portfolios])
+
+  const projectProgress = useMemo(() => portfolios.map((pf: any) => {
+    const imoveis = pf.properties || []
+    const done = imoveis.filter((p: any) => p.visit_status === 'report_done').length
+    const total = imoveis.length
+    const pct = total ? Math.round((done / total) * 100) : 0
+    return { label: pf.name, done, total, pct, prazo: pf.prazo_entrega }
+  }), [portfolios])
+
+  // Imóveis ainda por concluir, ordenados por prazo (do projecto) mais próximo primeiro.
+  const tasksList = useMemo(() => {
+    const hoje = new Date(); hoje.setHours(0,0,0,0)
+    const rows: any[] = []
+    portfolios.forEach((pf: any) => {
+      (pf.properties || []).forEach((p: any) => {
+        if (p.visit_status !== 'report_done') {
+          const atraso = pf.prazo_entrega ? new Date(pf.prazo_entrega) < hoje : false
+          rows.push({ ...p, _projecto: pf.name, _prazo: pf.prazo_entrega, _atraso: atraso })
+        }
+      })
+    })
+    rows.sort((a, b) => {
+      if (a._atraso !== b._atraso) return a._atraso ? -1 : 1
+      if (!a._prazo) return 1
+      if (!b._prazo) return -1
+      return new Date(a._prazo).getTime() - new Date(b._prazo).getTime()
+    })
+    return rows.slice(0, 8)
   }, [portfolios])
 
   const calendarItems = useMemo(() => portfolios
@@ -73,38 +136,54 @@ export default function ClienteDashboard() {
           <KpiCard label="Prazos em atraso"      value={stats.prazosAtraso} color={stats.prazosAtraso > 0 ? 'red' : 'default'} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="card">
-            <h2 className="text-sm font-semibold text-gray-800 mb-3">Os meus projectos</h2>
+        {/* Projectos · Imóveis por concluir · Calendário de prazos */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_300px] gap-4 items-start">
+
+          {/* Coluna 1 — cartões de projecto */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-gray-800">Os meus projectos</h2>
             {isLoading ? (
-              <p className="text-sm text-gray-400 py-4 text-center">A carregar…</p>
+              <div className="card"><p className="text-sm text-gray-400 py-4 text-center">A carregar…</p></div>
             ) : portfolios.length === 0 ? (
-              <EmptyState message="Ainda não tens projectos carregados na plataforma." />
+              <div className="card"><EmptyState message="Ainda não tens projectos carregados na plataforma." /></div>
             ) : (
-              <div className="space-y-2">
-                {portfolios.map((pf: any) => {
-                  const imoveis = pf.properties || []
-                  const concluidosPf = imoveis.filter((p: any) => p.visit_status === 'report_done').length
-                  const pct = imoveis.length ? Math.round((concluidosPf / imoveis.length) * 100) : 0
-                  return (
-                    <div key={pf.id} className="border border-gray-100 rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-gray-800 text-sm">{pf.name}</span>
-                        <div className="flex items-center gap-2">
-                          {pf.prazo_entrega && <Badge variant="blue">Prazo: {formatDate(pf.prazo_entrega)}</Badge>}
-                          <span className="text-xs text-gray-500">{concluidosPf} / {imoveis.length} concluídos</span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2">
-                        <div className="h-full bg-brand-400 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
+              projectProgress.map((pp: any) => <ProjectCard key={pp.label} {...pp} />)
+            )}
+          </div>
+
+          {/* Coluna 2 — imóveis por concluir */}
+          <div className="card p-0 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-800">Por concluir <span className="text-gray-400 font-normal">({tasksList.length})</span></h2>
+            </div>
+            {tasksList.length === 0 ? (
+              <p className="text-sm text-gray-400 py-8 text-center">Sem imóveis por concluir. 🎉</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {tasksList.map((p: any) => (
+                  <div key={p.id} className="flex items-center gap-2.5 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-700 truncate">{p.external_ref || p.address || 'Imóvel'}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{p._projecto}</p>
                     </div>
-                  )
-                })}
+                    {p._prazo && (
+                      <span className={`text-[10px] flex-shrink-0 ${p._atraso ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                        {formatDate(p._prazo)}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
-          <DeadlineCalendar items={calendarItems} />
+
+          {/* Coluna 3 — calendário de prazos */}
+          <div className="space-y-4">
+            <DeadlineCalendar items={calendarItems} />
+            <Link to="/cliente/pedidos" className="text-xs text-brand-600 hover:underline flex items-center justify-end">
+              Ver os meus pedidos <ChevronRight size={12}/>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

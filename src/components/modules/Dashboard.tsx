@@ -22,11 +22,42 @@ function toDisplayDash(val: any): string {
 }
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
-import { CheckSquare, Square, Pencil, Check, X, Trash2, AlertTriangle, MessageCircle } from 'lucide-react'
+import { CheckSquare, Square, Pencil, Check, X, Trash2, AlertTriangle, MessageCircle, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
 const BILLING_LABELS: Record<string,string> = { no_po:'Sem PO', awaiting_po:'A aguardar PO', po_received:'PO recebida', invoice_pending:'Fat. por emitir', invoice_issued:'Fat. emitida', paid:'Pago' }
+
+// Duas iniciais para o "avatar" dos cartões de projecto
+function initialsFor(label: string) {
+  const parts = label.replace(/\|/g, ' ').trim().split(/\s+/)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase()
+}
+
+// ── Cartão de projecto (estilo painel de gestão) ────────────────────────────
+function ProjectCard({ label, done, total, pct }: { label: string; done: number; total: number; pct: number }) {
+  const isDone = pct === 100
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {initialsFor(label)}
+          </div>
+          <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+        </div>
+        <span className={`badge flex-shrink-0 ${isDone ? 'badge-green' : 'badge-blue'}`}>{isDone ? 'Concluído' : 'Em progresso'}</span>
+      </div>
+      <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <span>Imóveis concluídos</span>
+        <span>{done} / {total}</span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-400' : 'bg-brand-400'}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
 
 // ── Inline text edit ───────────────────────────────────────────────────────
 function InlineEdit({ value, onSave }: { value: string|null; onSave: (v: string) => void }) {
@@ -317,6 +348,25 @@ export default function Dashboard() {
     return [...map.values()].map(v => JSON.parse(v))
   }, [recent])
 
+  // Lista de tarefas — imóveis ainda por concluir, ordenados por urgência
+  // (prazo do respectivo projecto), para uma leitura rápida do que falta fazer.
+  const tasksList = useMemo(() => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    return recent
+      .filter((p: any) => p.visit_status !== 'report_done')
+      .map((p: any) => {
+        const prazo = p.portfolios?.prazo_entrega || null
+        const atraso = prazo ? new Date(prazo) < hoje : false
+        return { ...p, _prazo: prazo, _atraso: atraso }
+      })
+      .sort((a: any, b: any) => {
+        if (a._atraso !== b._atraso) return a._atraso ? -1 : 1
+        if (a._prazo && b._prazo) return a._prazo.localeCompare(b._prazo)
+        return a._prazo ? -1 : b._prazo ? 1 : 0
+      })
+      .slice(0, 8)
+  }, [recent])
+
   // Mensagens novas — mostra um alerta no dashboard quando há conversas por ler.
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['dashboard-unread-messages', role, user?.id],
@@ -470,29 +520,72 @@ export default function Dashboard() {
             color={prazosAtraso > 0 ? 'red' : 'default'} />
         </div>
 
-        {/* Evolução dos projectos + calendário de prazos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="card">
-            <h2 className="text-sm font-semibold text-gray-800 mb-3">Evolução dos projectos</h2>
+        {/* Projectos · Tarefas · Calendário e mensagens */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_300px] gap-4 items-start">
+
+          {/* Coluna 1 — cartões de projecto */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-800">Projectos</h2>
+              <Link to="/portfolios" className="text-xs text-brand-600 hover:underline flex items-center">Ver todos <ChevronRight size={12}/></Link>
+            </div>
             {projectProgress.length === 0 ? (
-              <p className="text-sm text-gray-400 py-4 text-center">Sem imóveis associados a projectos.</p>
+              <div className="card"><p className="text-sm text-gray-400 py-4 text-center">Sem imóveis associados a projectos.</p></div>
             ) : (
-              <div className="space-y-3">
-                {projectProgress.map(pp => (
-                  <div key={pp.label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-700 font-medium truncate max-w-[70%]">{pp.label}</span>
-                      <span className="text-gray-400">{pp.done} / {pp.total}</span>
+              projectProgress.map(pp => <ProjectCard key={pp.label} {...pp} />)
+            )}
+          </div>
+
+          {/* Coluna 2 — lista de tarefas (imóveis por concluir) */}
+          <div className="card p-0 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-800">Tarefas <span className="text-gray-400 font-normal">({tasksList.length})</span></h2>
+              <Link to="/properties" className="text-xs text-brand-600 hover:underline flex items-center">Ver todas <ChevronRight size={12}/></Link>
+            </div>
+            {tasksList.length === 0 ? (
+              <p className="text-sm text-gray-400 py-8 text-center">Sem tarefas pendentes. 🎉</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {tasksList.map((p: any) => (
+                  <div key={p.id} className="flex items-center gap-2.5 px-4 py-2.5">
+                    <button onClick={() => updateField.mutate({ id: p.id, field: 'visit_status', value: 'report_done' })}
+                      className="text-gray-300 hover:text-brand-400 flex-shrink-0" title="Marcar como concluído">
+                      <Square size={15}/>
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <Link to={`/properties/${p.id}`} className="text-sm text-gray-700 hover:text-brand-600 truncate block">
+                        {p.external_ref || p.address || 'Imóvel'}
+                      </Link>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${pp.pct === 100 ? 'bg-emerald-400' : pp.pct === 0 ? 'bg-gray-300' : 'bg-brand-400'}`} style={{ width: `${pp.pct}%` }} />
-                    </div>
+                    {p._prazo && (
+                      <span className={`text-[10px] flex-shrink-0 ${p._atraso ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                        {formatDate(p._prazo)}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <DeadlineCalendar items={calendarItems} />
+
+          {/* Coluna 3 — calendário de prazos e mensagens */}
+          <div className="space-y-4">
+            <DeadlineCalendar items={calendarItems} />
+            <div className="card">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                  <MessageCircle size={14} className="text-brand-500"/> Mensagens
+                </h2>
+                {unreadCount > 0 && <span className="badge badge-blue">{unreadCount} novas</span>}
+              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                {unreadCount > 0 ? `Tens ${unreadCount} ${unreadCount === 1 ? 'mensagem por ler' : 'mensagens por ler'}.` : 'Sem mensagens novas.'}
+              </p>
+              <Link to={role === 'admin' ? '/admin/mensagens' : '/mensagens'} className="text-xs text-brand-600 hover:underline flex items-center">
+                Ver conversa <ChevronRight size={12}/>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Visão geral dos peritos (apenas admin) */}
