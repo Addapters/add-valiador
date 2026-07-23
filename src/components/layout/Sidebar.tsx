@@ -131,9 +131,12 @@ function NavItems({ onClose }: { onClose?: () => void }) {
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg text-sm mb-0.5 transition-colors
-                 ${item.sub ? 'ml-4 pl-2.5 pr-3 py-2 text-[13px]' : 'px-3 py-2.5'}
+                 ${item.sub ? 'ml-4 pl-2.5 pr-3 py-2 text-[13px]' : 'pl-3 pr-3 py-2.5'}
                  ${isActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`
               }>
+              {/* Espaçador que reproduz a largura da seta do grupo "Imóveis", para que
+                  todas as entradas fiquem alinhadas com o ícone desse grupo. */}
+              {!item.sub && <span className="w-2 flex-shrink-0" />}
               <Icon size={item.sub ? 14 : 16}/>
               <span className="flex-1">{item.label}</span>
               {showBadge && (
