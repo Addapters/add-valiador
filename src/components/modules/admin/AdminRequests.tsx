@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, Badge, EmptyState } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
+import { File, AlertTriangle, Mail, Phone } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const ESTADOS = ['pendente','em_analise','atribuido','rejeitado','concluido'] as const
@@ -31,7 +32,7 @@ export default function AdminRequests() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('requests')
-        .select('*, clients(name)')
+        .select('*, clients(name, contact_name, contact_email, contact_phone, email, phone), request_documents(*)')
         .order('created_at', { ascending: false })
       if (error) throw error
       return data || []
@@ -94,7 +95,40 @@ export default function AdminRequests() {
                       <Badge variant="blue">{TIPO_LABELS[r.tipo] || r.tipo}</Badge>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">{r.clients?.name || 'Cliente desconhecido'}</p>
+                    {(r.clients?.contact_name || r.clients?.contact_email || r.clients?.contact_phone || r.clients?.email || r.clients?.phone) && (
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-3 flex-wrap">
+                        {r.clients?.contact_name && <span>{r.clients.contact_name}</span>}
+                        {(r.clients?.contact_email || r.clients?.email) && (
+                          <span className="flex items-center gap-1"><Mail size={11}/>{r.clients.contact_email || r.clients.email}</span>
+                        )}
+                        {(r.clients?.contact_phone || r.clients?.phone) && (
+                          <span className="flex items-center gap-1"><Phone size={11}/>{r.clients.contact_phone || r.clients.phone}</span>
+                        )}
+                      </p>
+                    )}
                     {r.descricao && <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{r.descricao}</p>}
+
+                    {/* Documentos anexados pelo cliente */}
+                    <div className="mt-2">
+                      {r.request_documents?.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {r.request_documents.map((doc: any) => {
+                            const { data: { publicUrl } } = supabase.storage.from('request-documents').getPublicUrl(doc.storage_path)
+                            return (
+                              <a key={doc.id} href={publicUrl} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg px-2 py-1 text-brand-600">
+                                <File size={12} className="flex-shrink-0"/>{doc.name}
+                              </a>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 w-fit">
+                          <AlertTriangle size={12} className="flex-shrink-0"/> Sem documentos anexados a este pedido
+                        </p>
+                      )}
+                    </div>
+
                     <p className="text-xs text-gray-400 mt-2">Submetido em {formatDate(r.created_at)}</p>
                   </div>
                 </div>

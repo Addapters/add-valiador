@@ -22,7 +22,7 @@ function toDisplayDash(val: any): string {
 }
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
-import { CheckSquare, Square, Pencil, Check, X, Trash2, AlertTriangle, MessageCircle, ChevronRight } from 'lucide-react'
+import { CheckSquare, Square, Pencil, Check, X, Trash2, AlertTriangle, MessageCircle, ChevronRight, Inbox, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
@@ -392,6 +392,32 @@ export default function Dashboard() {
     refetchInterval: 30000,
   })
 
+  // Visão geral de clientes (apenas admin) — nº de projectos activos e
+  // pedidos por analisar de cada cliente, para dar visibilidade rápida sobre
+  // quem está à espera de resposta.
+  const { data: clientsOverview = [] } = useQuery({
+    queryKey: ['dashboard-clients-overview'],
+    queryFn: async () => {
+      const [{ data: clientsData }, { data: reqData }] = await Promise.all([
+        supabase.from('clients').select('id, name, portfolios(count)'),
+        supabase.from('requests').select('client_id, estado'),
+      ])
+      const pendingByClient = new Map<string, number>()
+      ;(reqData || []).forEach((r: any) => {
+        if (r.estado === 'pendente') pendingByClient.set(r.client_id, (pendingByClient.get(r.client_id) || 0) + 1)
+      })
+      return (clientsData || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        projectos: c.portfolios?.[0]?.count || 0,
+        pedidosPendentes: pendingByClient.get(c.id) || 0,
+      })).sort((a: any, b: any) => b.pedidosPendentes - a.pedidosPendentes || b.projectos - a.projectos)
+    },
+    enabled: role === 'admin',
+    refetchInterval: 30000,
+  })
+  const pedidosPendentesTotal = clientsOverview.reduce((s: number, c: any) => s + c.pedidosPendentes, 0)
+
   // Filtered rows
   const filtered = useMemo(() => recent.filter((p: any) => {
     if (filterVisita     && p.visit_status !== filterVisita) return false
@@ -499,9 +525,9 @@ export default function Dashboard() {
         {/* Bem-vindo */}
         <WelcomeBanner name={name} subtitle={role === 'perito' ? 'Aqui tens um resumo do teu trabalho' : 'Aqui tens um resumo do portfólio'} />
 
-        {/* Alertas: urgências de prazo e mensagens novas */}
-        {(prazosAtraso > 0 || unreadCount > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Alertas: urgências de prazo, mensagens novas e pedidos de clientes */}
+        {(prazosAtraso > 0 || unreadCount > 0 || pedidosPendentesTotal > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {prazosAtraso > 0 && (
               <AlertBanner variant="red">
                 <AlertTriangle size={16} className="flex-shrink-0" />
@@ -514,6 +540,15 @@ export default function Dashboard() {
                 <span>
                   Tens <strong>{unreadCount}</strong> {unreadCount === 1 ? 'mensagem nova' : 'mensagens novas'}.{' '}
                   <Link to={role === 'admin' ? '/admin/mensagens' : '/mensagens'} className="underline">Ver conversa</Link>
+                </span>
+              </AlertBanner>
+            )}
+            {role === 'admin' && pedidosPendentesTotal > 0 && (
+              <AlertBanner variant="amber">
+                <Inbox size={16} className="flex-shrink-0" />
+                <span>
+                  Tens <strong>{pedidosPendentesTotal}</strong> {pedidosPendentesTotal === 1 ? 'novo pedido' : 'novos pedidos'} de clientes por analisar.{' '}
+                  <Link to="/admin/pedidos" className="underline">Ver pedidos</Link>
                 </span>
               </AlertBanner>
             )}
@@ -604,6 +639,46 @@ export default function Dashboard() {
           {/* Coluna 4 — calendário de prazos */}
           <DeadlineCalendar items={calendarItems} />
         </div>
+
+        {/* Visão geral de clientes (apenas admin) */}
+        {role === 'admin' && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                <Users size={14} className="text-brand-500"/> Clientes
+              </h2>
+              <Link to="/clients" className="text-xs text-brand-600 hover:underline">Ver clientes →</Link>
+            </div>
+            {clientsOverview.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">Ainda não há clientes registados.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table-base">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Projectos activos</th>
+                      <th>Pedidos por analisar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientsOverview.slice(0, 8).map((c: any) => (
+                      <tr key={c.id}>
+                        <td className="font-medium text-gray-700 whitespace-nowrap">{c.name}</td>
+                        <td>{c.projectos}</td>
+                        <td>
+                          {c.pedidosPendentes > 0
+                            ? <Link to="/admin/pedidos" className="badge badge-amber hover:underline">{c.pedidosPendentes} por analisar</Link>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Visão geral dos peritos (apenas admin) */}
         {role === 'admin' && (

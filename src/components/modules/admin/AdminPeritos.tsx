@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
-import { Plus, Upload, X, Pencil, Check } from 'lucide-react'
+import { Plus, Upload, X, Pencil, Check, UserCircle, Briefcase } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const SIGNATURE_BUCKET = 'perito-assinaturas'
@@ -82,6 +82,116 @@ function SignatureCell({ peritoId, path, onUploaded }: { peritoId: string; path:
   )
 }
 
+// ── Modal de perfil do perito — dados completos + atribuição de projectos ──
+function PeritoProfileModal({ perito, projects, portfolios, onClose, onChanged }: {
+  perito: any; projects: string[]; portfolios: { id: string; label: string }[]; onClose: () => void; onChanged: () => void
+}) {
+  const [selectedPortfolio, setSelectedPortfolio] = useState('')
+  const [assigning, setAssigning] = useState(false)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+
+  if (perito.assinatura_path && signedUrl === null) {
+    supabase.storage.from(SIGNATURE_BUCKET).createSignedUrl(perito.assinatura_path, 300)
+      .then(({ data }) => setSignedUrl(data?.signedUrl || ''))
+  }
+
+  async function assignProject() {
+    if (!selectedPortfolio || !perito.name) return
+    setAssigning(true)
+    const { error } = await supabase.from('properties').update({ perito_avaliador: perito.name }).eq('portfolio_id', selectedPortfolio)
+    setAssigning(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Projecto atribuído')
+    setSelectedPortfolio('')
+    onChanged()
+  }
+
+  const CONTACT_FIELDS = [
+    { key: 'telefone', label: 'Telefone' },
+    { key: 'nif',      label: 'NIF' },
+    { key: 'iban',     label: 'IBAN' },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="card w-full max-w-lg max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+              {(perito.name || '?').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">{perito.name || '—'}</h2>
+              <p className="text-xs text-gray-400">Perito Avaliador</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Contacto</p>
+            <div className="space-y-1.5">
+              {CONTACT_FIELDS.map(f => (
+                <p key={f.key} className="text-xs text-gray-600 flex justify-between">
+                  <span className="text-gray-400">{f.label}</span>{perito[f.key] || '—'}
+                </p>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Dados profissionais</p>
+            <div className="space-y-1.5">
+              {PROFILE_FIELDS.map(f => (
+                <p key={f.key} className="text-xs text-gray-600 flex justify-between">
+                  <span className="text-gray-400">{f.label}</span>
+                  {perito[f.key] ? ((f as any).type === 'date' ? formatDate(perito[f.key]) : perito[f.key]) : '—'}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {perito.zonas_atuacao && (
+          <p className="text-xs text-gray-500 mb-4"><span className="text-gray-400">Zonas de actuação: </span>{perito.zonas_atuacao}</p>
+        )}
+
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Assinatura</p>
+          {signedUrl ? (
+            <img src={signedUrl} alt="Assinatura" className="h-10 max-w-[140px] object-contain bg-white border border-gray-100 rounded" />
+          ) : (
+            <span className="text-xs text-gray-300">Sem assinatura</span>
+          )}
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2 flex items-center gap-1.5">
+            <Briefcase size={11}/> Projectos atribuídos
+          </p>
+          {projects.length === 0 ? (
+            <p className="text-xs text-gray-300 mb-3">Sem projectos atribuídos.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {projects.map(label => <span key={label} className="badge badge-gray">{label}</span>)}
+            </div>
+          )}
+          <div className="flex gap-1.5">
+            <select className="input text-xs flex-1" value={selectedPortfolio} onChange={e => setSelectedPortfolio(e.target.value)}>
+              <option value="">Seleccionar projecto para atribuir…</option>
+              {portfolios.map(pf => <option key={pf.id} value={pf.id}>{pf.label}</option>)}
+            </select>
+            <button className="btn btn-primary text-xs whitespace-nowrap" disabled={!selectedPortfolio || assigning} onClick={assignProject}>
+              {assigning ? 'A atribuir…' : 'Atribuir'}
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1.5">Atribui todos os imóveis desse projecto a este perito.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Modal de criação de novo perito ─────────────────────────────────────────
 // Esta área só cria contas de Perito Avaliador — contas de Cliente criam-se
 // na tab Clientes, associadas à respectiva entidade.
@@ -137,17 +247,31 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
 export default function AdminPeritos() {
   const qc = useQueryClient()
   const [showNewUser, setShowNewUser] = useState(false)
+  const [selectedPerito, setSelectedPerito] = useState<any>(null)
 
   const { data: peritos = [], isLoading } = useQuery({
     queryKey: ['admin-peritos'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, telefone, numero_cmvm, seguro_rc_apolice, seguro_rc_validade, seguradora, assinatura_path')
+        .select('id, name, telefone, nif, iban, zonas_atuacao, numero_cmvm, seguro_rc_apolice, seguro_rc_validade, seguradora, assinatura_path')
         .eq('role', 'perito')
         .order('name')
       if (error) throw error
       return data || []
+    },
+  })
+
+  // Todos os projectos existentes, para a atribuição a partir do perfil do perito.
+  const { data: allPortfolios = [] } = useQuery({
+    queryKey: ['admin-peritos-portfolios'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('portfolios').select('id, name, clients(name)').order('name')
+      if (error) throw error
+      return (data || []).map((pf: any) => ({
+        id: pf.id,
+        label: pf.clients?.name ? `${pf.clients.name} | ${pf.name}` : pf.name,
+      }))
     },
   })
 
@@ -216,7 +340,11 @@ export default function AdminPeritos() {
               <tbody>
                 {peritos.map((p: any) => (
                   <tr key={p.id}>
-                    <td className="font-medium text-gray-800 whitespace-nowrap">{p.name || '—'}</td>
+                    <td className="font-medium text-gray-800 whitespace-nowrap">
+                      <button className="flex items-center gap-1.5 hover:text-brand-600" onClick={() => setSelectedPerito(p)} title="Ver perfil">
+                        <UserCircle size={14} className="text-gray-300"/>{p.name || '—'}
+                      </button>
+                    </td>
                     {PROFILE_FIELDS.map(f => (
                       <td key={f.key}>
                         <InlineField value={p[f.key]} type={(f as any).type}
@@ -246,6 +374,16 @@ export default function AdminPeritos() {
       </div>
 
       {showNewUser && <NewUserModal onClose={() => setShowNewUser(false)} />}
+
+      {selectedPerito && (
+        <PeritoProfileModal
+          perito={selectedPerito}
+          projects={projectsFor(selectedPerito.name)}
+          portfolios={allPortfolios}
+          onClose={() => setSelectedPerito(null)}
+          onChanged={() => { qc.invalidateQueries({ queryKey: ['admin-peritos-allocations'] }); qc.invalidateQueries({ queryKey: ['admin-peritos'] }) }}
+        />
+      )}
     </div>
   )
 }
