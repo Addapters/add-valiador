@@ -199,7 +199,7 @@ export default function AdminMessages() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{activePerito.name}</p>
-                  {activePerito.telefone && <p className="text-[11px] text-gray-400">{activePerito.telefone}</p>}
+                  <p className="text-[11px] text-gray-400">Perito Avaliador</p>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3">

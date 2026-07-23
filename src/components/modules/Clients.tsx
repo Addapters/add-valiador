@@ -2,11 +2,22 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, EmptyState } from '@/components/ui'
-import { Plus, Trash2, ChevronRight, UserPlus, X, Mail, Phone, Search } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, UserPlus, X, Mail, Phone, Search, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function initials(name: string) {
   return (name || '').trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
+}
+
+// Logótipos de clientes específicos — substitui o avatar de iniciais quando o
+// nome do cliente coincide. Basta adicionar mais entradas conforme necessário.
+const CLIENT_LOGOS: { match: string; src: string }[] = [
+  { match: 'garen', src: '/logos/garen.svg' },
+  { match: 'hipoges', src: '/logos/hipoges.svg' },
+]
+function logoFor(name: string) {
+  const n = (name || '').toLowerCase()
+  return CLIENT_LOGOS.find(l => n.includes(l.match))?.src || null
 }
 
 const empty = {
@@ -74,10 +85,15 @@ function NewClientUserModal({ client, onClose }: { client: { id: string; name: s
   )
 }
 
+const GENERAL_FIELDS   = [['name','Nome','text'],['nif','NIF','text'],['email','Email','email'],['phone','Telefone','text'],['address','Morada','text'],['notes','Notas','text']] as const
+const CONTACT_FIELDS   = [['contact_name','Nome do contacto','text'],['contact_role','Cargo/Função','text'],['contact_email','Email do contacto','email'],['contact_phone','Telefone do contacto','text']] as const
+const BILLING_FIELDS   = [['billing_nif','NIF de faturação','text'],['billing_email','Email para faturas','email'],['billing_address','Morada de faturação','text'],['billing_notes','Notas de faturação','text']] as const
+
 export default function Clients() {
   const qc = useQueryClient()
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState<any>(null)
+  const [editMode, setEditMode] = useState(false)
   const [form, setForm]       = useState({ ...empty })
   const [newUserFor, setNewUserFor] = useState<{ id: string; name: string } | null>(null)
   const [search, setSearch]   = useState('')
@@ -103,7 +119,7 @@ export default function Clients() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clients'] })
       toast.success(editing ? 'Cliente actualizado' : 'Cliente criado')
-      setModal(false); setEditing(null); setForm({ ...empty })
+      setModal(false); setEditing(null); setEditMode(false); setForm({ ...empty })
     },
     onError: (e: any) => toast.error(e.message)
   })
@@ -120,14 +136,16 @@ export default function Clients() {
     onError: (e: any) => toast.error(e.message)
   })
 
-  function openCreate() { setEditing(null); setForm({ ...empty }); setModal(true) }
+  function openCreate() { setEditing(null); setForm({ ...empty }); setEditMode(true); setModal(true) }
   function openEdit(c: any) {
     setEditing(c)
     const next = { ...empty }
     Object.keys(empty).forEach(k => { (next as any)[k] = c[k] || '' })
     setForm(next)
+    setEditMode(false)
     setModal(true)
   }
+  function closeModal() { setModal(false); setEditing(null); setEditMode(false) }
 
   const filteredClients = clients.filter((c: any) => {
     if (!search) return true
@@ -157,9 +175,15 @@ export default function Clients() {
                 <div key={c.id} className="card flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {initials(c.name)}
-                      </div>
+                      {logoFor(c.name) ? (
+                        <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
+                          <img src={logoFor(c.name)!} alt={c.name} className="w-full h-full object-cover"/>
+                        </div>
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {initials(c.name)}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
                         {c.nif && <p className="text-[11px] text-gray-400">NIF {c.nif}</p>}
@@ -190,59 +214,127 @@ export default function Clients() {
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4 overflow-y-auto py-8">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold">{editing ? 'Detalhes do cliente' : 'Novo cliente'}</h2>
-              {editing && (
-                <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 flex items-center gap-1.5"
-                  onClick={() => { if (confirm(`Eliminar "${editing.name}"? Esta acção não pode ser desfeita.`)) { del.mutate(editing.id); setModal(false); setEditing(null) } }}>
-                  <Trash2 size={12}/> Eliminar cliente
-                </button>
-              )}
+              <h2 className="text-base font-semibold">{editing ? (editMode ? 'Editar cliente' : 'Detalhes do cliente') : 'Novo cliente'}</h2>
+              <div className="flex items-center gap-1.5">
+                {editing && !editMode && (
+                  <button className="btn text-xs flex items-center gap-1.5" onClick={() => setEditMode(true)}>
+                    <Pencil size={12}/> Editar
+                  </button>
+                )}
+                {editing && (
+                  <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 flex items-center gap-1.5"
+                    onClick={() => { if (confirm(`Eliminar "${editing.name}"? Esta acção não pode ser desfeita.`)) { del.mutate(editing.id); closeModal() } }}>
+                    <Trash2 size={12}/> Eliminar cliente
+                  </button>
+                )}
+              </div>
             </div>
 
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Dados gerais</p>
-            <div className="space-y-3">
-              {([['name','Nome *','text'],['nif','NIF','text'],['email','Email','email'],
-                 ['phone','Telefone','text'],['address','Morada','text'],['notes','Notas','text']] as any[]).map(([key,label,type]: any) => (
-                <div key={key}>
-                  <label className="label">{label}</label>
-                  <input type={type} className="input" value={(form as any)[key]}
-                    onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+            {editing && !editMode ? (
+              // ── Modo visualização — só leitura, sem campos editáveis ──
+              <div className="space-y-5">
+                <div className="flex items-center gap-3">
+                  {logoFor(editing.name) ? (
+                    <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
+                      <img src={logoFor(editing.name)!} alt={editing.name} className="w-full h-full object-cover"/>
+                    </div>
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                      {initials(editing.name)}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{editing.name}</p>
+                    {editing.nif && <p className="text-xs text-gray-400">NIF {editing.nif}</p>}
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mt-5 mb-2">
-              Pessoa de contacto <span className="normal-case text-gray-300 font-normal">(o próprio cliente também pode preencher no seu perfil)</span>
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {([['contact_name','Nome do contacto','text'],['contact_role','Cargo/Função','text'],
-                 ['contact_email','Email do contacto','email'],['contact_phone','Telefone do contacto','text']] as any[]).map(([key,label,type]: any) => (
-                <div key={key}>
-                  <label className="label">{label}</label>
-                  <input type={type} className="input" value={(form as any)[key]}
-                    onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Dados gerais</p>
+                  <div className="space-y-1.5">
+                    {GENERAL_FIELDS.filter(([key]) => key !== 'name').map(([key, label]) => (
+                      <p key={key} className="text-xs text-gray-600 flex justify-between gap-3">
+                        <span className="text-gray-400 flex-shrink-0">{label}</span>
+                        <span className="text-right">{(editing as any)[key] || '—'}</span>
+                      </p>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mt-5 mb-2">Faturação</p>
-            <div className="grid grid-cols-2 gap-3">
-              {([['billing_nif','NIF de faturação','text'],['billing_email','Email para faturas','email'],
-                 ['billing_address','Morada de faturação','text'],['billing_notes','Notas de faturação','text']] as any[]).map(([key,label,type]: any) => (
-                <div key={key}>
-                  <label className="label">{label}</label>
-                  <input type={type} className="input" value={(form as any)[key]}
-                    onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Pessoa de contacto</p>
+                  <div className="space-y-1.5">
+                    {CONTACT_FIELDS.map(([key, label]) => (
+                      <p key={key} className="text-xs text-gray-600 flex justify-between gap-3">
+                        <span className="text-gray-400 flex-shrink-0">{label}</span>
+                        <span className="text-right">{(editing as any)[key] || '—'}</span>
+                      </p>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="flex justify-end gap-2 mt-6">
-              <button className="btn" onClick={() => { setModal(false); setEditing(null) }}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => upsert.mutate(form)} disabled={!form.name || upsert.isPending}>
-                {upsert.isPending ? 'A guardar…' : 'Guardar'}
-              </button>
-            </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Faturação</p>
+                  <div className="space-y-1.5">
+                    {BILLING_FIELDS.map(([key, label]) => (
+                      <p key={key} className="text-xs text-gray-600 flex justify-between gap-3">
+                        <span className="text-gray-400 flex-shrink-0">{label}</span>
+                        <span className="text-right">{(editing as any)[key] || '—'}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button className="btn" onClick={closeModal}>Fechar</button>
+                </div>
+              </div>
+            ) : (
+              // ── Modo edição — campos editáveis (também usado na criação) ──
+              <>
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Dados gerais</p>
+                <div className="space-y-3">
+                  {GENERAL_FIELDS.map(([key, label, type]) => (
+                    <div key={key}>
+                      <label className="label">{key === 'name' ? 'Nome *' : label}</label>
+                      <input type={type} className="input" value={(form as any)[key]}
+                        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mt-5 mb-2">
+                  Pessoa de contacto <span className="normal-case text-gray-300 font-normal">(o próprio cliente também pode preencher no seu perfil)</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {CONTACT_FIELDS.map(([key, label, type]) => (
+                    <div key={key}>
+                      <label className="label">{label}</label>
+                      <input type={type} className="input" value={(form as any)[key]}
+                        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mt-5 mb-2">Faturação</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {BILLING_FIELDS.map(([key, label, type]) => (
+                    <div key={key}>
+                      <label className="label">{label}</label>
+                      <input type={type} className="input" value={(form as any)[key]}
+                        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6">
+                  <button className="btn" onClick={() => { if (editing) setEditMode(false); else closeModal() }}>Cancelar</button>
+                  <button className="btn btn-primary" onClick={() => upsert.mutate(form)} disabled={!form.name || upsert.isPending}>
+                    {upsert.isPending ? 'A guardar…' : 'Guardar'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -82,9 +82,65 @@ function SignatureCell({ peritoId, path, onUploaded }: { peritoId: string; path:
   )
 }
 
+// ── Célula de projectos alocados — atribuir/remover directamente na lista ──
+function ProjectsCell({ perito, projects, portfolios, onChanged }: {
+  perito: any; projects: { id: string; label: string }[]; portfolios: { id: string; label: string }[]; onChanged: () => void
+}) {
+  const [selected, setSelected] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function assign() {
+    if (!selected || !perito.name) return
+    setSaving(true)
+    const { error } = await supabase.from('properties').update({ perito_avaliador: perito.name }).eq('portfolio_id', selected)
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Projecto atribuído')
+    setSelected('')
+    onChanged()
+  }
+
+  async function unassign(portfolioId: string, label: string) {
+    if (!confirm(`Remover "${label}" de ${perito.name}?`)) return
+    const { error } = await supabase.from('properties').update({ perito_avaliador: null }).eq('portfolio_id', portfolioId).eq('perito_avaliador', perito.name)
+    if (error) { toast.error(error.message); return }
+    toast.success('Projecto removido')
+    onChanged()
+  }
+
+  return (
+    <div className="min-w-[220px]">
+      {projects.length === 0 ? (
+        <p className="text-xs text-gray-300 mb-1.5">Sem projectos</p>
+      ) : (
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {projects.map(pr => (
+            <span key={pr.id} className="badge badge-gray flex items-center gap-1">
+              {pr.label}
+              <button onClick={() => unassign(pr.id, pr.label)} className="text-gray-400 hover:text-red-500"><X size={9}/></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1">
+        <select className="border border-gray-200 rounded text-[11px] px-1 py-0.5 flex-1 max-w-[150px]"
+          value={selected} onChange={e => setSelected(e.target.value)}>
+          <option value="">+ Atribuir…</option>
+          {portfolios.map(pf => <option key={pf.id} value={pf.id}>{pf.label}</option>)}
+        </select>
+        {selected && (
+          <button className="btn text-[11px] py-0.5 px-1.5" disabled={saving} onClick={assign}>
+            {saving ? '…' : 'OK'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Modal de perfil do perito — dados completos + atribuição de projectos ──
 function PeritoProfileModal({ perito, projects, portfolios, onClose, onChanged }: {
-  perito: any; projects: string[]; portfolios: { id: string; label: string }[]; onClose: () => void; onChanged: () => void
+  perito: any; projects: { id: string; label: string }[]; portfolios: { id: string; label: string }[]; onClose: () => void; onChanged: () => void
 }) {
   const [selectedPortfolio, setSelectedPortfolio] = useState('')
   const [assigning, setAssigning] = useState(false)
@@ -173,7 +229,7 @@ function PeritoProfileModal({ perito, projects, portfolios, onClose, onChanged }
             <p className="text-xs text-gray-300 mb-3">Sem projectos atribuídos.</p>
           ) : (
             <div className="flex flex-wrap gap-1.5 mb-3">
-              {projects.map(label => <span key={label} className="badge badge-gray">{label}</span>)}
+              {projects.map(pr => <span key={pr.id} className="badge badge-gray">{pr.label}</span>)}
             </div>
           )}
           <div className="flex gap-1.5">
@@ -289,7 +345,7 @@ export default function AdminPeritos() {
     },
   })
 
-  function projectsFor(nome: string | null) {
+  function projectsFor(nome: string | null): { id: string; label: string }[] {
     if (!nome) return []
     const map = new Map<string, string>()
     allocations
@@ -298,7 +354,7 @@ export default function AdminPeritos() {
         const label = a.portfolios?.clients?.name ? `${a.portfolios.clients.name} | ${a.portfolios.name}` : a.portfolios.name
         map.set(a.portfolios.id, label)
       })
-    return [...map.values()]
+    return [...map.entries()].map(([id, label]) => ({ id, label }))
   }
 
   const updateField = useMutation({
@@ -334,7 +390,7 @@ export default function AdminPeritos() {
                   <th>Nome</th>
                   {PROFILE_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}
                   <th>Assinatura</th>
-                  <th>Projectos alocados</th>
+                  <th>Projetos</th>
                 </tr>
               </thead>
               <tbody>
@@ -354,16 +410,9 @@ export default function AdminPeritos() {
                     <td>
                       <SignatureCell peritoId={p.id} path={p.assinatura_path} onUploaded={() => qc.invalidateQueries({ queryKey: ['admin-peritos'] })} />
                     </td>
-                    <td className="max-w-[240px]">
-                      {projectsFor(p.name).length === 0 ? (
-                        <span className="text-xs text-gray-300">Sem projectos</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {projectsFor(p.name).map(label => (
-                            <span key={label} className="badge badge-gray">{label}</span>
-                          ))}
-                        </div>
-                      )}
+                    <td>
+                      <ProjectsCell perito={p} projects={projectsFor(p.name)} portfolios={allPortfolios}
+                        onChanged={() => { qc.invalidateQueries({ queryKey: ['admin-peritos-allocations'] }); qc.invalidateQueries({ queryKey: ['admin-peritos'] }) }} />
                     </td>
                   </tr>
                 ))}

@@ -88,14 +88,14 @@ function NavItems({ onClose }: { onClose?: () => void }) {
             return (
               <div key={item.to} className="mb-0.5">
                 <div className={`flex items-center rounded-lg text-sm transition-colors ${groupActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
-                  <NavLink to={item.to!} onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
+                  <button onClick={() => setImoveisOpen(o => !o)} title={imoveisOpen ? 'Fechar' : 'Abrir'}
+                    className="pl-3 pr-1 py-2.5 text-gray-400 hover:text-gray-600">
+                    {imoveisOpen ? <ChevronDown size={14}/> : <ChevronRightIcon size={14}/>}
+                  </button>
+                  <NavLink to={item.to!} onClick={onClose} className="flex items-center gap-2.5 pr-3 py-2.5 flex-1 min-w-0">
                     <Icon size={16}/>
                     <span className="flex-1">{item.label}</span>
                   </NavLink>
-                  <button onClick={() => setImoveisOpen(o => !o)} title={imoveisOpen ? 'Fechar' : 'Abrir'}
-                    className="pr-3 pl-1 py-2.5 text-gray-400 hover:text-gray-600">
-                    {imoveisOpen ? <ChevronDown size={14}/> : <ChevronRightIcon size={14}/>}
-                  </button>
                 </div>
                 {imoveisOpen && (
                   <div className="mt-0.5 space-y-0.5">
