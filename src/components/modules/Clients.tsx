@@ -2,8 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, EmptyState } from '@/components/ui'
-import { Plus, Pencil, Trash2, ChevronRight, UserPlus, X } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, UserPlus, X, Mail, Phone, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+function initials(name: string) {
+  return (name || '').trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
+}
 
 const empty = {
   name: '', nif: '', email: '', phone: '', address: '', notes: '',
@@ -76,6 +80,7 @@ export default function Clients() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm]       = useState({ ...empty })
   const [newUserFor, setNewUserFor] = useState<{ id: string; name: string } | null>(null)
+  const [search, setSearch]   = useState('')
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients'],
@@ -124,48 +129,57 @@ export default function Clients() {
     setModal(true)
   }
 
+  const filteredClients = clients.filter((c: any) => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return [c.name, c.email, c.nif].some((v: any) => v?.toLowerCase().includes(s))
+  })
+
   return (
     <div>
       <PageHeader title="Clientes" subtitle="Empresas e entidades que encomendam avaliações"
         actions={<button className="btn btn-primary" onClick={openCreate}><Plus size={15}/> Novo cliente</button>}
       />
       <div className="p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <p className="text-sm text-gray-500">Todos os clientes <span className="text-gray-400">({clients.length})</span></p>
+          <div className="relative w-full max-w-[240px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300"/>
+            <input className="input text-sm pl-7" placeholder="Pesquisar…" value={search} onChange={e => setSearch(e.target.value)}/>
+          </div>
+        </div>
+
         {isLoading ? <p className="text-sm text-gray-400">A carregar…</p>
-          : clients.length === 0 ? <EmptyState message="Sem clientes. Cria o primeiro." />
+          : filteredClients.length === 0 ? <EmptyState message="Sem clientes para mostrar." />
           : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {clients.map((c: any) => (
+              {filteredClients.map((c: any) => (
                 <div key={c.id} className="card flex flex-col gap-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">{c.name}</p>
-                      {c.nif && <p className="text-xs text-gray-400">NIF {c.nif}</p>}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {initials(c.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                        {c.nif && <p className="text-[11px] text-gray-400">NIF {c.nif}</p>}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button className="btn p-1.5" onClick={() => openEdit(c)}><Pencil size={13}/></button>
-                      <button className="btn p-1.5 text-red-500 hover:bg-red-50"
-                        onClick={() => { if (confirm('Eliminar cliente?')) del.mutate(c.id) }}>
-                        <Trash2 size={13}/>
-                      </button>
-                    </div>
+                    <button className="btn p-1.5 flex-shrink-0" title="Criar acesso de cliente"
+                      onClick={() => setNewUserFor({ id: c.id, name: c.name })}>
+                      <UserPlus size={13}/>
+                    </button>
                   </div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    {c.email   && <p className="flex items-center gap-1.5">📧 {c.email}</p>}
-                    {c.phone   && <p className="flex items-center gap-1.5">📞 {c.phone}</p>}
-                    {c.address && <p className="flex items-center gap-1.5">📍 {c.address}</p>}
-                    {c.notes   && <p className="text-gray-400 italic mt-1">{c.notes}</p>}
+                  <div className="text-xs text-gray-500 space-y-1">
+                    {c.email && <p className="flex items-center gap-1.5 truncate"><Mail size={12} className="text-gray-300 flex-shrink-0"/>{c.email}</p>}
+                    {c.phone && <p className="flex items-center gap-1.5"><Phone size={12} className="text-gray-300 flex-shrink-0"/>{c.phone}</p>}
                   </div>
-                  <div className="flex gap-3 mt-auto pt-2 border-t border-gray-50 text-xs text-gray-400">
-                    <span>{c.portfolios?.[0]?.count || 0} projetos</span>
-                    <span>{c.client_templates?.[0]?.count || 0} templates</span>
-                    <a href={`/portfolios?client=${c.id}`} className="ml-auto text-brand-500 flex items-center gap-0.5 hover:underline">
-                      Ver projetos <ChevronRight size={11}/>
-                    </a>
+                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 text-xs">
+                    <span className="text-gray-400">{c.portfolios?.[0]?.count || 0} projectos</span>
+                    <button className="text-brand-600 hover:underline flex items-center gap-0.5" onClick={() => openEdit(c)}>
+                      Ver detalhes <ChevronRight size={11}/>
+                    </button>
                   </div>
-                  <button className="btn text-xs flex items-center gap-1.5 justify-center"
-                    onClick={() => setNewUserFor({ id: c.id, name: c.name })}>
-                    <UserPlus size={12}/> Criar acesso de cliente
-                  </button>
                 </div>
               ))}
             </div>
@@ -175,7 +189,15 @@ export default function Clients() {
       {modal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4 overflow-y-auto py-8">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
-            <h2 className="text-base font-semibold mb-5">{editing ? 'Editar cliente' : 'Novo cliente'}</h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold">{editing ? 'Detalhes do cliente' : 'Novo cliente'}</h2>
+              {editing && (
+                <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 flex items-center gap-1.5"
+                  onClick={() => { if (confirm(`Eliminar "${editing.name}"? Esta acção não pode ser desfeita.`)) { del.mutate(editing.id); setModal(false); setEditing(null) } }}>
+                  <Trash2 size={12}/> Eliminar cliente
+                </button>
+              )}
+            </div>
 
             <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Dados gerais</p>
             <div className="space-y-3">

@@ -110,6 +110,28 @@ const STATUS_OPTIONS = [
 ] as const
 const STATUS_MAP = Object.fromEntries(STATUS_OPTIONS.map(s => [s.value, s])) as Record<string, typeof STATUS_OPTIONS[number]>
 
+const TEMPLATE_OPTIONS = [
+  { value: '',         label: 'Automático',  desc: 'Escolhido pelo nº de bens' },
+  { value: 'standard', label: 'Standard',    desc: '1–3 bens' },
+  { value: 'multi',    label: 'Multi',       desc: '4+ bens' },
+  { value: 'terreno',  label: 'Terreno',     desc: 'Avaliação de terreno' },
+] as const
+
+// ── Selector de template — cartões clicáveis (em vez de <select>) ──────────
+function TemplatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {TEMPLATE_OPTIONS.map(opt => (
+        <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
+          className={`border rounded-lg px-3 py-2 text-xs text-left transition-colors ${value === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+          <p className="font-semibold">{opt.label}</p>
+          <p className="text-gray-400 mt-0.5">{opt.desc}</p>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function ImportPanel({ portfolioId, clientId, onClose, onDone }: { portfolioId:string; clientId:string; onClose:()=>void; onDone:()=>void }) {
   const [rows, setRows]         = useState<any[]>([])
   const [headers, setHeaders]   = useState<string[]>([])
@@ -427,6 +449,7 @@ export default function Portfolios() {
   const [modal, setModal]           = useState(false)
   const [form, setForm]             = useState({ client_id:'', name:'', description:'', deadline:'', status:'active', type:'datatape', template_type:'' })
   const [openImport, setOpenImport] = useState<string|null>(null)
+  const [viewingId, setViewingId]   = useState<string|null>(null)
 
   const { data: portfolios = [], isLoading } = useQuery({
     queryKey: ['portfolios'],
@@ -492,90 +515,34 @@ export default function Portfolios() {
                 const statusInfo = STATUS_MAP[p.status] || STATUS_MAP['active']
                 return (
                   <div key={p.id} className="card flex flex-col gap-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className={`font-semibold ${p.status === 'closed' ? 'line-through text-gray-400' : 'text-gray-900'}`}>{p.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{p.clients?.name}</p>
-                        {p.template_type && (
-                          <p className="text-xs text-brand-500 mt-0.5">
-                            Template: {p.template_type === 'standard' ? 'Standard (1-3 bens)' : p.template_type === 'multi' ? 'Multi (4+ bens)' : p.template_type === 'terreno' ? 'Terreno' : p.template_type}
-                          </p>
-                        )}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={`font-semibold truncate ${p.status === 'closed' ? 'line-through text-gray-400' : 'text-gray-900'}`}>{p.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 truncate">{p.clients?.name}</p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant={statusInfo.badge as any}>{statusInfo.label}</Badge>
-                        <button className="btn p-1.5 text-red-400 hover:bg-red-50 border-0 ml-1"
-                          onClick={() => { if (confirm(`Eliminar "${p.name}" e todos os imóveis? Esta acção é irreversível.`)) del.mutate(p.id) }}>
-                          <Trash2 size={13}/>
-                        </button>
-                      </div>
+                      <Badge variant={statusInfo.badge as any}>{statusInfo.label}</Badge>
                     </div>
 
-                    {p.description && <p className="text-xs text-gray-500">{p.description}</p>}
+                    {p.description && <p className="text-xs text-gray-500 line-clamp-2">{p.description}</p>}
 
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Estado</label>
-                      <select className="input text-xs py-1.5" value={p.status||'active'}
-                        onChange={e => updateStatus.mutate({ id:p.id, status:e.target.value })}>
-                        {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Template do relatório</label>
-                      <select className="input text-xs py-1.5" value={p.template_type||''}
-                        onChange={e => supabase.from('portfolios').update({ template_type: e.target.value || null }).eq('id', p.id).then(() => qc.invalidateQueries({ queryKey:['portfolios'] }))}>
-                        <option value="">Automático (pelo nº de bens)</option>
-                        <option value="standard">Forçar Standard (1-3 bens)</option>
-                        <option value="multi">Forçar Multi (4+ bens)</option>
-                        <option value="terreno">Forçar Terreno</option>
-                      </select>
-                    </div>
-                    {/* URLs de templates customizados — se preenchidos, substituem os templates globais */}
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-gray-400 hover:text-gray-600 select-none">Templates customizados (URLs do Supabase Storage)</summary>
-                      <div className="mt-2 space-y-2">
-                        {(['template_url_standard','template_url_multi','template_url_terreno'] as const).map(field => (
-                          <div key={field}>
-                            <label className="text-[10px] text-gray-400 uppercase tracking-wide">{field.replace('template_url_','').replace('standard','Standard').replace('multi','Multi').replace('terreno','Terreno')}</label>
-                            <input className="input text-xs" placeholder="https://... (vazio = usa template global)"
-                              defaultValue={p[field]||''}
-                              onBlur={e => {
-                                const val = e.target.value.trim() || null
-                                supabase.from('portfolios').update({ [field]: val }).eq('id', p.id)
-                                  .then(() => qc.invalidateQueries({ queryKey:['portfolios'] }))
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-
-                    <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-50">
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
                       <span>{p.properties?.[0]?.count || 0} imóveis</span>
                       {p.deadline && <span>Prazo: {p.deadline}</span>}
-                      <Link to={`/properties?portfolio=${p.id}`} className="text-brand-500 flex items-center gap-0.5 hover:underline">
-                        Ver imóveis <ChevronRight size={11}/>
-                      </Link>
+                      {p.template_type && (
+                        <span className="text-brand-500">
+                          {p.template_type === 'standard' ? 'Standard' : p.template_type === 'multi' ? 'Multi' : p.template_type === 'terreno' ? 'Terreno' : p.template_type}
+                        </span>
+                      )}
                     </div>
 
-                    {openImport === p.id ? (
-                      <ImportPanel
-                        portfolioId={p.id}
-                        clientId={p.clients?.id || ''}
-                        onClose={() => setOpenImport(null)}
-                        onDone={() => { qc.invalidateQueries({ queryKey:['portfolios'] }); setOpenImport(null) }}
-                      />
-                    ) : p.type === 'adhoc' ? (
-                      <Link to={`/properties/new?portfolio=${p.id}&client=${p.clients?.id || ''}`}
-                        className="btn text-xs w-full flex items-center justify-center gap-1.5 border-dashed">
-                        <Plus size={13}/> Adicionar imóvel
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-50 text-xs">
+                      <Link to={`/properties?portfolio=${p.id}`} className="text-gray-500 hover:text-brand-600 flex items-center gap-0.5">
+                        Ver imóveis <ChevronRight size={11}/>
                       </Link>
-                    ) : (
-                      <button className="btn text-xs w-full flex items-center justify-center gap-1.5 border-dashed"
-                        onClick={() => setOpenImport(p.id)}>
-                        <Upload size={13}/> Importar / actualizar data-tape
+                      <button className="text-brand-600 hover:underline flex items-center gap-0.5" onClick={() => setViewingId(p.id)}>
+                        Ver detalhes <ChevronRight size={11}/>
                       </button>
-                    )}
+                    </div>
                   </div>
                 )
               })}
@@ -609,6 +576,10 @@ export default function Portfolios() {
                 </div>
               </div>
               <div>
+                <label className="label">Nome do projecto *</label>
+                <input className="input" value={form.name} onChange={e => setForm(f => ({...f, name:e.target.value}))} placeholder="Ex: Carteira ABANCA 2026"/>
+              </div>
+              <div>
                 <label className="label">Cliente *</label>
                 <select className="input" value={form.client_id} onChange={e => setForm(f => ({...f, client_id:e.target.value}))}>
                   <option value="">Seleccionar…</option>
@@ -617,12 +588,7 @@ export default function Portfolios() {
               </div>
               <div>
                 <label className="label">Template do relatório</label>
-                <select className="input" value={form.template_type} onChange={e => setForm(f => ({...f, template_type:e.target.value}))}>
-                  <option value="">Automático (pelo nº de bens)</option>
-                  <option value="standard">Standard (1-3 bens)</option>
-                  <option value="multi">Multi (4+ bens)</option>
-                  <option value="terreno">Terreno</option>
-                </select>
+                <TemplatePicker value={form.template_type} onChange={v => setForm(f => ({...f, template_type:v}))}/>
               </div>
               <div><label className="label">Descrição</label><input className="input" value={form.description} onChange={e => setForm(f => ({...f, description:e.target.value}))}/></div>
               <div><label className="label">Prazo</label><input type="date" className="input" value={form.deadline} onChange={e => setForm(f => ({...f, deadline:e.target.value}))}/></div>
@@ -642,6 +608,104 @@ export default function Portfolios() {
           </div>
         </div>
       )}
+
+      {viewingId && (() => {
+        const p = portfolios.find((x: any) => x.id === viewingId)
+        if (!p) return null
+        const statusInfo = STATUS_MAP[p.status] || STATUS_MAP['active']
+        return (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4 overflow-y-auto py-8">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+              <div className="flex items-start justify-between mb-4 gap-2">
+                <div className="min-w-0">
+                  <h2 className={`text-base font-semibold truncate ${p.status === 'closed' ? 'line-through text-gray-400' : 'text-gray-900'}`}>{p.name}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{p.clients?.name}</p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Badge variant={statusInfo.badge as any}>{statusInfo.label}</Badge>
+                  <button onClick={() => setViewingId(null)} className="text-gray-400 hover:text-gray-600"><X size={16}/></button>
+                </div>
+              </div>
+
+              {p.description && <p className="text-sm text-gray-500 mb-4">{p.description}</p>}
+
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="bg-gray-50 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-gray-400">Imóveis</p>
+                  <p className="text-sm font-semibold text-gray-800">{p.properties?.[0]?.count || 0}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-gray-400">Prazo</p>
+                  <p className="text-sm font-semibold text-gray-800">{p.deadline || '—'}</p>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-xs text-gray-400 mb-1.5 block">Estado</label>
+                <select className="input text-sm" value={p.status || 'active'}
+                  onChange={e => updateStatus.mutate({ id: p.id, status: e.target.value })}>
+                  {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-xs text-gray-400 mb-1.5 block">Template do relatório</label>
+                <TemplatePicker value={p.template_type || ''} onChange={v =>
+                  supabase.from('portfolios').update({ template_type: v || null }).eq('id', p.id).then(() => qc.invalidateQueries({ queryKey: ['portfolios'] }))
+                }/>
+              </div>
+
+              <details className="text-xs mb-4">
+                <summary className="cursor-pointer text-gray-400 hover:text-gray-600 select-none">Templates customizados (URLs do Supabase Storage)</summary>
+                <div className="mt-2 space-y-2">
+                  {(['template_url_standard','template_url_multi','template_url_terreno'] as const).map(field => (
+                    <div key={field}>
+                      <label className="text-[10px] text-gray-400 uppercase tracking-wide">{field.replace('template_url_','').replace('standard','Standard').replace('multi','Multi').replace('terreno','Terreno')}</label>
+                      <input className="input text-xs" placeholder="https://... (vazio = usa template global)"
+                        defaultValue={p[field] || ''}
+                        onBlur={e => {
+                          const val = e.target.value.trim() || null
+                          supabase.from('portfolios').update({ [field]: val }).eq('id', p.id)
+                            .then(() => qc.invalidateQueries({ queryKey: ['portfolios'] }))
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </details>
+
+              {openImport === p.id ? (
+                <ImportPanel
+                  portfolioId={p.id}
+                  clientId={p.clients?.id || ''}
+                  onClose={() => setOpenImport(null)}
+                  onDone={() => { qc.invalidateQueries({ queryKey: ['portfolios'] }); setOpenImport(null) }}
+                />
+              ) : p.type === 'adhoc' ? (
+                <Link to={`/properties/new?portfolio=${p.id}&client=${p.clients?.id || ''}`}
+                  className="btn text-sm w-full flex items-center justify-center gap-1.5 border-dashed mb-4">
+                  <Plus size={13}/> Adicionar imóvel
+                </Link>
+              ) : (
+                <button className="btn text-sm w-full flex items-center justify-center gap-1.5 border-dashed mb-4"
+                  onClick={() => setOpenImport(p.id)}>
+                  <Upload size={13}/> Importar / actualizar data-tape
+                </button>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <button className="btn text-xs text-red-500 hover:bg-red-50 border-red-200 flex items-center gap-1.5"
+                  onClick={() => { if (confirm(`Eliminar "${p.name}" e todos os imóveis? Esta acção é irreversível.`)) { del.mutate(p.id); setViewingId(null) } }}>
+                  <Trash2 size={12}/> Eliminar projecto
+                </button>
+                <Link to={`/properties?portfolio=${p.id}`} className="text-xs text-brand-600 hover:underline flex items-center gap-0.5">
+                  Ver imóveis <ChevronRight size={11}/>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

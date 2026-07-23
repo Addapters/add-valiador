@@ -1,20 +1,22 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { LayoutDashboard, Building2, Briefcase, Map, Receipt, TrendingUp, Users, LogOut, Menu, X, Calculator, Inbox, MessageSquare, UserCircle, FileText, BadgeCheck } from 'lucide-react'
+import { LayoutDashboard, Building2, Briefcase, Map, Receipt, TrendingUp, Users, LogOut, Menu, X, Calculator, Inbox, MessageSquare, UserCircle, FileText, BadgeCheck, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { useCalculator } from '@/components/Calculator'
 
 type NavItem = { label: string; to: string; icon: any; sub?: boolean; badge?: 'messages' } | { section: string }
+
+// "Imóveis" passou a ser um grupo colapsável — Prospeção, Mapa e Calculadora
+// ficam lá dentro como sub-entradas, fechado por defeito.
+const IMOVEIS_GROUP_PATHS = ['/properties', '/market', '/map']
 
 const NAV_ADMIN: NavItem[] = [
   { label: 'Dashboard',   to: '/dashboard',  icon: LayoutDashboard },
   { label: 'Clientes',    to: '/clients',    icon: Users },
   { label: 'Projetos',    to: '/portfolios', icon: Briefcase },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
-  { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
-  { label: 'Mapa',        to: '/map',        icon: Map,         sub: true },
   { section: 'Pedidos' },
   { label: 'Pedidos de clientes', to: '/admin/pedidos', icon: Inbox },
   { section: 'Peritos' },
@@ -28,8 +30,6 @@ const NAV_ADMIN: NavItem[] = [
 const NAV_PERITO: NavItem[] = [
   { label: 'Dashboard',   to: '/dashboard',  icon: LayoutDashboard },
   { label: 'Imóveis',     to: '/properties', icon: Building2 },
-  { label: 'Prospeção',   to: '/market',     icon: TrendingUp, sub: true },
-  { label: 'Mapa',        to: '/map',        icon: Map,         sub: true },
   { section: 'Conta' },
   { label: 'O meu perfil', to: '/perfil',     icon: UserCircle },
   { label: 'Mensagens',   to: '/mensagens',  icon: MessageSquare, sub: true, badge: 'messages' },
@@ -54,6 +54,8 @@ function NavItems({ onClose }: { onClose?: () => void }) {
   const { name, role, user, signOut } = useAuth()
   const { toggle, open: calcOpen, el: calcEl } = useCalculator()
   const nav = navForRole(role)
+  const location = useLocation()
+  const [imoveisOpen, setImoveisOpen] = useState(() => IMOVEIS_GROUP_PATHS.some(p => location.pathname.startsWith(p)))
 
   // Mensagens novas — mostra o número de conversas por ler junto ao item Mensagens.
   const { data: unreadCount = 0 } = useQuery({
@@ -78,6 +80,52 @@ function NavItems({ onClose }: { onClose?: () => void }) {
           )
           const Icon = item.icon!
           const showBadge = item.badge === 'messages' && unreadCount > 0
+
+          // "Imóveis" é um grupo colapsável — Prospeção, Mapa e Calculadora ficam
+          // dentro dele como sub-entradas, fechado por defeito.
+          if (item.to === '/properties') {
+            const groupActive = IMOVEIS_GROUP_PATHS.some(p => location.pathname.startsWith(p))
+            return (
+              <div key={item.to} className="mb-0.5">
+                <div className={`flex items-center rounded-lg text-sm transition-colors ${groupActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+                  <NavLink to={item.to!} onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
+                    <Icon size={16}/>
+                    <span className="flex-1">{item.label}</span>
+                  </NavLink>
+                  <button onClick={() => setImoveisOpen(o => !o)} title={imoveisOpen ? 'Fechar' : 'Abrir'}
+                    className="pr-3 pl-1 py-2.5 text-gray-400 hover:text-gray-600">
+                    {imoveisOpen ? <ChevronDown size={14}/> : <ChevronRightIcon size={14}/>}
+                  </button>
+                </div>
+                {imoveisOpen && (
+                  <div className="mt-0.5 space-y-0.5">
+                    <NavLink to="/market" onClick={onClose}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2.5 rounded-lg text-[13px] ml-4 pl-2.5 pr-3 py-2 transition-colors
+                         ${isActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`
+                      }>
+                      <TrendingUp size={14}/>
+                      <span className="flex-1">Prospeção</span>
+                    </NavLink>
+                    <NavLink to="/map" onClick={onClose}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2.5 rounded-lg text-[13px] ml-4 pl-2.5 pr-3 py-2 transition-colors
+                         ${isActive ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`
+                      }>
+                      <Map size={14}/>
+                      <span className="flex-1">Mapa</span>
+                    </NavLink>
+                    <button onClick={toggle}
+                      className={`flex items-center gap-2.5 rounded-lg text-[13px] ml-4 pl-2.5 pr-3 py-2 w-[calc(100%-1rem)] transition-colors ${calcOpen ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+                      <Calculator size={14}/>
+                      <span className="flex-1 text-left">Calculadora</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           return (
             <NavLink key={item.to} to={item.to!} end={item.to!.endsWith('/dashboard')}
               onClick={onClose}
@@ -97,14 +145,6 @@ function NavItems({ onClose }: { onClose?: () => void }) {
           )
         })}
       </nav>
-      {role !== 'cliente' && (
-        <div className="px-2 pb-2">
-          <button onClick={toggle} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full transition-colors ${calcOpen ? 'bg-brand-50 text-brand-600' : 'text-gray-500 hover:bg-gray-100'}`}>
-            <Calculator size={16}/>
-            Calculadora
-          </button>
-        </div>
-      )}
       <div className="px-4 py-3 border-t border-gray-100">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
