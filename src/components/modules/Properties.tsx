@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { PageHeader, VisitBadge, EmptyState } from '@/components/ui'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
-import { formatCurrency } from '@/lib/utils'
-import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pencil, Check, X, Plus } from 'lucide-react'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { ChevronDown, ChevronRight, Trash2, CheckSquare, Square, Eye, EyeOff, Pencil, Check, X, Plus, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   getSavedFilters as _getSavedFilters, saveFilters as _saveFilters, clearFilters as _clearFilters, type PropertyFilters,
@@ -14,6 +14,11 @@ import {
 
 const VISIT_LABELS: Record<string,string>   = { pending:'Por visitar', scheduled:'Agendado', visited:'Visitado', report_done:'Report OK' }
 const BILLING_LABELS: Record<string,string> = { no_po:'Sem PO', awaiting_po:'A aguardar PO', po_received:'PO recebida', invoice_pending:'Fat. por emitir', invoice_issued:'Fat. emitida', paid:'Pago' }
+const PORTFOLIO_STATUS_LABELS: Record<string,string> = { active:'Activo', delivered:'Entregue', awaiting_payment:'Aguarda Pagamento', closed:'Encerrado' }
+const PORTFOLIO_STATUS_BADGE: Record<string,string>  = {
+  active:'bg-emerald-100 text-emerald-700', delivered:'bg-blue-100 text-blue-700',
+  awaiting_payment:'bg-amber-100 text-amber-700', closed:'bg-gray-100 text-gray-500',
+}
 
 // Converte texto em uppercase (vindo da datatape em espanhol) para titleCase
 function toDisplayProps(val: any): string {
@@ -34,32 +39,6 @@ function toDisplayProps(val: any): string {
 function initialsForProject(label: string) {
   const parts = label.replace(/\|/g, ' ').trim().split(/\s+/)
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase()
-}
-
-// ── Cartão de projecto — clicável, filtra a listagem abaixo para esse projecto ──
-function ProjectCard({ label, done, total, active, onClick }: { label: string; done: number; total: number; active: boolean; onClick: () => void }) {
-  const pct = total ? Math.round((done / total) * 100) : 0
-  const isDone = pct === 100
-  return (
-    <button onClick={onClick} className={`card w-full text-left transition-shadow hover:shadow-md ${active ? 'ring-2 ring-brand-400' : ''}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-            {initialsForProject(label)}
-          </div>
-          <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
-        </div>
-        <span className={`badge flex-shrink-0 ${isDone ? 'badge-green' : 'badge-blue'}`}>{isDone ? 'Concluído' : 'Em progresso'}</span>
-      </div>
-      <div className="flex justify-between text-xs text-gray-400 mb-1">
-        <span>Imóveis concluídos</span>
-        <span>{done} / {total}</span>
-      </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-400' : 'bg-brand-400'}`} style={{ width: `${pct}%` }} />
-      </div>
-    </button>
-  )
 }
 
 function MultiSelect({ label, options, selected, onChange }: { label:string; options:string[]; selected:string[]; onChange:(v:string[])=>void }) {
@@ -266,6 +245,11 @@ export default function Properties() {
   const [collapsed,   setCollapsed]   = useState<Record<string,boolean>>({})
   const [projectFilter, setProjectFilterRaw] = useState<string>(loadProjectFilter)
   function setProjectFilter(v: string) { persistProjectFilter(v); setProjectFilterRaw(v) }
+  // Só depois de escolher um projecto e confirmar é que a listagem detalhada
+  // (tabela com filtros/edição) aparece — antes disso vê-se apenas a lista de
+  // projectos e o respectivo resumo.
+  const [listingRevealed, setListingRevealed] = useState(false)
+  const [listStatusTab, setListStatusTab] = useState<'all'|'active'|'closed'>('all')
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
   const [bulkVisit,   setBulkVisit]   = useState('')
   const [bulkBilling, setBulkBilling] = useState('')
@@ -338,7 +322,7 @@ export default function Properties() {
           prev_valuation_expert, prev_valuation_entity,
           tem_fotos, tem_comparaveis, para_verificacao, verificado,
           pendente_motivo, anulado_motivo,
-          portfolios(id, name, status, clients(name))
+          portfolios(id, name, status, prazo_entrega, clients(name))
         `)
         .order('portfolio_id').order('external_ref')
       return (data||[]) as any[]
@@ -348,15 +332,23 @@ export default function Properties() {
   // Lista de projectos disponíveis (independente dos filtros activos), para
   // permitir escolher "ver este projecto sozinho" mesmo com outros filtros aplicados.
   const projectOptions = useMemo(() => {
-    const map = new Map<string, { id: string; label: string; count: number; done: number }>()
+    const map = new Map<string, {
+      id: string; label: string; clientName: string; name: string
+      count: number; done: number; feeTotal: number
+      status: string; prazo: string | null
+    }>()
     rows.forEach((r: any) => {
       const id = r.portfolios?.id || 'sem-portfolio'
-      const clientName = r.portfolios?.clients?.name
-      const portfolioName = r.portfolios?.name
+      const clientName = r.portfolios?.clients?.name || ''
+      const portfolioName = r.portfolios?.name || 'Sem projeto'
       const label = clientName && portfolioName ? `${clientName} | ${portfolioName}` : (portfolioName || clientName || 'Sem projeto')
-      const entry = map.get(id) || { id, label, count: 0, done: 0 }
+      const entry = map.get(id) || {
+        id, label, clientName, name: portfolioName, count: 0, done: 0, feeTotal: 0,
+        status: r.portfolios?.status || 'active', prazo: r.portfolios?.prazo_entrega || null,
+      }
       entry.count += 1
       if (r.verificado) entry.done += 1
+      entry.feeTotal += r.fee_amount || 0
       map.set(id, entry)
     })
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt'))
@@ -598,29 +590,145 @@ export default function Properties() {
         </>}
       />
 
-      {projectOptions.length > 1 && (
+      {projectOptions.length > 0 && (
         <div className="bg-white border-b border-gray-100 px-6 py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            <ProjectCard
-              label="Todos os projectos"
-              done={rows.filter((r: any) => r.verificado).length}
-              total={rows.length}
-              active={projectFilter === 'all'}
-              onClick={() => setProjectFilter('all')}
-            />
-            {projectOptions.map(opt => (
-              <ProjectCard key={opt.id}
-                label={opt.label}
-                done={opt.done}
-                total={opt.count}
-                active={projectFilter === opt.id}
-                onClick={() => setProjectFilter(opt.id)}
-              />
-            ))}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 items-start">
+
+            {/* Lista de projectos */}
+            <div className="card p-0 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-1.5">
+                {(['all','active','closed'] as const).map(tab => {
+                  const count = tab === 'all' ? projectOptions.length
+                    : tab === 'closed' ? projectOptions.filter(o => o.status === 'closed').length
+                    : projectOptions.filter(o => o.status !== 'closed').length
+                  const tabLabel = tab === 'all' ? 'Todos' : tab === 'active' ? 'Activos' : 'Encerrados'
+                  return (
+                    <button key={tab} onClick={() => setListStatusTab(tab)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${listStatusTab === tab ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                      {tabLabel} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
+                <button
+                  onClick={() => { setProjectFilter('all'); setListingRevealed(false) }}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 border-b border-gray-100 ${projectFilter === 'all' ? 'bg-brand-50' : ''}`}>
+                  <div className="w-9 h-9 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={16}/>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 truncate">Todos os projectos</p>
+                    <p className="text-xs text-gray-400 truncate">Todos os clientes</p>
+                  </div>
+                  <div className="text-right flex-shrink-0 w-14">
+                    <p className="text-xs font-medium text-gray-700">{rows.length}</p>
+                  </div>
+                </button>
+                {projectOptions
+                  .filter(opt => listStatusTab === 'all' ? true : listStatusTab === 'closed' ? opt.status === 'closed' : opt.status !== 'closed')
+                  .map(opt => {
+                    const pct = opt.count ? Math.round((opt.done / opt.count) * 100) : 0
+                    const isSelected = projectFilter === opt.id
+                    return (
+                      <button key={opt.id}
+                        onClick={() => { setProjectFilter(opt.id); setListingRevealed(false) }}
+                        className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 ${isSelected ? 'bg-brand-50' : ''}`}>
+                        <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {initialsForProject(opt.label)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 truncate">{opt.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{opt.clientName || '—'}</p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 whitespace-nowrap ${PORTFOLIO_STATUS_BADGE[opt.status] || 'bg-gray-100 text-gray-500'}`}>
+                          {PORTFOLIO_STATUS_LABELS[opt.status] || opt.status}
+                        </span>
+                        <div className="text-right flex-shrink-0 w-14">
+                          <p className="text-xs font-medium text-gray-700">{opt.count}</p>
+                          <p className="text-[10px] text-gray-400">{pct}%</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+              </div>
+            </div>
+
+            {/* Painel de detalhe do projecto seleccionado */}
+            <div className="card">
+              {(() => {
+                const isAll = projectFilter === 'all'
+                const opt = isAll
+                  ? {
+                      id: 'all', label: 'Todos os projectos', clientName: 'Todos os clientes', name: 'Todos os projectos',
+                      count: rows.length, done: rows.filter((r: any) => r.verificado).length,
+                      feeTotal: rows.reduce((s: number, r: any) => s + (r.fee_amount || 0), 0),
+                      status: '', prazo: null as string | null,
+                    }
+                  : projectOptions.find(o => o.id === projectFilter)
+                if (!opt) return <p className="text-sm text-gray-400 py-8 text-center">Selecciona um projecto na lista para ver os detalhes.</p>
+                const pct = opt.count ? Math.round((opt.done / opt.count) * 100) : 0
+                return (
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="w-10 h-10 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        {isAll ? <Building2 size={16}/> : initialsForProject(opt.label)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{opt.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{opt.clientName || 'Sem cliente'}</p>
+                      </div>
+                    </div>
+                    {!isAll && (
+                      <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-3 ${PORTFOLIO_STATUS_BADGE[opt.status] || 'bg-gray-100 text-gray-500'}`}>
+                        {PORTFOLIO_STATUS_LABELS[opt.status] || opt.status}
+                      </span>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
+                        <p className="text-[10px] text-gray-400">Imóveis</p>
+                        <p className="text-sm font-semibold text-gray-800">{opt.count}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
+                        <p className="text-[10px] text-gray-400">Concluídos</p>
+                        <p className="text-sm font-semibold text-emerald-600">{opt.done}</p>
+                      </div>
+                      {isAdmin && (
+                        <div className="bg-gray-50 rounded-lg px-3 py-2 col-span-2">
+                          <p className="text-[10px] text-gray-400">Valor total honorários</p>
+                          <p className="text-sm font-semibold text-gray-800">{formatCurrency(opt.feeTotal)}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Progresso</span><span>{pct}%</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-400' : 'bg-brand-400'}`} style={{ width: `${pct}%` }}/>
+                      </div>
+                    </div>
+
+                    {opt.prazo && <p className="text-xs text-gray-500 mb-3">Prazo de entrega: {formatDate(opt.prazo)}</p>}
+
+                    <button className="btn btn-primary text-sm w-full" onClick={() => setListingRevealed(true)}>
+                      {isAll ? 'Ver todos os imóveis →' : 'Ver imóveis deste projecto →'}
+                    </button>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         </div>
       )}
 
+      {listingRevealed && (
+      <>
+      <div className="bg-white border-b border-gray-100 px-6 py-2.5">
+        <button className="text-xs text-brand-600 hover:underline" onClick={() => setListingRevealed(false)}>← Voltar aos projectos</button>
+      </div>
       <div className="bg-white border-b border-gray-100 px-6 py-3 flex flex-wrap gap-2 items-center">
         <input className="input max-w-[180px]" placeholder="Ref, morada, perito…" value={filters.search} onChange={e => updateFilters({ search: e.target.value })}/>
         <MultiSelect label="Distrito"  options={districts} selected={filters.districtFilter} onChange={v => updateFilters({ districtFilter:v, parishFilter:[] })}/>
@@ -778,6 +886,8 @@ export default function Properties() {
           })
         }
       </div>
+      </>
+      )}
     </div>
   )
 }
